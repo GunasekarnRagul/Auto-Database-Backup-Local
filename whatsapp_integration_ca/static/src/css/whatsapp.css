@@ -1,0 +1,43 @@
+/* WhatsApp Integration Custom Styles */
+
+/* Status message formatting */
+.o_field_text_mono textarea {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 10px;
+    white-space: pre-wrap;
+}
+
+/* Connection status badges */
+.o_field_badge[name="connection_status"] .badge {
+    font-size: 0.85em;
+    padding: 6px 12px;
+}
+
+/* WhatsApp branding colors */
+.whatsapp-success {
+    color: #25D366;
+}
+
+.whatsapp-primary {
+    background-color: #25D366;
+    border-color: #25D366;
+}
+
+/* Form view enhancements */
+.o_form_view .o_group .o_inner_group .o_td_label {
+    min-width: 150px;
+}
+
+/* Status details notebook page */
+.o_notebook_content .o_field_text_mono {
+    min-height: 200px;
+}
+
+/* Button hover effects */
+.o_form_view header button[name="action_test_connection"]:hover {
+    box-shadow: 0 2px 8px rgba(37, 211, 102, 0.3);
+}

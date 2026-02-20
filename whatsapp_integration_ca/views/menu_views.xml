@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- WhatsApp Root Menu -->
+    <menuitem id="menu_whatsapp_root"
+              name="WhatsApp"
+              web_icon="whatsapp_integration_ca,static/description/icon.png"
+              sequence="200"/>
+
+    <!-- Messages Menu -->
+    <menuitem id="menu_whatsapp_messages"
+              name="Messages"
+              parent="menu_whatsapp_root"
+              sequence="10"/>
+
+    <!-- Send Message Menu Item -->
+    <menuitem id="menu_whatsapp_send_message"
+              name="Send Message"
+              parent="menu_whatsapp_messages"
+              action="action_whatsapp_message"
+              sequence="10"/>
+
+    <!-- Configuration Menu -->
+    <menuitem id="menu_whatsapp_configuration"
+              name="Configuration"
+              parent="menu_whatsapp_root"
+              sequence="100"/>
+
+    <!-- WhatsApp Settings Menu Item -->
+    <menuitem id="menu_whatsapp_settings"
+              name="WhatsApp Settings"
+              parent="menu_whatsapp_configuration"
+              action="action_whatsapp_open_settings"
+              sequence="10"/>
+</odoo>
