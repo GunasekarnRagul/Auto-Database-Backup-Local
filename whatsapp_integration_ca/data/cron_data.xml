@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Cron Job: Send Scheduled WhatsApp Messages -->
+    <record id="ir_cron_whatsapp_scheduled_messages" model="ir.cron">
+        <field name="name">WhatsApp: Send Scheduled Messages</field>
+        <field name="model_id" ref="model_whatsapp_message"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_send_scheduled_messages()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="active">True</field>
+        <field name="priority">5</field>
+    </record>
+
+    <!-- Cron Job: Process Message Queue (Background Sending) -->
+    <record id="ir_cron_whatsapp_process_queue" model="ir.cron">
+        <field name="name">WhatsApp: Process Message Queue</field>
+        <field name="model_id" ref="model_whatsapp_message_queue"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_process_queue()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="active">True</field>
+        <field name="priority">1</field>
+    </record>
+</odoo>

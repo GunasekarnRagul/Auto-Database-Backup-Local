@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_whatsapp_config_form" model="ir.ui.view">
+        <field name="name">whatsapp.config.form</field>
+        <field name="model">whatsapp.config</field>
+        <field name="arch" type="xml">
+
+<form string="WhatsApp Configuration">
+
+<header>
+    <button name="action_test_connection"
+            string="Test Connection"
+            type="object"
+            class="btn-primary"
+            icon="fa-plug"
+            invisible="connection_status == 'connected'"/>
+
+
+    <field name="connection_status" widget="statusbar" statusbar_visible="unknown,connected,failed"/>
+</header>
+
+<sheet>
+
+    <!-- RIBBONS -->
+    <widget name="web_ribbon" title="Connected" bg_color="bg-success"
+            invisible="connection_status != 'connected'"/>
+    <widget name="web_ribbon" title="Disconnected" bg_color="bg-danger"
+            invisible="connection_status != 'failed'"/>
+
+    <!-- ==================== SETUP MODE ==================== -->
+    <div invisible="connection_status == 'connected'">
+
+        <h2 class="text-center mt-3" style="color:#25D366;">
+            <i class="fa fa-whatsapp"/> WhatsApp Cloud API Setup
+        </h2>
+
+        <group>
+            <group string="API Credentials">
+                <field name="name" invisible="1"/>
+                <field name="phone_number_id" placeholder="Enter Phone Number ID"/>
+                <field name="whatsapp_business_account_id" placeholder="Enter WABA ID (from Meta URL)" required="1"/>
+                <field name="access_token" password="True" placeholder="Enter Access Token"/>
+                <field name="api_version" placeholder="v18.0"/>
+            </group>
+        </group>
+
+        <div class="alert alert-info text-center mt-3">
+            <b>💡 Tip:</b> Get your credentials from 
+            <a href="https://developers.facebook.com" target="_blank">Meta for Developers</a> → 
+            WhatsApp → API Setup
+        </div>
+
+    </div>
+
+    <!-- ==================== DASHBOARD MODE ==================== -->
+    <div invisible="connection_status != 'connected'">
+
+        <div class="card shadow-lg border-0 mt-3" style="border-radius:15px;overflow:hidden;">
+
+            <!-- Header -->
+            <div class="card-header p-4"
+                 style="background:linear-gradient(135deg,#25D366,#128C7E);color:white;">
+                <h3 style="color:white;" class="m-0">
+                    <i class="fa fa-whatsapp"/> WhatsApp Cloud API Active
+                </h3>
+                <small>Connection verified successfully</small>
+            </div>
+
+            <!-- Body -->
+            <div class="card-body p-4 bg-white">
+
+                <div class="row g-4">
+
+                    <!-- LEFT COLUMN - Account Details -->
+                    <div class="col-md-6 border-end">
+
+                        <h5 class="text-primary mb-4">
+                            <i class="fa fa-building"/> Account Details
+                        </h5>
+
+                        <div class="mb-3">
+                            <small class="text-muted text-uppercase fw-bold">Verified Name</small>
+                            <div class="fs-5"><field name="verified_name" readonly="1"/></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <small class="text-muted text-uppercase fw-bold">Phone Number</small>
+                            <div class="fs-5 text-success"><field name="display_phone_number" readonly="1"/></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <small class="text-muted text-uppercase fw-bold">Account Status</small>
+                            <div class="fs-5"><field name="account_status" readonly="1"/></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <small class="text-muted text-uppercase fw-bold">Official Business</small>
+                            <div class="fs-5"><field name="is_official_business" readonly="1"/></div>
+                        </div>
+
+                    </div>
+
+                    <!-- RIGHT COLUMN - API Info -->
+                    <div class="col-md-6">
+
+                        <h5 class="text-primary mb-4">
+                            <i class="fa fa-bar-chart"/> API Information
+                        </h5>
+
+                        <div class="mb-3">
+                            <small class="text-muted text-uppercase fw-bold">Quality Rating</small>
+                            <div class="fs-5 text-info"><field name="quality_rating" readonly="1"/></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <small class="text-muted text-uppercase fw-bold">Messaging Limit</small>
+                            <div class="fs-5 text-primary"><field name="messaging_limit" readonly="1"/></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <small class="text-muted text-uppercase fw-bold">Account Mode</small>
+                            <div class="fs-5"><field name="account_mode" readonly="1"/></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <small class="text-muted text-uppercase fw-bold">Phone Number ID</small>
+                            <div class="text-break font-monospace text-muted">
+                                <field name="phone_number_id" readonly="1"/>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <small class="text-muted text-uppercase fw-bold">WABA ID</small>
+                            <div class="text-break font-monospace text-muted">
+                                <field name="whatsapp_business_account_id" readonly="1"/>
+                            </div>
+                        </div>
+
+
+
+                    </div>
+                </div>
+
+                <hr class="my-4"/>
+
+                <!-- Footer -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <span><i class="fa fa-clock-o"/> Last Verified: <field name="last_tested" readonly="1"/></span>
+
+                    <button name="action_disconnect"
+                            string="Disconnect &amp; Reset"
+                            type="object"
+                            class="btn btn-outline-danger btn-sm"/>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+</sheet>
+</form>
+
+        </field>
+    </record>
+
+    <!-- Action to open settings -->
+    <record id="action_whatsapp_config" model="ir.actions.act_window">
+        <field name="name">WhatsApp Settings</field>
+        <field name="res_model">whatsapp.config</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure your WhatsApp Cloud API connection
+            </p>
+        </field>
+    </record>
+
+    <!-- Server action for menu -->
+    <record id="action_whatsapp_open_settings" model="ir.actions.server">
+        <field name="name">WhatsApp Settings</field>
+        <field name="model_id" ref="model_whatsapp_config"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_settings()</field>
+    </record>
+</odoo>
