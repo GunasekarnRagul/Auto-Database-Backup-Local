@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_twilio_whatsapp_root" name="SMS &amp; WhatsApp" sequence="50" />
+
+    <!-- Messages Menu -->
+    <menuitem id="menu_twilio_whatsapp_messages" name="Messages" parent="menu_twilio_whatsapp_root" sequence="10" />
+
+    <menuitem id="menu_whatsapp_send_message"
+              name="WhatsApp Message"
+              parent="menu_twilio_whatsapp_messages"
+              action="action_whatsapp_message"
+              sequence="20" />
+
+    <menuitem id="menu_sms_send_message"
+              name="SMS Message"
+              parent="menu_twilio_whatsapp_messages"
+              action="action_sms_message"
+              sequence="10" />
+
+    <menuitem id="menu_twilio_whatsapp_config" name="Configuration" parent="menu_twilio_whatsapp_root" sequence="100" />
+
+    <menuitem id="menu_twilio_config"
+              name="SMS Settings"
+              parent="menu_twilio_whatsapp_config"
+              action="action_twilio_config_server"
+              sequence="10" />
+
+    <menuitem id="menu_whatsapp_config"
+              name="WhatsApp Settings"
+              parent="menu_twilio_whatsapp_config"
+              action="action_whatsapp_open_settings"
+              sequence="20" />
+</odoo>
