@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Tree View -->
+    <record id="view_twilio_config_tree" model="ir.ui.view">
+        <field name="name">twilio.config.tree</field>
+        <field name="model">twilio.config</field>
+        <field name="arch" type="xml">
+            <list string="SMS Accounts"
+                  decoration-success="connection_status == 'connected'"
+                  decoration-muted="connection_status == 'unknown'">
+                <field name="name"/>
+                <field name="provider" widget="badge"
+                       decoration-primary="provider == 'twilio'"
+                       decoration-info="provider != 'twilio'"/>
+                <field name="account_name"/>
+                <field name="account_balance"/>
+                <field name="connection_status" widget="badge"
+                       decoration-success="connection_status == 'connected'"
+                       decoration-danger="connection_status == 'failed'"
+                       decoration-info="connection_status == 'unknown'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_twilio_config_form" model="ir.ui.view">
+        <field name="name">twilio.config.form</field>
+        <field name="model">twilio.config</field>
+        <field name="arch" type="xml">
+            <form string="SMS Account" class="oe_form">
+                <header>
+                    <button name="action_test_connection"
+                        string="Connect Account" type="object" class="btn-primary" icon="fa-bolt"
+                        invisible="connection_status == 'connected'" />
+                    <button name="update_twilio_usage"
+                        string="Refresh Stats" type="object" class="btn-secondary" icon="fa-refresh"
+                        invisible="connection_status != 'connected'" />
+                    <field name="connection_status" widget="statusbar"
+                        statusbar_visible="unknown,connected,failed" />
+                </header>
+
+                <sheet>
+                    <widget name="web_ribbon" title="Connected" bg_color="bg-success"
+                        invisible="connection_status != 'connected'" />
+                    <widget name="web_ribbon" title="Not Connected" bg_color="bg-secondary"
+                        invisible="connection_status == 'connected'" />
+
+                    <!-- ==================== SETUP MODE ==================== -->
+                    <div invisible="connection_status == 'connected'">
+
+                        <!-- Hero Banner -->
+                        <div class="p-4 rounded-3 mb-4 mt-2"
+                             style="background: linear-gradient(135deg, #4A6CF7 0%, #6C8AFF 100%); color: white;">
+                            <div class="row align-items-center">
+                                <div class="col-8">
+                                    <h2 class="m-0 fw-bold text-white">
+                                        <i class="fa fa-commenting-o me-2"/> Connect SMS Account
+                                    </h2>
+                                    <p class="m-0 mt-1 opacity-75" style="font-size: 14px;">
+                                        Select your SMS provider and enter credentials to start sending.
+                                    </p>
+                                </div>
+                                <div class="col-4 text-end">
+                                    <i class="fa fa-plug opacity-25" style="font-size: 50px;"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Provider Selection -->
+                        <div class="row justify-content-center">
+                            <div class="col-lg-10">
+                                <div class="card border-0 shadow-sm mb-3" style="border-radius: 12px;">
+                                    <div class="card-body p-4 text-center">
+                                        <h6 class="text-uppercase fw-bold mb-3"
+                                            style="font-size: 11px; letter-spacing: 1px; color: #4A6CF7;">
+                                            Choose SMS Provider
+                                        </h6>
+                                        <field name="provider" widget="radio" options="{'horizontal': true}"/>
+                                    </div>
+                                </div>
+
+                                <!-- ===== TWILIO ===== -->
+                                <div class="card border-0 shadow-sm" style="border-radius: 12px;"
+                                     invisible="provider != 'twilio'">
+                                    <div class="card-body p-4">
+                                        <group>
+                                            <group string="Twilio Credentials">
+                                                <field name="name" placeholder="e.g. My Twilio SMS"/>
+                                                <field name="account_sid" placeholder="ACxxxxxxxxxxxxx" required="provider == 'twilio'"/>
+                                                <field name="auth_token" password="True" placeholder="Auth Token" required="provider == 'twilio'"/>
+                                            </group>
+                                            <group string="Configuration">
+                                                <field name="twilio_number" placeholder="+1234567890" required="provider == 'twilio'"/>
+                                            </group>
+                                        </group>
+                                    </div>
+                                </div>
+
+
+
+                                <!-- Help Tip -->
+                                <div class="alert border-0 mt-3 shadow-sm"
+                                     style="border-radius: 10px; background: #EEF2FF; border-left: 4px solid #4A6CF7 !important;">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fa fa-lightbulb-o fa-lg me-3" style="color: #4A6CF7;"/>
+                                        <div>
+                                            <strong>Getting started</strong>
+                                            <br/>
+                                            <small class="text-muted">
+                                                Enter your API credentials and click
+                                                <b>Connect Account</b> to verify and activate.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ==================== CONNECTED DASHBOARD ==================== -->
+                    <div invisible="connection_status != 'connected'">
+                        <field name="provider" invisible="1"/>
+
+                        <div class="card border-0 shadow mt-2" style="border-radius: 16px; overflow: hidden;">
+
+                            <!-- Header -->
+                            <div class="p-4"
+                                 style="background: linear-gradient(135deg, #4A6CF7 0%, #3B5DE7 100%); color: white;">
+                                <div class="d-flex align-items-center">
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                                         style="width: 50px; height: 50px; background: rgba(255,255,255,0.2);">
+                                        <i class="fa fa-commenting-o" style="font-size: 22px;"/>
+                                    </div>
+                                    <div>
+                                        <h3 class="m-0 fw-bold text-white">
+                                            <field name="name" readonly="1" class="text-white"/>
+                                        </h3>
+                                        <small class="opacity-75">
+                                            <i class="fa fa-check-circle me-1"/> Active via
+                                            <field name="provider" readonly="1" nolabel="1"
+                                                   style="font-weight: bold; text-transform: uppercase;"/>
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Stats Row -->
+                            <div class="bg-white px-4 py-3">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <div class="p-3 rounded-3 text-center"
+                                             style="background: linear-gradient(135deg, #E8F5E9, #C8E6C9); border: 1px solid #A5D6A7;">
+                                            <div class="text-uppercase fw-bold mb-1"
+                                                 style="font-size: 10px; letter-spacing: 1px; color: #2E7D32;">
+                                                Account Balance
+                                            </div>
+                                            <div class="fw-bold" style="font-size: 20px; color: #1B5E20;">
+                                                <field name="account_balance" readonly="1"/>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-3 rounded-3 text-center"
+                                             style="background: linear-gradient(135deg, #E3F2FD, #BBDEFB); border: 1px solid #90CAF9;">
+                                            <div class="text-uppercase fw-bold mb-1"
+                                                 style="font-size: 10px; letter-spacing: 1px; color: #1565C0;">
+                                                Messages
+                                            </div>
+                                            <div class="fw-bold" style="font-size: 20px; color: #0D47A1;">
+                                                <field name="total_messages_sent" readonly="1"/>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-3 rounded-3 text-center"
+                                             style="background: linear-gradient(135deg, #FFF3E0, #FFE0B2); border: 1px solid #FFCC80;">
+                                            <div class="text-uppercase fw-bold mb-1"
+                                                 style="font-size: 10px; letter-spacing: 1px; color: #E65100;">
+                                                Current Bill
+                                            </div>
+                                            <div class="fw-bold" style="font-size: 20px; color: #BF360C;">
+                                                <field name="current_bill_amount" readonly="1"/>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="m-0" style="opacity: 0.08;"/>
+
+                            <!-- Details Section -->
+                            <div class="bg-white p-4">
+                                <div class="row g-4">
+                                    <div class="col-md-6">
+                                        <h6 class="text-uppercase fw-bold mb-3"
+                                            style="font-size: 11px; letter-spacing: 1px; color: #4A6CF7;">
+                                            <i class="fa fa-user-circle me-1"/> Account Details
+                                        </h6>
+
+                                        <div class="d-flex align-items-center mb-3 p-2 rounded" style="background: #F8F9FF;">
+                                            <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                                                 style="width: 36px; height: 36px; background: #EEF2FF;">
+                                                <i class="fa fa-building" style="color: #4A6CF7; font-size: 14px;"/>
+                                            </div>
+                                            <div>
+                                                <small class="text-muted d-block" style="font-size: 10px;">ACCOUNT NAME</small>
+                                                <span class="fw-semibold"><field name="account_name" readonly="1"/></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex align-items-center mb-3 p-2 rounded" style="background: #F8F9FF;">
+                                            <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                                                 style="width: 36px; height: 36px; background: #EEF2FF;">
+                                                <i class="fa fa-tag" style="color: #4A6CF7; font-size: 14px;"/>
+                                            </div>
+                                            <div>
+                                                <small class="text-muted d-block" style="font-size: 10px;">PROVIDER / TYPE</small>
+                                                <span class="fw-semibold"><field name="account_type" readonly="1"/></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex align-items-center p-2 rounded" style="background: #F8F9FF;">
+                                            <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                                                 style="width: 36px; height: 36px; background: #EEF2FF;">
+                                                <i class="fa fa-clock-o" style="color: #4A6CF7; font-size: 14px;"/>
+                                            </div>
+                                            <div>
+                                                <small class="text-muted d-block" style="font-size: 10px;">LAST VERIFIED</small>
+                                                <span class="fw-semibold"><field name="last_tested" readonly="1"/></span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <h6 class="text-uppercase fw-bold mb-3"
+                                            style="font-size: 11px; letter-spacing: 1px; color: #4A6CF7;">
+                                            <i class="fa fa-shield me-1"/> Account Info
+                                        </h6>
+
+                                        <div class="d-flex align-items-center mb-3 p-2 rounded" style="background: #F8F9FF;">
+                                            <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                                                 style="width: 36px; height: 36px; background: #EEF2FF;">
+                                                <i class="fa fa-id-badge" style="color: #4A6CF7; font-size: 14px;"/>
+                                            </div>
+                                            <div>
+                                                <small class="text-muted d-block" style="font-size: 10px;">ACCOUNT LABEL</small>
+                                                <span class="fw-semibold"><field name="name" readonly="1"/></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex align-items-center mb-3 p-2 rounded" style="background: #F8F9FF;">
+                                            <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                                                 style="width: 36px; height: 36px; background: #EEF2FF;">
+                                                <i class="fa fa-cloud" style="color: #4A6CF7; font-size: 14px;"/>
+                                            </div>
+                                            <div>
+                                                <small class="text-muted d-block" style="font-size: 10px;">SMS PROVIDER</small>
+                                                <span class="fw-semibold text-uppercase">
+                                                    <field name="provider" readonly="1"/>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Footer -->
+                            <div class="bg-white px-4 py-3 border-top d-flex justify-content-end">
+                                <button name="action_disconnect" string="Disconnect &amp; Reset"
+                                        type="object"
+                                        class="btn btn-outline-danger btn-sm rounded-pill px-4"
+                                        icon="fa-power-off"/>
+                            </div>
+
+                        </div>
+                    </div>
+
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_twilio_config_server" model="ir.actions.server">
+        <field name="name">SMS Settings</field>
+        <field name="model_id" ref="model_twilio_config" />
+        <field name="state">code</field>
+        <field name="code">
+            action = model.action_open_settings()
+        </field>
+    </record>
+
+    <record id="action_twilio_config" model="ir.actions.act_window">
+        <field name="name">SMS Settings</field>
+        <field name="res_model">twilio.config</field>
+        <field name="view_mode">list,form</field>
+        <field name="target">current</field>
+    </record>
+</odoo>
