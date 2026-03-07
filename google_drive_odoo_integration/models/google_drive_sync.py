@@ -309,6 +309,8 @@ class GoogleDriveSync(models.AbstractModel):
             ('drive_config_id', '=', config.id),
             ('root_folder_id', '=', root_folder_id),
             ('parent_folder_id', '=', parent_folder_id),
+            # Ignore pending un-uploaded records which don't have a google_file_id yet
+            ('google_file_id', '!=', False),
         ]
         if synced_google_ids:
             stale_domain.append(('google_file_id', 'not in', synced_google_ids))

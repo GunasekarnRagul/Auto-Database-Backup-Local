@@ -79,6 +79,29 @@ class GoogleDriveFile(models.Model):
                 return root_rec.root_id
         return False
 
+    @api.model
+    def get_folder_breadcrumbs(self, folder_id):
+        """Recursively build breadcrumbs for a folder."""
+        breadcrumbs = []
+        folder = self.with_context(active_test=False).browse(folder_id)
+        
+        curr = folder
+        while curr:
+            breadcrumbs.insert(0, {'id': curr.id, 'name': curr.name})
+            curr = curr.parent_folder_id
+            
+        # Add root and section information
+        if folder.exists():
+            if not folder.active:
+                # Trashed item - prefix with Trash
+                breadcrumbs.insert(0, {'id': 'section', 'name': 'Trash'})
+            elif folder.root_folder_id:
+                breadcrumbs.insert(0, {'id': None, 'name': folder.root_folder_id.name})
+                if folder.drive_config_id:
+                    breadcrumbs.insert(0, {'id': 'section', 'name': folder.drive_config_id.name})
+                
+        return breadcrumbs
+
     def unlink(self):
         # Standard Odoo unlink 
         return super(GoogleDriveFile, self).unlink()
@@ -89,8 +112,17 @@ class GoogleDriveFile(models.Model):
             record.child_ids.action_archive_recursive()
             record.write({
                 'active': False,
-                'sync_state': 'pending_delete'
             })
+        return True
+
+    def action_unarchive(self):
+        """Restore archived records and their children."""
+        for record in self.with_context(active_test=False):
+            record.write({
+                'active': True,
+                'sync_state': 'synced'
+            })
+            record.child_ids.action_unarchive()
         return True
 
     @api.model
@@ -130,13 +162,57 @@ class GoogleDriveFile(models.Model):
                 pass
                 
         if success_ids:
-            self.browse(success_ids).with_context(active_test=False).unlink()
+            records_to_unlink = self.browse(success_ids).with_context(active_test=False)
+            
+            # Find all children recursively so we don't leave orphaned records in Odoo
+            all_to_unlink = self.env['google.drive.file']
+            
+            def get_all_children(record):
+                children = record.child_ids.with_context(active_test=False)
+                result = children
+                for child in children:
+                    if child.file_type == 'folder':
+                        result |= get_all_children(child)
+                return result
+                
+            for rec in records_to_unlink:
+                all_to_unlink |= rec
+                if rec.file_type == 'folder':
+                    all_to_unlink |= get_all_children(rec)
+            
+            all_to_unlink.unlink()
         
         return len(success_ids) == len(record_ids)
 
     def write(self, vals):
         # We handle Drive rename asynchronously from JS to keep UI instant
         return super(GoogleDriveFile, self).write(vals)
+
+    @api.model
+    def get_trash_roots(self):
+        """Return only the top-level archived items for the Trash tab.
+        An item is a trash root if it is inactive AND:
+        1. It has no parent, OR
+        2. Its parent is active (not in trash).
+        """
+        # Get all inactive records
+        inactive_records = self.with_context(active_test=False).search([('active', '=', False)])
+        if not inactive_records:
+            return []
+
+        # Find the roots
+        trash_roots = self.env['google.drive.file']
+        for record in inactive_records:
+            if not record.parent_folder_id or record.parent_folder_id.active:
+                trash_roots |= record
+
+        # Return the data in the format expected by the JS file explorer
+        result = trash_roots.read([
+            "name", "file_type", "mime_type", "google_url", "file_size",
+            "owner_name", "last_modified", "sync_state", "starred", 
+            "drive_config_id", "google_file_id", "attachment_id", "display_path"
+        ])
+        return result
 
     @api.model
     def rename_on_drive_by_id(self, record_id, new_name):
@@ -184,11 +260,33 @@ class GoogleDriveFile(models.Model):
         raw_data = base64.b64decode(file_data)
         file_size_bytes = len(raw_data)
 
+        # Handle versioning - append _v2, _v3 etc if file name already exists 
+        base_name = file_name
+        extension = ""
+        if '.' in file_name:
+            parts = file_name.rsplit('.', 1)
+            base_name = parts[0]
+            extension = "." + parts[1]
+
+        domain = [
+            ('name', '=', file_name),
+            ('drive_config_id', '=', config.id),
+            ('parent_folder_id', '=', parent_folder_id or False),
+            ('file_type', '=', 'file'),
+        ]
+        counter = 1
+        while self.search_count(domain) > 0:
+            counter += 1
+            file_name = f"{base_name}_v{counter}{extension}"
+            domain[0] = ('name', '=', file_name)
+
         # Store the attachment locally (skip Drive sync — will happen on Sync click)
-        self.env['ir.attachment'].with_context(skip_gdrive_sync=True).create({
+        attachment = self.env['ir.attachment'].with_context(skip_gdrive_sync=True).create({
             'name': file_name,
             'raw': raw_data,
             'mimetype': mime_type,
+            'res_model': 'google.drive.file',
+            'res_id': 0, # Will be set below
         })
 
         # Create a record in the file explorer with pending status
@@ -204,6 +302,9 @@ class GoogleDriveFile(models.Model):
             'last_modified': fields.Datetime.now(),
             'sync_state': 'pending',
         })
+
+        # Link attachment to file explorer record properly
+        attachment.write({'res_id': explorer_record.id})
 
         return explorer_record.id
 
@@ -252,11 +353,19 @@ class GoogleDriveFile(models.Model):
                 file_rec.parent_folder_id.id if file_rec.parent_folder_id else False,
                 file_rec.root_folder_id.id if file_rec.root_folder_id else False,
             )
-            # Find the corresponding ir.attachment
+            # Find the corresponding ir.attachment using strong res_id matching
             attachment = self.env['ir.attachment'].sudo().search([
-                ('name', '=', file_rec.name),
+                ('res_model', '=', 'google.drive.file'),
+                ('res_id', '=', file_rec.id),
                 ('google_file_id', '=', False),
             ], limit=1)
+
+            # Fallback for old records or unexpectedly created attachments
+            if not attachment:
+                attachment = self.env['ir.attachment'].sudo().search([
+                    ('name', '=', file_rec.name),
+                    ('google_file_id', '=', False),
+                ], limit=1)
 
             if not attachment or not attachment.raw:
                 continue

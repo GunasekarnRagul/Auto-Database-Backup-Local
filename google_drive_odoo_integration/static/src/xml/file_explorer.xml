@@ -13,22 +13,36 @@
                             <t t-esc="selectedCount"/> selected
                         </span>
                     </div>
-                    <div class="gd_sel_actions">
+                    <div class="gd_sel_actions" t-if="state.activeSection !== 'trash'">
                         <button class="gd_sel_btn" t-on-click="onShareSelected" title="Copy share link(s)">
                             <i class="fa fa-share-alt"/>
-                            <span>Share Link</span>
+                            <span>Share Drive Link</span>
                         </button>
                         <button class="gd_sel_btn" t-on-click="onDownloadSelected" title="Download selected files">
                             <i class="fa fa-download"/>
                             <span>Download</span>
                         </button>
+                        <button class="gd_sel_btn" t-on-click="toggleStarSelected" title="Star / Unstar selected" t-if="!hasFolderInSelection">
+                            <i class="fa fa-star"/>
+                            <span>Star</span>
+                        </button>
                         <button class="gd_sel_btn" t-on-click="onRenameSelected" title="Rename selected item" t-if="selectedCount === 1">
                             <i class="fa fa-pencil"/>
                             <span>Rename</span>
                         </button>
-                        <button class="gd_sel_btn gd_sel_btn_delete" t-on-click="onDeleteSelected" title="Delete selected">
+                        <button class="gd_sel_btn gd_sel_btn_delete" t-on-click="onDeleteSelected" title="Move to Trash">
                             <i class="fa fa-trash-o"/>
-                            <span>Delete</span>
+                            <span>Move To Trash</span>
+                        </button>
+                    </div>
+                    <div class="gd_sel_actions" t-if="state.activeSection === 'trash' ">
+                        <button class="gd_sel_btn" t-on-click="onRestoreSelected" title="Restore selected items">
+                            <i class="fa fa-undo"/>
+                            <span>Restore</span>
+                        </button>
+                        <button class="gd_sel_btn gd_sel_btn_delete" t-on-click="onPermanentlyDeleteSelected" title="Permanently delete from Drive">
+                            <i class="fa fa-trash"/>
+                            <span>Permanently Delete</span>
                         </button>
                     </div>
                 </div>
@@ -38,7 +52,7 @@
             <div class="gd_header" t-att-class="{ 'gd_header_hidden': state.selectionMode }">
                 <div class="gd_header_left">
                     <div class="gd_logo">
-                        <img src="/google_drive_odoo_integration/static/src/img/folder.png" alt="Drive" class="gd_logo_icon"/>
+                        <img src="/google_drive_odoo_integration/static/description/folders.png" alt="Drive" class="gd_logo_icon"/>
                         <span class="gd_logo_text">File Explorer</span>
                     </div>
                 </div>
@@ -46,7 +60,7 @@
                     <div class="gd_search_wrapper">
                         <i class="fa fa-search gd_search_icon"/>
                         <input type="text" class="gd_search_input"
-                               placeholder="Search in Drive or by Odoo Record ID..."
+                                placeholder="Search..."
                                t-att-value="state.searchQuery"
                                t-on-focus="(ev) => this.onSearchFocus(ev)"
                                t-on-input="onSearchInput"
@@ -62,7 +76,11 @@
                         <div class="gd_sync_mode_badge" t-on-click="toggleSyncModeMenu"
                              t-att-class="{ 'gd_sync_auto': state.syncMode === 'auto', 'gd_sync_manual': state.syncMode === 'manual' }">
                             <i t-att-class="state.syncMode === 'auto' ? 'fa fa-bolt' : 'fa fa-hand-paper-o'"/>
-                            <span t-if="state.syncMode === 'auto'">Auto Sync</span>
+                            <span t-if="state.syncMode === 'auto'" class="d-flex align-items-center">
+                                Auto Sync
+                                <i class="fa fa-info-circle text-warning" style="margin-left: 5px; font-size: 0.9rem;" 
+                                   title="Warning: Auto Sync works fine but for intense work it's not recommended; switch to manual sync. Auto Sync is only a one-way sync (Odoo to Google Drive), but Manual Sync is a bi-directional sync."/>
+                            </span>
                             <span t-else="">Manual Sync</span>
                             <i class="fa fa-caret-down" style="margin-left: 4px; font-size: 0.7rem;"/>
                             <div t-if="state.hasPendingChanges and state.syncMode === 'manual'" class="gd_sync_dot" title="Changes need sync"/>
@@ -73,7 +91,11 @@
                                 <i class="fa fa-bolt"/>
                                 <div class="gd_sync_mode_info">
                                     <span class="gd_sync_mode_name">Auto Sync</span>
-                                    <span class="gd_sync_mode_desc">Syncs immediately after changes</span>
+                                    <span class="gd_sync_mode_desc d-flex align-items-center">
+                                        Syncs immediately after changes
+                                        <i class="fa fa-info-circle text-warning" style="margin-left: 6px; font-size: 0.85rem;" 
+                                           title="Warning: Auto Sync works fine but for intense work it's not recommended; switch to manual sync. Auto Sync is only a one-way sync (Odoo to Google Drive), but Manual Sync is a bi-directional sync."/>
+                                    </span>
                                 </div>
                                 <i t-if="state.syncMode === 'auto'" class="fa fa-check gd_sync_mode_check"/>
                             </a>
@@ -149,6 +171,25 @@
                                 </t>
                             </div>
                         </div>
+
+
+                           <!-- Root Folder Filter -->
+                        <div class="gd_filter_wrapper" t-on-click.stop="" t-if="state.searchRoots.length > 0">
+                            <div class="gd_filter_chip" t-att-class="{ 'active': state.searchFilterRoot }" t-on-click="toggleRootDropdown">
+                                <span><t t-esc="getRootFilterName()"/></span>
+                                <i class="fa fa-caret-down"/>
+                            </div>
+                            <div class="gd_filter_dropdown" t-if="state.showRootDropdown">
+                                <div class="gd_filter_dropdown_item" t-att-class="{ 'active': !state.searchFilterRoot }" t-on-click="() => this.setSearchFilterRoot(null)">
+                                    All Folders
+                                </div>
+                                <t t-foreach="state.searchRoots" t-as="root" t-key="root.id">
+                                    <div class="gd_filter_dropdown_item" t-att-class="{ 'active': state.searchFilterRoot === root.id }" t-on-click="() => this.setSearchFilterRoot(root.id)">
+                                        <t t-esc="root.name"/>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
                         <!-- Type Filter -->
                         <div class="gd_filter_wrapper" t-on-click.stop="">
                             <div class="gd_filter_chip" t-att-class="{ 'active': state.searchFilterType }" t-on-click="toggleTypeDropdown">
@@ -166,23 +207,7 @@
                                 </t>
                             </div>
                         </div>
-                        <!-- Root Folder Filter -->
-                        <div class="gd_filter_wrapper" t-on-click.stop="" t-if="state.searchRoots.length > 0">
-                            <div class="gd_filter_chip" t-att-class="{ 'active': state.searchFilterRoot }" t-on-click="toggleRootDropdown">
-                                <span><t t-esc="getRootFilterName() || 'Root Folder'"/></span>
-                                <i class="fa fa-caret-down"/>
-                            </div>
-                            <div class="gd_filter_dropdown" t-if="state.showRootDropdown">
-                                <div class="gd_filter_dropdown_item" t-att-class="{ 'active': !state.searchFilterRoot }" t-on-click="() => this.setSearchFilterRoot(null)">
-                                    All Folders
-                                </div>
-                                <t t-foreach="state.searchRoots" t-as="root" t-key="root.id">
-                                    <div class="gd_filter_dropdown_item" t-att-class="{ 'active': state.searchFilterRoot === root.id }" t-on-click="() => this.setSearchFilterRoot(root.id)">
-                                        <t t-esc="root.name"/>
-                                    </div>
-                                </t>
-                            </div>
-                        </div>
+                     
                         <!-- Modified Date Filter -->
                         <div class="gd_filter_wrapper" t-on-click.stop="">
                             <div class="gd_filter_chip" t-att-class="{ 'active': state.searchFilterModified }" t-on-click="toggleModifiedDropdown">
@@ -224,38 +249,90 @@
             <t t-else="">
             <div class="gd_body">
                 <!-- ====== SIDEBAR ====== -->
-                <div class="gd_sidebar">
+                <div class="gd_sidebar" t-att-class="{ 'gd_sidebar_disabled': state.searchMode }">
                     <div class="gd_sidebar_inner">
 
                         <!-- Navigation Items -->
                         <nav class="gd_nav">
                             <div class="gd_nav_group">
-                                <a class="gd_nav_item" t-att-class="{ active: state.activeSection === 'my_drive' }"
-                                   t-on-click="() => this.onSidebarClick('my_drive')">
-                                    <i class="fa fa-laptop gd_nav_icon"/>
-                                    <span t-esc="activeDriveName"/>
-                                </a>
-                                <!-- Root Folders Dropdown -->
-                                <div t-if="state.activeSection === 'my_drive' and state.rootFolders.length > 0" class="gd_nav_subs">
+                                <div class="gd_nav_item_wrapper" style="display: flex; align-items: center;">
+                                    <a class="gd_nav_item" t-att-class="{ active: state.activeSection === 'my_drive' and !state.activeFolderTreeId }"
+                                       t-on-click="() => this.onSidebarClick('my_drive')" style="flex: 1;">
+                                        <i class="fa fa-laptop gd_nav_icon"/>
+                                        <span t-esc="activeDriveName"/>
+                                    </a>
+                                    <span class="gd_nav_toggle_icon" t-on-click="toggleRootTreeExpanded" style="padding: 10px; cursor: pointer; color: #5f6368;" t-if="state.rootFolders.length > 0">
+                                        <i t-att-class="'fa ' + (state.isRootTreeExpanded ? 'fa-caret-down' : 'fa-caret-right')"/>
+                                    </span>
+                                </div>
+                                <!-- Root Folders with Tree Hierarchy -->
+                                <div t-if="state.isRootTreeExpanded and state.rootFolders.length > 0" class="gd_nav_subs">
                                     <t t-foreach="state.rootFolders" t-as="root" t-key="root.id">
-                                        <a class="gd_nav_sub_item" t-att-class="{ active: state.activeRootId === root.id }"
+                                        <a class="gd_nav_sub_item" t-att-class="{ active: state.activeRootId === root.id and !state.activeFolderTreeId }"
                                            t-on-click="() => this.switchRoot(root.id)">
-                                            <i class="fa fa-folder-o gd_nav_icon"/>
+                                            <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" style="width: 16px; height: 16px; margin-right: 10px;"/>
                                             <span t-esc="root.name"/>
                                         </a>
+                                        <!-- Folder Tree for this root -->
+                                        <t t-if="state.activeRootId === root.id">
+                                            <div class="gd_folder_tree">
+                                                <t t-foreach="getTreeRootChildren()" t-as="folder" t-key="folder.id">
+                                                    <div class="gd_tree_node_wrap">
+                                                        <div class="gd_tree_node" t-att-class="{ 'gd_tree_active': state.activeFolderTreeId === folder.id }" style="padding-left: 36px;">
+                                                            <span class="gd_tree_toggle" t-on-click.stop="() => this.toggleFolderTree(folder.id)">
+                                                                <i t-att-class="'fa ' + (isTreeNodeExpanded(folder.id) ? 'fa-caret-down' : 'fa-caret-right')"/>
+                                                            </span>
+                                                            <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" class="gd_tree_icon"/>
+                                                            <span class="gd_tree_name" t-on-click.stop="() => this.onTreeFolderClick(folder.id, folder.name)" t-esc="folder.name"/>
+                                                        </div>
+                                                        <!-- Level 2 children -->
+                                                        <t t-if="isTreeNodeExpanded(folder.id)">
+                                                            <t t-foreach="getTreeNodeChildren(folder.id)" t-as="child2" t-key="child2.id">
+                                                                <div class="gd_tree_node_wrap">
+                                                                    <div class="gd_tree_node" t-att-class="{ 'gd_tree_active': state.activeFolderTreeId === child2.id }" style="padding-left: 52px;">
+                                                                        <span class="gd_tree_toggle" t-on-click.stop="() => this.toggleFolderTree(child2.id)">
+                                                                            <i t-att-class="'fa ' + (isTreeNodeExpanded(child2.id) ? 'fa-caret-down' : 'fa-caret-right')"/>
+                                                                        </span>
+                                                                        <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" class="gd_tree_icon"/>
+                                                                        <span class="gd_tree_name" t-on-click.stop="() => this.onTreeFolderClick(child2.id, child2.name)" t-esc="child2.name"/>
+                                                                    </div>
+                                                                    <!-- Level 3 children -->
+                                                                    <t t-if="isTreeNodeExpanded(child2.id)">
+                                                                        <t t-foreach="getTreeNodeChildren(child2.id)" t-as="child3" t-key="child3.id">
+                                                                            <div class="gd_tree_node_wrap">
+                                                                                <div class="gd_tree_node" t-att-class="{ 'gd_tree_active': state.activeFolderTreeId === child3.id }" style="padding-left: 68px;">
+                                                                                    <span class="gd_tree_toggle" t-on-click.stop="() => this.toggleFolderTree(child3.id)">
+                                                                                        <i t-att-class="'fa ' + (isTreeNodeExpanded(child3.id) ? 'fa-caret-down' : 'fa-caret-right')"/>
+                                                                                    </span>
+                                                                                    <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" class="gd_tree_icon"/>
+                                                                                    <span class="gd_tree_name" t-on-click.stop="() => this.onTreeFolderClick(child3.id, child3.name)" t-esc="child3.name"/>
+                                                                                </div>
+                                                                                <!-- Level 4 children -->
+                                                                                <t t-if="isTreeNodeExpanded(child3.id)">
+                                                                                    <t t-foreach="getTreeNodeChildren(child3.id)" t-as="child4" t-key="child4.id">
+                                                                                        <div class="gd_tree_node" t-att-class="{ 'gd_tree_active': state.activeFolderTreeId === child4.id }" style="padding-left: 84px;">
+                                                                                            <span class="gd_tree_toggle" t-on-click.stop="() => this.toggleFolderTree(child4.id)">
+                                                                                                <i t-att-class="'fa ' + (isTreeNodeExpanded(child4.id) ? 'fa-caret-down' : 'fa-caret-right')"/>
+                                                                                            </span>
+                                                                                            <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" class="gd_tree_icon"/>
+                                                                                            <span class="gd_tree_name" t-on-click.stop="() => this.onTreeFolderClick(child4.id, child4.name)" t-esc="child4.name"/>
+                                                                                        </div>
+                                                                                    </t>
+                                                                                </t>
+                                                                            </div>
+                                                                        </t>
+                                                                    </t>
+                                                                </div>
+                                                            </t>
+                                                        </t>
+                                                    </div>
+                                                </t>
+                                            </div>
+                                        </t>
                                     </t>
                                 </div>
                             </div>
-                            <a class="gd_nav_item" t-att-class="{ active: state.activeSection === 'shared_drives' }"
-                               t-on-click="() => this.onSidebarClick('shared_drives')">
-                                <i class="fa fa-hdd-o gd_nav_icon"/>
-                                <span>Shared Drives</span>
-                            </a>
-                            <a class="gd_nav_item" t-att-class="{ active: state.activeSection === 'shared_with_me' }"
-                               t-on-click="() => this.onSidebarClick('shared_with_me')">
-                                <i class="fa fa-users gd_nav_icon"/>
-                                <span>Shared with me</span>
-                            </a>
+                            
                             <a class="gd_nav_item" t-att-class="{ active: state.activeSection === 'recent' }"
                                t-on-click="() => this.onSidebarClick('recent')">
                                 <i class="fa fa-clock-o gd_nav_icon"/>
@@ -268,7 +345,7 @@
                             </a>
                             <a class="gd_nav_item" t-att-class="{ active: state.activeSection === 'trash' }"
                                t-on-click="() => this.onSidebarClick('trash')">
-                                <i class="fa fa-trash-o gd_nav_icon"/>
+                                <i class="fa fa-trash gd_nav_icon"/>
                                 <span>Trash</span>
                             </a>
                         </nav>
@@ -279,7 +356,7 @@
                 <div class="gd_main">
                     <!-- Content Header -->
                     <div class="gd_content_header">
-                        <div class="gd_content_title">
+                        <div class="gd_content_title" t-if="!state.searchMode">
                             <t t-foreach="state.breadcrumbs" t-as="bc" t-key="bc_index">
                                 <span t-if="bc_index > 0" class="gd_breadcrumb_sep">
                                     <i class="fa fa-angle-right"/>
@@ -294,13 +371,19 @@
 
                         <!-- Action Buttons -->
                         <div class="gd_action_btns">
-                            <t t-if="state.activeSection === 'recent' and state.breadcrumbs.length === 1">
+                            <t t-if="hasSelectedFiles">
+                                <button class="gd_action_btn gd_btn_download" t-on-click="onDownloadSelected" title="Download Selected files" style="color: #1a73e8; border-color: #d2e3fc; background: #e8f0fe; margin-right: 8px;">
+                                    <i class="fa fa-download"/>
+                                    <span>Download</span>
+                                </button>
+                            </t>
+                            <t t-if="state.activeSection === 'recent' &amp;&amp; state.breadcrumbs.length === 1">
                                 <button class="gd_action_btn" t-on-click="clearRecent" title="Clear Recent Files" style="color: #d93025; border-color: #fad2cf; background: #fce8e6;">
                                     <i class="fa fa-trash-o"/>
                                     <span>Clear Recent</span>
                                 </button>
                             </t>
-                            <t t-if="state.activeRootId and state.activeSection === 'my_drive'">
+                            <t t-if="state.activeRootId &amp;&amp; state.activeSection === 'my_drive' &amp;&amp; !state.searchMode">
                                 <button class="gd_action_btn gd_btn_folder" t-on-click="onCreateFolder" title="Create Folder">
                                     <i class="fa fa-folder-o"/>
                                     <span>Create Folder</span>
@@ -351,27 +434,91 @@
                         </div>
                     </t>
 
+                    <!-- Uploading State -->
+                    <t t-if="state.uploading">
+                        <div class="gd_loading" style="background-color: #fce8e6; border: 1px solid #fad2cf; padding: 15px; border-radius: 8px; margin: 15px; color: #d93025;">
+                            <i class="fa fa-cloud-upload fa-2x fa-bounce" style="margin-bottom: 10px;"/>
+                            <span style="font-weight: 500;">Uploading <t t-esc="state.uploadProgress.current + 1"/> of <t t-esc="state.uploadProgress.total"/> files to <t t-esc="state.currentFolderName"/>...</span>
+                        </div>
+                    </t>
+
                     <!-- ===== LIST VIEW ===== -->
                     <t t-elif="state.viewMode === 'list'">
                         <div class="gd_table_wrap">
                             <table class="gd_table">
                                 <thead>
                                     <tr>
-                                        <th class="gd_th_name">Name</th>
-                                        <th t-if="state.activeSection === 'recent'" class="gd_th_path">File Path</th>
-                                        <th class="gd_th_owner">Owner</th>
-                                        <th class="gd_th_date">Last Modified</th>
-                                        <th class="gd_th_size">Size</th>
-                                        <th class="gd_th_sync">Odoo Sync</th>
+                                        <th class="gd_th_select" style="width: 40px; text-align: center;">
+                                            <div class="gd_select_all_wrap" t-on-click="onSelectAll" t-att-title="isAllSelected ? 'Deselect All' : 'Select All'">
+                                                <i t-att-class="'fa ' + (isAllSelected ? 'fa-check-square' : 'fa-square-o')" 
+                                                   t-att-style="isAllSelected ? 'color: #1a73e8;' : 'opacity: 0.5;'"/>
+                                            </div>
+                                        </th>
+                                        <th class="gd_th_name" t-on-click="() => this.toggleSort('name')" style="cursor: pointer;" title="Sort by Name">
+                                            Name 
+                                            <i t-if="state.sortBy === 'name'" t-attf-class="fa fa-arrow-{{state.sortOrder === 'asc' ? 'up' : 'down'}}" style="margin-left: 6px;"/>
+                                            <i t-else="" class="fa fa-sort" style="margin-left: 6px; opacity: 0.3;"/>
+                                        </th>
+                                        <th class="gd_th_path" t-on-click="() => this.toggleSort('display_path')" style="cursor: pointer;" title="Sort by File Path">
+                                            File Path 
+                                            <i t-if="state.sortBy === 'display_path'" t-attf-class="fa fa-arrow-{{state.sortOrder === 'asc' ? 'up' : 'down'}}" style="margin-left: 6px;"/>
+                                            <i t-else="" class="fa fa-sort" style="margin-left: 6px; opacity: 0.3;"/>
+                                        </th>
+                                        <th class="gd_th_owner" t-on-click="() => this.toggleSort('owner_name')" style="cursor: pointer;" title="Sort by Owner">
+                                            Owner 
+                                            <i t-if="state.sortBy === 'owner_name'" t-attf-class="fa fa-arrow-{{state.sortOrder === 'asc' ? 'up' : 'down'}}" style="margin-left: 6px;"/>
+                                            <i t-else="" class="fa fa-sort" style="margin-left: 6px; opacity: 0.3;"/>
+                                        </th>
+                                        <th class="gd_th_date" t-on-click="() => this.toggleSort('last_modified')" style="cursor: pointer;" title="Sort by Last Modified">
+                                            Last Modified 
+                                            <i t-if="state.sortBy === 'last_modified'" t-attf-class="fa fa-arrow-{{state.sortOrder === 'asc' ? 'up' : 'down'}}" style="margin-left: 6px;"/>
+                                            <i t-else="" class="fa fa-sort" style="margin-left: 6px; opacity: 0.3;"/>
+                                        </th>
+                                        <th class="gd_th_size" t-on-click="() => this.toggleSort('file_size')" style="cursor: pointer;" title="Sort by Size">
+                                            Size 
+                                            <i t-if="state.sortBy === 'file_size'" t-attf-class="fa fa-arrow-{{state.sortOrder === 'asc' ? 'up' : 'down'}}" style="margin-left: 6px;"/>
+                                            <i t-else="" class="fa fa-sort" style="margin-left: 6px; opacity: 0.3;"/>
+                                        </th>
+                                        <th class="gd_th_sync" t-on-click="() => this.toggleSort('sync_state')" style="cursor: pointer;" title="Sort by Sync State">
+                                            Odoo Sync 
+                                            <i t-if="state.sortBy === 'sync_state'" t-attf-class="fa fa-arrow-{{state.sortOrder === 'asc' ? 'up' : 'down'}}" style="margin-left: 6px;"/>
+                                            <i t-else="" class="fa fa-sort" style="margin-left: 6px; opacity: 0.3;"/>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    <!-- Drive Overview: List Root Folders -->
+                                    <t t-if="state.isDriveOverview">
+                                        <t t-foreach="state.rootFolders" t-as="root" t-key="root.id">
+                                            <tr class="gd_row" t-on-click="() => this.switchRoot(root.id)">
+                                                <td class="gd_cell_select"></td>
+                                                <td class="gd_cell_name">
+                                                    <div class="gd_name_wrap">
+                                                        <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" style="width: 32px; height: 32px; margin-right: 12px;"/>
+                                                        <span class="gd_file_name" t-esc="root.name"/>
+                                                    </div>
+                                                </td>
+                                                <td colspan="5"></td>
+                                            </tr>
+                                        </t>
+                                        <t t-if="state.rootFolders.length === 0">
+                                            <tr>
+                                                <td colspan="7" class="gd_empty">
+                                                    <div class="gd_empty_content">
+                                                        <i class="fa fa-exclamation-triangle fa-3x" style="color: #fbbc04;"/>
+                                                        <p>Please configure the root folder or activate the root status.</p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </t>
+
                                     <!-- Inline Folder Creation Row -->
                                     <t t-if="state.creatingFolder">
                                         <tr class="gd_row gd_row_creating">
-                                            <td colspan="5">
+                                            <td colspan="7">
                                                 <div class="gd_inline_folder">
-                                                    <i class="fa fa-folder gd_file_icon" style="color: #5f6368;"/>
+                                                    <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" style="width: 32px; height: 32px; margin-right: 12px;"/>
                                                     <input type="text" class="gd_folder_input"
                                                            placeholder="Untitled folder"
                                                            t-att-value="state.newFolderName"
@@ -388,11 +535,11 @@
                                         </tr>
                                     </t>
 
-                                    <t t-if="state.files.length === 0 and !state.creatingFolder">
+                                    <t t-if="state.files.length === 0 &amp;&amp; !state.creatingFolder &amp;&amp; !state.isDriveOverview">
                                         <tr>
-                                            <td colspan="5" class="gd_empty">
+                                            <td colspan="7" class="gd_empty">
                                                 <div class="gd_empty_content">
-                                                    <t t-if="!state.activeRootId">
+                                                    <t t-if="!state.activeRootId and state.activeSection === 'my_drive'">
                                                         <i class="fa fa-exclamation-triangle fa-3x" style="color: #fbbc04;"/>
                                                         <p>Please configure the root folder or activate the root status.</p>
                                                     </t>
@@ -400,11 +547,23 @@
                                                         <i class="fa fa-clock-o fa-3x"/>
                                                         <p>No recent files</p>
                                                     </t>
+                                                    <t t-elif="state.activeSection === 'starred'">
+                                                        <i class="fa fa-star-o fa-3x" style="color: #f4b400;"/>
+                                                        <p>No starred files</p>
+                                                    </t>
+                                                    <t t-elif="state.activeSection === 'trash'">
+                                                        <i class="fa fa-trash-o fa-3x"/>
+                                                        <p>Trash is empty</p>
+                                                    </t>
+                                                    <t t-elif="state.searchMode">
+                                                        <i class="fa fa-search fa-3x" style="opacity: 0.5;"/>
+                                                        <p>No results found</p>
+                                                    </t>
                                                     <t t-else="">
-                                                        <i class="fa fa-folder-open-o fa-3x"/>
+                                                        <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" style="width: 64px; height: 64px; margin-bottom: 10px; opacity: 0.5;"/>
                                                         <p>No files in this location</p>
                                                     </t>
-                                                    <t t-if="state.activeRootId and state.activeSection === 'my_drive'">
+                                                    <t t-if="state.activeRootId &amp;&amp; state.activeSection === 'my_drive' &amp;&amp; !state.searchMode">
                                                         <div class="gd_empty_actions">
                                                             <button class="gd_action_btn gd_btn_folder" t-on-click="onCreateFolder">
                                                                 <i class="fa fa-folder-o"/> Create Folder
@@ -418,15 +577,17 @@
                                             </td>
                                         </tr>
                                     </t>
-                                    <t t-foreach="state.files" t-as="file" t-key="file.id">
+                                    <t t-foreach="sortedFiles" t-as="file" t-key="file.id">
                                         <tr t-att-class="'gd_row' + (isFileSelected(file) ? ' gd_row_selected' : '')"
-                                            t-on-click="(ev) => this.onFileClick(ev, file)"
-                                            t-on-dblclick="() => this.onFileDblClick(file)">
+                                            t-on-click="(ev) => this.onFileClick(ev, file)">
+                                            <td class="gd_cell_select" style="text-align: center;">
+                                                <div class="gd_row_select_wrap" t-on-click.stop="(ev) => this.toggleFileSelection(ev, file)">
+                                                    <i t-att-class="'fa ' + (isFileSelected(file) ? 'fa-check-square' : 'fa-square-o')" 
+                                                       t-att-style="isFileSelected(file) ? 'color: #1a73e8;' : 'opacity: 0.3;'"/>
+                                                </div>
+                                            </td>
                                             <td class="gd_cell_name">
                                                 <div class="gd_name_wrap">
-                                                    <span t-if="isFileSelected(file)" class="gd_tick_icon">
-                                                        <i class="fa fa-check"/>
-                                                    </span>
                                                     <t t-if="getFileImageUrl(file)">
                                                         <img t-att-src="getFileImageUrl(file)" alt="icon" style="width: 32px; height: 32px; object-fit: contain; flex-shrink: 0;"/>
                                                     </t>
@@ -452,12 +613,12 @@
                                                 <t t-else="">
                                                     <span class="gd_file_name" t-esc="file.name"/>
                                                 </t>
-                                                    <button class="gd_row_open_link" t-on-click.stop="() => this.onFileDblClick(file)" title="Open">
-                                                        <i class="fa fa-external-link"/>
+                                                    <button t-if="file.file_type !== 'folder' &amp;&amp; state.activeSection !== 'trash'" t-att-class="'gd_star_btn' + (file.starred ? ' gd_starred' : '')" t-on-click.stop="(ev) => this.toggleStar(ev, file)" t-att-title="file.starred ? 'Unstar' : 'Star'">
+                                                        <i t-att-class="file.starred ? 'fa fa-star' : 'fa fa-star-o'"/>
                                                     </button>
                                                 </div>
                                             </td>
-                                            <td t-if="state.activeSection === 'recent'" class="gd_cell_path">
+                                            <td class="gd_cell_path">
                                                 <span class="text-muted" t-esc="file.display_path" style="font-size: 0.85rem;"/>
                                             </td>
                                             <td class="gd_cell_owner">
@@ -487,12 +648,29 @@
                     <!-- ===== GRID VIEW ===== -->
                     <t t-elif="state.viewMode === 'grid'">
                         <div class="gd_grid_layout">
-                            <t t-set="gridFolders" t-value="state.files.filter(f => f.file_type === 'folder')"/>
-                            <t t-set="gridFiles" t-value="state.files.filter(f => f.file_type !== 'folder')"/>
 
-                            <t t-if="state.files.length === 0 and !state.creatingFolder">
+                            <!-- Drive Overview: Grid View -->
+                            <t t-if="state.isDriveOverview">
+                                <div class="gd_grid_section_title">Root Folders</div>
+                                <div class="gd_grid_folders">
+                                    <t t-foreach="state.rootFolders" t-as="root" t-key="root.id">
+                                        <div class="gd_grid_folder_card" t-on-click="() => this.switchRoot(root.id)">
+                                            <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" style="width: 24px; height: 24px; margin-right: 12px;"/>
+                                            <span class="gd_grid_name gd_folder_name_pill" t-esc="root.name"/>
+                                        </div>
+                                    </t>
+                                </div>
+                                <t t-if="state.rootFolders.length === 0">
+                                    <div class="gd_empty_content">
+                                        <i class="fa fa-exclamation-triangle fa-3x" style="color: #fbbc04;"/>
+                                        <p>Please configure the root folder or activate the root status.</p>
+                                    </div>
+                                </t>
+                            </t>
+
+                            <t t-if="state.files.length === 0 &amp;&amp; !state.creatingFolder &amp;&amp; !state.isDriveOverview">
                                 <div class="gd_empty_content">
-                                    <t t-if="!state.activeRootId">
+                                    <t t-if="!state.activeRootId and state.activeSection === 'my_drive'">
                                         <i class="fa fa-exclamation-triangle fa-3x" style="color: #fbbc04;"/>
                                         <p>Please configure the root folder or activate the root status.</p>
                                     </t>
@@ -500,11 +678,23 @@
                                         <i class="fa fa-clock-o fa-3x"/>
                                         <p>No recent files</p>
                                     </t>
+                                    <t t-elif="state.activeSection === 'starred'">
+                                        <i class="fa fa-star-o fa-3x" style="color: #f4b400;"/>
+                                        <p>No starred files</p>
+                                    </t>
+                                    <t t-elif="state.activeSection === 'trash'">
+                                        <i class="fa fa-trash-o fa-3x"/>
+                                        <p>Trash is empty</p>
+                                    </t>
+                                    <t t-elif="state.searchMode">
+                                        <i class="fa fa-search fa-3x" style="opacity: 0.5;"/>
+                                        <p>No results found</p>
+                                    </t>
                                     <t t-else="">
-                                        <i class="fa fa-folder-open-o fa-3x"/>
+                                        <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" style="width: 64px; height: 64px; margin-bottom: 10px; opacity: 0.5;"/>
                                         <p>No files in this location</p>
                                     </t>
-                                    <t t-if="state.activeRootId and state.activeSection === 'my_drive'">
+                                    <t t-if="state.activeRootId &amp;&amp; state.activeSection === 'my_drive' &amp;&amp; !state.searchMode">
                                         <div class="gd_empty_actions">
                                             <button class="gd_action_btn gd_btn_folder" t-on-click="onCreateFolder">
                                                 <i class="fa fa-folder-o"/> Create Folder
@@ -517,13 +707,13 @@
                                 </div>
                             </t>
 
-                            <t t-if="gridFolders.length > 0 or state.creatingFolder">
+                            <t t-if="gridFolders.length > 0 || state.creatingFolder">
                                 <div class="gd_grid_section_title">Folders</div>
                                 <div class="gd_grid_folders">
                                     <!-- Inline Folder Creation Card -->
                                     <t t-if="state.creatingFolder">
                                         <div class="gd_grid_folder_card gd_grid_creating">
-                                            <i class="fa fa-folder" style="color: #5f6368; font-size: 1.2rem;"/>
+                                            <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" style="width: 24px; height: 24px; margin-right: 12px;"/>
                                             <input type="text" class="gd_folder_input gd_folder_input_grid"
                                                    placeholder="Untitled folder"
                                                    t-att-value="state.newFolderName"
@@ -540,10 +730,14 @@
 
                                     <t t-foreach="gridFolders" t-as="file" t-key="file.id">
                                         <div t-att-class="'gd_grid_folder_card' + (isFileSelected(file) ? ' gd_grid_selected' : '')"
-                                             t-on-click="(ev) => this.onFileClick(ev, file)"
-                                             t-on-dblclick="() => this.onFileDblClick(file)">
+                                             t-on-click="(ev) => this.onFileClick(ev, file)">
                                             
-                                            <i class="fa fa-folder" style="color: #5f6368; font-size: 1.2rem;"/>
+                                            <div class="gd_grid_select_toggle" t-on-click.stop="(ev) => this.toggleFileSelection(ev, file)">
+                                                <i t-att-class="'fa ' + (isFileSelected(file) ? 'fa-check-square' : 'fa-square-o')" 
+                                                   t-att-style="isFileSelected(file) ? 'color: #1a73e8;' : 'opacity: 0.3;'"/>
+                                            </div>
+                                            
+                                            <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" style="width: 24px; height: 24px; margin-right: 12px;"/>
                                             
                                             <t t-if="state.renamingFileId === file.id">
                                                 <input type="text" class="gd_grid_rename_input"
@@ -561,9 +755,6 @@
                                             <t t-else="">
                                                 <span class="gd_grid_name gd_folder_name_pill" t-esc="file.name"/>
                                             </t>
-                                            <button class="gd_card_open_link" t-on-click.stop="() => this.onFileDblClick(file)" title="Open">
-                                                <i class="fa fa-external-link"/>
-                                            </button>
                                         </div>
                                     </t>
                                 </div>
@@ -574,8 +765,13 @@
                                 <div class="gd_grid_files">
                                     <t t-foreach="gridFiles" t-as="file" t-key="file.id">
                                         <div t-att-class="'gd_grid_card' + (isFileSelected(file) ? ' gd_grid_selected' : '')"
-                                             t-on-click="(ev) => this.onFileClick(ev, file)"
-                                             t-on-dblclick="() => this.onFileDblClick(file)">
+                                             t-on-click="(ev) => this.onFileClick(ev, file)">
+                                            
+                                            <div class="gd_grid_select_toggle" t-on-click.stop="(ev) => this.toggleFileSelection(ev, file)">
+                                                <i t-att-class="'fa ' + (isFileSelected(file) ? 'fa-check-square' : 'fa-square-o')" 
+                                                   t-att-style="isFileSelected(file) ? 'color: #1a73e8;' : 'opacity: 0.3;'"/>
+                                            </div>
+
                                             <div class="gd_grid_preview">
                                                 <t t-if="getFileImageUrl(file, true)">
                                                     <img t-att-src="getFileImageUrl(file, true)" alt="icon" style="width: 72px; height: 72px; object-fit: contain;" onerror="this.onerror=null; this.src='/google_drive_odoo_integration/static/description/photo.png';"/>
@@ -611,8 +807,8 @@
                                                 <t t-else="">
                                                     <span class="gd_grid_name" t-esc="file.name"/>
                                                 </t>
-                                                <button class="gd_card_open_link" t-on-click.stop="() => this.onFileDblClick(file)" title="Open">
-                                                    <i class="fa fa-external-link"/>
+                                                <button t-if="file.file_type !== 'folder' &amp;&amp; state.activeSection !== 'trash'" t-att-class="'gd_star_btn gd_star_btn_grid' + (file.starred ? ' gd_starred' : '')" t-on-click.stop="(ev) => this.toggleStar(ev, file)" t-att-title="file.starred ? 'Unstar' : 'Star'">
+                                                    <i t-att-class="file.starred ? 'fa fa-star' : 'fa fa-star-o'"/>
                                                 </button>
                                             </div>
                                         </div>
@@ -624,6 +820,26 @@
                 </div>
             </div>
             </t>
+            
+            <!-- ====== DELETE CONFIRMATION MODAL ====== -->
+            <div t-if="state.showDeleteConfirm" class="gd_modal_overlay">
+                <div class="gd_confirm_modal">
+                    <div class="gd_confirm_header">
+                        <div class="gd_confirm_icon_circle">
+                            <i class="fa fa-trash-o"/>
+                        </div>
+                        <h3>Permanently Delete?</h3>
+                    </div>
+                    <div class="gd_confirm_body">
+                        <p>Are you sure you want to permanently delete <t t-esc="selectedCount"/> selected item(s)?</p>
+                        <p class="gd_confirm_warning">This action will remove items from Google Drive and cannot be undone.</p>
+                    </div>
+                    <div class="gd_confirm_footer">
+                        <button class="gd_confirm_btn gd_confirm_cancel" t-on-click="cancelPermanentDelete">Cancel</button>
+                        <button class="gd_confirm_btn gd_confirm_delete" t-on-click="confirmPermanentDelete">Delete Forever</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </t>
     <t t-name="google_drive_odoo_integration.FilePreviewDialog">
@@ -636,6 +852,81 @@
                 <button class="btn btn-secondary" t-on-click="props.onOpenDetails">File Details</button>
                 <button class="btn btn-secondary" t-on-click="props.close">Close</button>
             </t>
+        </Dialog>
+    </t>
+
+    <!-- ====== SHARE DRIVE LINK DIALOG ====== -->
+    <t t-name="google_drive_odoo_integration.ShareDriveLinkDialog">
+        <Dialog title="''" size="'md'">
+            <div class="gd_share_dialog">
+                <!-- Header with file name -->
+                <div class="gd_share_header">
+                    <div class="gd_share_header_icon">
+                        <i class="fa fa-share-alt"/>
+                    </div>
+                    <div class="gd_share_header_info">
+                        <h4 class="gd_share_title">
+                            <t t-if="props.files.length === 1">
+                                Share '<t t-esc="props.files[0].name"/>'
+                            </t>
+                            <t t-else="">
+                                Share <t t-esc="props.files.length"/> items
+                            </t>
+                        </h4>
+                    </div>
+                </div>
+
+                <!-- Link Section -->
+                <div class="gd_share_link_section">
+                    <t t-foreach="shareableFiles" t-as="file" t-key="file.id">
+                        <div class="gd_share_link_row">
+                            <div class="gd_share_link_icon">
+                                <i class="fa fa-link"/>
+                            </div>
+                            <div class="gd_share_link_input_wrap">
+                                <span class="gd_share_file_label" t-if="shareableFiles.length > 1" t-esc="file.name"/>
+                                <input type="text" class="gd_share_link_input" t-att-value="file.google_url" readonly="true"/>
+                            </div>
+                        </div>
+                    </t>
+                    <t t-if="shareableFiles.length === 0">
+                        <div class="gd_share_no_link">
+                            <i class="fa fa-exclamation-circle"/>
+                            <span>No shareable links available. Please sync the file(s) first.</span>
+                        </div>
+                    </t>
+                </div>
+
+                <!-- General Access Section -->
+                <div class="gd_share_access_section">
+                    <div class="gd_share_access_label">General access</div>
+                    <div class="gd_share_access_row">
+                        <div class="gd_share_access_icon">
+                            <i class="fa fa-lock"/>
+                        </div>
+                        <div class="gd_share_access_info">
+                            <span class="gd_share_access_level">Restricted</span>
+                            <span class="gd_share_access_desc">Only people with access can open with the link</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="gd_share_footer">
+                    <button class="gd_share_copy_btn" t-on-click="onCopyLink" t-att-class="{ 'gd_share_copied': state.copied }">
+                        <t t-if="state.copied">
+                            <i class="fa fa-check"/>
+                            <span>Copied!</span>
+                        </t>
+                        <t t-else="">
+                            <i class="fa fa-link"/>
+                            <span>Copy link</span>
+                        </t>
+                    </button>
+                    <button class="gd_share_done_btn" t-on-click="props.close">Done</button>
+                </div>
+            </div>
+            <t t-set-slot="footer"/>
         </Dialog>
     </t>
 </templates>

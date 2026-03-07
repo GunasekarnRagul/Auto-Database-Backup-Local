@@ -16,18 +16,19 @@
 
 /* Card base */
 .o_file_card {
-    border-radius: 10px;
-    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    border: 1px solid #dadce0;
     background: #fff;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.2s ease;
     overflow: hidden;
     position: relative;
 }
 
 .o_file_card:hover {
     border-color: #1a73e8;
-    box-shadow: 0 1px 6px rgba(26, 115, 232, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
 }
 
 .o_file_card:hover .o_file_card_menu {
