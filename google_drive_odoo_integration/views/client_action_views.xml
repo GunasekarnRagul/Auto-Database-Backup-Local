@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <record id="action_google_drive_file_explorer" model="ir.actions.client">
-        <field name="name">File Explorer</field>
-        <field name="tag">google_drive_file_explorer</field>
-    </record>
-</odoo>

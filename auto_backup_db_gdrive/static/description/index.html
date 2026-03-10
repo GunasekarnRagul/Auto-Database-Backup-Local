@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Backup Database to Google Drive</title>
+</head>
+
+<body>
+
+    <div style="margin: 0; color: #374151; line-height: 1.6; font-family: 'Segoe UI', Roboto, sans-serif;">
+        <div style="padding: 2rem 1rem;">
+
+            <div class="row text-center">
+                <div class="col-12">
+
+                    <div style="margin-bottom: 1rem; text-align: center;">
+                        <span
+                            style="display: inline-block; padding: 12px 16px; border-radius: 50px; color: #ffffff !important; font-size: 14px; font-weight: bold; line-height: 1; text-transform: none; background-color: #1a1a1a; background-image: linear-gradient(90deg, #1a1a1a 0%, #3B82F6 100%);">
+                            Automated + Secure
+                        </span>
+                    </div>
+
+                    <h1
+                        style="font-size: 4rem; font-weight: 700; margin-bottom: 1rem; text-align: center; color: #374151;">
+                        <span style="color: #3B82F6 !important;">Auto Backup</span> <span
+                            style="color: #1a1a1a !important;">Google Drive</span>
+                    </h1>
+
+                    <h5
+                        style="font-size: 2rem; text-align: center; font-weight: 700; color: #374151; margin-bottom: 1rem;">
+                        OAuth 2.0 Security <span style="color: #6c757d; margin: 0 8px;">|</span>
+                        Smart Retention <span style="color: #6c757d; margin: 0 8px;">|</span>
+                        Direct Sync
+                    </h5>
+
+                    <p
+                        style="color: #6b7280; font-size: 1.2rem; max-width: 800px; margin: 1.5rem auto 1.5rem; line-height: 1.6;">
+                        Protect your business data with the ultimate administrative utility. Automate your Odoo database
+                        snapshots securely to Google Drive, complete with smart storage retention and 1-click manual
+                        triggers.
+                    </p>
+
+                    <div
+                        style="width: 50px; height: 4px; margin: 20px auto; background-color: #1a1a1a; background-image: linear-gradient(90deg, #1a1a1a, #3B82F6); display: block;">
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
+
+        <div class="row" style="margin-bottom: 3rem; text-align: center;">
+
+            <div class="col-md-4" style="padding: 10px;">
+                <div
+                    style="padding: 25px; border: 1px solid #e5e7eb; border-bottom: 4px solid #3B82F6; border-radius: 16px; background-color: #ffffff; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+                    <div
+                        style="width: 80px; height: 80px; margin: 0 auto 20px; background-color: rgba(59, 130, 246, 0.1); border-radius: 20px; display: table;">
+                        <div style="display: table-cell; vertical-align: middle; text-align: center;">
+                            <span style="font-size: 36px;">🛡️</span>
+                        </div>
+                    </div>
+                    <h5 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 0.75rem; color: #3B82F6 !important;">
+                        OAuth 2.0 Security</h5>
+                    <p style="font-size: 0.95rem; color: #6c757d; line-height: 1.5; margin: 0;">Securely connect Odoo
+                        with Google Drive using official Client ID and Secret protocols.</p>
+                </div>
+            </div>
+
+            <div class="col-md-4" style="padding: 10px;">
+                <div
+                    style="padding: 25px; border: 1px solid #e5e7eb; border-bottom: 4px solid #10B981; border-radius: 16px; background-color: #ffffff; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+                    <div
+                        style="width: 80px; height: 80px; margin: 0 auto 20px; background-color: rgba(16, 185, 129, 0.1); border-radius: 20px; display: table;">
+                        <div style="display: table-cell; vertical-align: middle; text-align: center;">
+                            <span style="font-size: 36px;">⏱️</span>
+                        </div>
+                    </div>
+                    <h5 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 0.75rem; color: #10B981 !important;">
+                        Automated Schedules</h5>
+                    <p style="font-size: 0.95rem; color: #6c757d; line-height: 1.5; margin: 0;">Never worry about data
+                        loss. Uses Odoo's Cron system for reliable daily, weekly, or monthly backups.</p>
+                </div>
+            </div>
+
+            <div class="col-md-4" style="padding: 10px;">
+                <div
+                    style="padding: 25px; border: 1px solid #e5e7eb; border-bottom: 4px solid #F59E0B; border-radius: 16px; background-color: #ffffff; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+                    <div
+                        style="width: 80px; height: 80px; margin: 0 auto 20px; background-color: rgba(245, 158, 11, 0.1); border-radius: 20px; display: table;">
+                        <div style="display: table-cell; vertical-align: middle; text-align: center;">
+                            <span style="font-size: 36px;">🗑️</span>
+                        </div>
+                    </div>
+                    <h5 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 0.75rem; color: #F59E0B !important;">
+                        Smart Retention</h5>
+                    <p style="font-size: 0.95rem; color: #6c757d; line-height: 1.5; margin: 0;">Automatically purges
+                        older backups based on your configuration to save Drive space.</p>
+                </div>
+            </div>
+
+            <div class="col-md-4" style="padding: 10px;">
+                <div
+                    style="padding: 25px; border: 1px solid #e5e7eb; border-bottom: 4px solid #EF4444; border-radius: 16px; background-color: #ffffff; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+                    <div
+                        style="width: 80px; height: 80px; margin: 0 auto 20px; background-color: rgba(239, 68, 68, 0.1); border-radius: 20px; display: table;">
+                        <div style="display: table-cell; vertical-align: middle; text-align: center;">
+                            <span style="font-size: 36px;">📦</span>
+                        </div>
+                    </div>
+                    <h5 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 0.75rem; color: #EF4444 !important;">
+                        Complete Archives</h5>
+                    <p style="font-size: 0.95rem; color: #6c757d; line-height: 1.5; margin: 0;">Exports the full
+                        database in a compressed .zip format, including your filestore if configured.</p>
+                </div>
+            </div>
+
+            <div class="col-md-4" style="padding: 10px;">
+                <div
+                    style="padding: 25px; border: 1px solid #e5e7eb; border-bottom: 4px solid #8B5CF6; border-radius: 16px; background-color: #ffffff; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+                    <div
+                        style="width: 80px; height: 80px; margin: 0 auto 20px; background-color: rgba(139, 92, 246, 0.1); border-radius: 20px; display: table;">
+                        <div style="display: table-cell; vertical-align: middle; text-align: center;">
+                            <span style="font-size: 36px;">🖱️</span>
+                        </div>
+                    </div>
+                    <h5 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 0.75rem; color: #8B5CF6 !important;">
+                        1-Click Manual</h5>
+                    <p style="font-size: 0.95rem; color: #6c757d; line-height: 1.5; margin: 0;">Need an immediate backup
+                        before a module update? Trigger it instantly with one click.</p>
+                </div>
+            </div>
+
+            <div class="col-md-4" style="padding: 10px;">
+                <div
+                    style="padding: 25px; border: 1px solid #e5e7eb; border-bottom: 4px solid #14B8A6; border-radius: 16px; background-color: #ffffff; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+                    <div
+                        style="width: 80px; height: 80px; margin: 0 auto 20px; background-color: rgba(20, 184, 166, 0.1); border-radius: 20px; display: table;">
+                        <div style="display: table-cell; vertical-align: middle; text-align: center;">
+                            <span style="font-size: 36px;">⚙️</span>
+                        </div>
+                    </div>
+                    <h5 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 0.75rem; color: #14B8A6 !important;">
+                        Central Settings</h5>
+                    <p style="font-size: 0.95rem; color: #6c757d; line-height: 1.5; margin: 0;">Manage URIs, scopes, and
+                        target folders entirely within the standard Odoo Settings menu.</p>
+                </div>
+            </div>
+
+        </div>
+
+        <div style="width: 100%; margin: 40px auto; padding: 0 10px; font-family: 'Segoe UI', Roboto, sans-serif;">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h3 style="font-size: 3rem; font-weight: 700; color: #374151; margin: 4rem 0;">Why Choose Auto Backup?
+                </h3>
+            </div>
+
+            <div class="row" style="text-align: center;">
+                <div class="col-md-3" style="padding: 15px;">
+                    <h2 style="font-size: 3rem; font-weight: 700; color: #3B82F6 !important; margin: 0;">2.0</h2>
+                    <p
+                        style="font-size: 1rem; font-weight: 700; color: #6c757d !important; text-transform: uppercase; letter-spacing: 1px; margin: 5px 0 0 0;">
+                        OAuth Standard</p>
+                </div>
+                <div class="col-md-3" style="padding: 15px;">
+                    <h2 style="font-size: 3rem; font-weight: 700; color: #10B981 !important; margin: 0;">100%</h2>
+                    <p
+                        style="font-size: 1rem; font-weight: 700; color: #6c757d !important; text-transform: uppercase; letter-spacing: 1px; margin: 5px 0 0 0;">
+                        Data Secured</p>
+                </div>
+                <div class="col-md-3" style="padding: 15px;">
+                    <h2 style="font-size: 3rem; font-weight: 700; color: #F59E0B !important; margin: 0;">1-Click</h2>
+                    <p
+                        style="font-size: 1rem; font-weight: 700; color: #6c757d !important; text-transform: uppercase; letter-spacing: 1px; margin: 5px 0 0 0;">
+                        Manual Trigger</p>
+                </div>
+                <div class="col-md-3" style="padding: 15px;">
+                    <h2 style="font-size: 3rem; font-weight: 700; color: #EF4444 !important; margin: 0;">4+</h2>
+                    <p
+                        style="font-size: 1rem; font-weight: 700; color: #6c757d !important; text-transform: uppercase; letter-spacing: 1px; margin: 5px 0 0 0;">
+                        Odoo Versions</p>
+                </div>
+            </div>
+
+            <div
+                style="width: 60px; height: 4px; background-color: #1a1a1a; background-image: linear-gradient(90deg, #1a1a1a, #3B82F6); margin: 20px auto; border-radius: 2px;">
+            </div>
+        </div>
+
+
+        <div
+            style="margin-top: 5rem; margin-bottom: 5rem; font-family: 'Segoe UI', Roboto, sans-serif; color: #374151; line-height: 1.6;">
+            <div class="row">
+
+                <div class="col-md-6" style="padding: 15px;">
+                    <div
+                        style="padding: 10px; border-radius: 16px; background-color: #ffffff; text-align: center; border: 1px solid #e5e7eb;">
+                        <a href="https://youtu.be/PvOtdk8WCLQ?si=ppJWmHaI1geM3pWF" target="_blank"
+                            style="text-decoration: none; display: block;">
+                            <img src="https://img.youtube.com/vi/PvOtdk8WCLQ/maxresdefault.jpg"
+                                style="width: 100%; border-radius: 12px; display: block;" alt="Watch Demo">
+                            <div style="margin-top: -140px; margin-bottom: 80px; display: table; width: 100%;">
+                                <div style="display: table-cell; vertical-align: middle; text-align: center;">
+                                    <div
+                                        style="width: 70px; height: 70px; margin: 0 auto; background-color: #3B82F6; border-radius: 50%; display: table;">
+                                        <div
+                                            style="display: table-cell; vertical-align: middle; text-align: center; padding-left: 5px;">
+                                            <div
+                                                style="width: 0; height: 0; border-left: 20px solid white; border-top: 12px solid transparent; border-bottom: 12px solid transparent; margin: 0 auto;">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                        <p
+                            style="text-align: center; margin-top: 16px; font-size: 1rem; color: #6b7280; font-weight: 600;">
+                            ▶ Click to watch: Auto Backup Setup Guide</p>
+                    </div>
+                </div>
+
+                <div class="col-md-6" style="padding: 15px;">
+                    <h3 style="color: #3B82F6 !important; font-weight: 700; font-size: 2rem; margin-bottom: 15px;">
+                        <span><img src="icon.png" style="width: 3rem; display: inline-block; border-radius: 8px;"
+                                alt="Logo"></span> Peace of Mind
+                    </h3>
+                    <p style="color: #374151; line-height: 1.6; margin-bottom: 20px; font-size: 1.4rem;">
+                        A seamless bridge between Odoo and Google Drive for total business data protection.
+                    </p>
+
+                    <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+                        <li style="margin-bottom: 8px; color: #4b5563; font-size: 1.2rem;"><span
+                                style="color: #10B981; font-weight: bold; margin-right: 10px;">✔</span> Set it and
+                            forget it cron jobs</li>
+                        <li style="margin-bottom: 8px; color: #4b5563; font-size: 1.2rem;"><span
+                                style="color: #10B981; font-weight: bold; margin-right: 10px;">✔</span> Keeps Drive
+                            storage clean automatically</li>
+                        <li style="margin-bottom: 8px; color: #4b5563; font-size: 1.2rem;"><span
+                                style="color: #10B981; font-weight: bold; margin-right: 10px;">✔</span> Zipped format
+                            includes filestore</li>
+                        <li style="margin-bottom: 8px; color: #4b5563; font-size: 1.2rem;"><span
+                                style="color: #10B981; font-weight: bold; margin-right: 10px;">✔</span> Strict OAuth 2.0
+                            authentication</li>
+                        <li style="margin-bottom: 8px; color: #4b5563; font-size: 1.2rem;"><span
+                                style="color: #10B981; font-weight: bold; margin-right: 10px;">✔</span> No complex
+                            server scripts required</li>
+                    </ul>
+                </div>
+
+            </div>
+        </div>
+
+
+        <div style="padding: 0 1rem; margin-bottom: 5rem; font-family: 'Segoe UI', Roboto, sans-serif;">
+
+            <div style="text-align: center; margin-bottom: 3.5rem;">
+                <span
+                    style="display: inline-block; padding: 6px 16px; background: rgba(59, 130, 246, 0.1); color: #3B82F6; border-radius: 50px; font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px;">Powerful
+                    Capabilities</span>
+                <h3 style="font-size: 3rem; font-weight: 800; color: #111827 !important; margin-bottom: 15px;">
+                    Professional Feature Breakdown</h3>
+                <p style="font-size: 1.25rem; color: #6b7280; max-width: 750px; margin: 0 auto;">Engineered for
+                    reliability, our module ensures your data is protected without requiring daily manual intervention.
+                </p>
+            </div>
+
+            <div class="row" style="margin-bottom: 15px;">
+
+                <div class="col-md-6" style="padding: 15px;">
+                    <div
+                        style="background: #ffffff; padding: 40px; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(0,0,0,0.04); height: 100%; position: relative; overflow: hidden;">
+
+                        <div
+                            style="width: 60px; height: 60px; background: linear-gradient(135deg, #3B82F6, #2563EB); border-radius: 14px; display: flex; align-items: center; justify-content: center; margin-bottom: 25px; box-shadow: 0 8px 16px rgba(59, 130, 246, 0.2);">
+                            <span style="font-size: 28px; color: white;">🔄</span>
+                        </div>
+                        <h4
+                            style="font-size: 1.6rem; font-weight: 800; color: #1e293b !important; margin-bottom: 15px;">
+                            Automated Backup System</h4>
+                        <p style="color: #475569; font-size: 1.1rem; line-height: 1.7; margin-bottom: 20px;">
+                            The core <strong>Auto Backup feature</strong> works seamlessly with Odoo's native Cron
+                            scheduler. Configure it once to automatically generate and upload database snapshots daily,
+                            weekly, or monthly—completely hands-free.
+                        </p>
+                        <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+                            <li style="margin-bottom: 10px; color: #334155; font-size: 1.05rem;"><span
+                                    style="color: #3B82F6; font-weight: bold; margin-right: 10px;">✓</span>
+                                "Set-it-and-forget-it" cron integration</li>
+                            <li style="margin-bottom: 10px; color: #334155; font-size: 1.05rem;"><span
+                                    style="color: #3B82F6; font-weight: bold; margin-right: 10px;">✓</span> Silent
+                                background execution</li>
+                            <li style="color: #334155; font-size: 1.05rem;"><span
+                                    style="color: #3B82F6; font-weight: bold; margin-right: 10px;">✓</span> 1-Click
+                                manual backup override</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="col-md-6" style="padding: 15px;">
+                    <div
+                        style="background: #ffffff; padding: 40px; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(0,0,0,0.04); height: 100%;">
+                        <div
+                            style="width: 60px; height: 60px; background: linear-gradient(135deg, #10B981, #059669); border-radius: 14px; display: flex; align-items: center; justify-content: center; margin-bottom: 25px; box-shadow: 0 8px 16px rgba(16, 185, 129, 0.2);">
+                            <span style="font-size: 28px; color: white;">🛡️</span>
+                        </div>
+                        <h4
+                            style="font-size: 1.6rem; font-weight: 800; color: #1e293b !important; margin-bottom: 15px;">
+                            Enterprise-Grade Security</h4>
+                        <p style="color: #475569; font-size: 1.1rem; line-height: 1.7; margin-bottom: 20px;">
+                            Your data never touches unauthorized third-party servers. We use official <strong>Google
+                                OAuth 2.0 protocols</strong> to securely authenticate and transfer your Odoo data
+                            directly to your designated Drive folder.
+                        </p>
+                        <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+                            <li style="margin-bottom: 10px; color: #334155; font-size: 1.05rem;"><span
+                                    style="color: #10B981; font-weight: bold; margin-right: 10px;">✓</span> Official
+                                Client ID & Secret protocols</li>
+                            <li style="margin-bottom: 10px; color: #334155; font-size: 1.05rem;"><span
+                                    style="color: #10B981; font-weight: bold; margin-right: 10px;">✓</span> Managed
+                                securely via Odoo Settings</li>
+                            <li style="color: #334155; font-size: 1.05rem;"><span
+                                    style="color: #10B981; font-weight: bold; margin-right: 10px;">✓</span> No external
+                                server scripts required</li>
+                        </ul>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="row">
+
+                <div class="col-md-6" style="padding: 15px;">
+                    <div
+                        style="background: #ffffff; padding: 40px; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(0,0,0,0.04); height: 100%;">
+                        <div
+                            style="width: 60px; height: 60px; background: linear-gradient(135deg, #F59E0B, #D97706); border-radius: 14px; display: flex; align-items: center; justify-content: center; margin-bottom: 25px; box-shadow: 0 8px 16px rgba(245, 158, 11, 0.2);">
+                            <span style="font-size: 28px; color: white;">🧠</span>
+                        </div>
+                        <h4
+                            style="font-size: 1.6rem; font-weight: 800; color: #1e293b !important; margin-bottom: 15px;">
+                            Smart Storage Retention</h4>
+                        <p style="color: #475569; font-size: 1.1rem; line-height: 1.7; margin-bottom: 20px;">
+                            Cloud storage isn't free. Our built-in retention algorithm automatically scans your Drive
+                            and <strong>purges outdated backups</strong> based on the exact number of days you specify,
+                            keeping your workspace clean.
+                        </p>
+                        <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+                            <li style="margin-bottom: 10px; color: #334155; font-size: 1.05rem;"><span
+                                    style="color: #F59E0B; font-weight: bold; margin-right: 10px;">✓</span> Automated
+                                cloud cleanup</li>
+                            <li style="margin-bottom: 10px; color: #334155; font-size: 1.05rem;"><span
+                                    style="color: #F59E0B; font-weight: bold; margin-right: 10px;">✓</span> Prevents
+                                Drive quota limits</li>
+                            <li style="color: #334155; font-size: 1.05rem;"><span
+                                    style="color: #F59E0B; font-weight: bold; margin-right: 10px;">✓</span>
+                                Cost-efficient cloud management</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="col-md-6" style="padding: 15px;">
+                    <div
+                        style="background: #ffffff; padding: 40px; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(0,0,0,0.04); height: 100%;">
+                        <div
+                            style="width: 60px; height: 60px; background: linear-gradient(135deg, #8B5CF6, #6D28D9); border-radius: 14px; display: flex; align-items: center; justify-content: center; margin-bottom: 25px; box-shadow: 0 8px 16px rgba(139, 92, 246, 0.2);">
+                            <span style="font-size: 28px; color: white;">📦</span>
+                        </div>
+                        <h4
+                            style="font-size: 1.6rem; font-weight: 800; color: #1e293b !important; margin-bottom: 15px;">
+                            Comprehensive Archives</h4>
+                        <p style="color: #475569; font-size: 1.1rem; line-height: 1.7; margin-bottom: 20px;">
+                            We don't just backup text. The module exports your <strong>entire database into a compressed
+                                .zip format</strong>, with an optional toggle to include your entire Odoo filestore
+                            (images, documents, attachments).
+                        </p>
+                        <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+                            <li style="margin-bottom: 10px; color: #334155; font-size: 1.05rem;"><span
+                                    style="color: #8B5CF6; font-weight: bold; margin-right: 10px;">✓</span> Full
+                                database SQL dumps</li>
+                            <li style="margin-bottom: 10px; color: #334155; font-size: 1.05rem;"><span
+                                    style="color: #8B5CF6; font-weight: bold; margin-right: 10px;">✓</span> Optional
+                                Filestore inclusion</li>
+                            <li style="color: #334155; font-size: 1.05rem;"><span
+                                    style="color: #8B5CF6; font-weight: bold; margin-right: 10px;">✓</span> Highly
+                                compressed .zip exports</li>
+                        </ul>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+
+        <div style="padding: 0 1rem; margin-bottom: 3rem; font-family: 'Segoe UI', Roboto, sans-serif;">
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <h3 style="font-size: 3rem; font-weight: 700; color: #111827 !important; margin-bottom: 10px;">How It
+                    Works</h3>
+                <p style="font-size: 1.3rem; color: #6b7280;">See the clean, centralized interface for managing your
+                    backups.</p>
+            </div>
+
+            <div
+                style="margin-bottom: 40px; background-color: #ffffff; padding: 20px; border-radius: 16px; border: 1px solid #e5e7eb; box-shadow: 0 4px 15px rgba(0,0,0,0.08);">
+                <h4 style="font-size: 1.5rem; font-weight: 700; color: #1a1a1a !important; margin-bottom: 10px;">⚙️
+                    Centralized Odoo Settings</h4>
+                <p style="font-size: 1rem; color: #6c757d; margin-bottom: 15px;">Configure your Client ID, Secret, and
+                    Redirect URIs directly in res.config.settings.</p>
+                <img src="settings_config.png" alt="Odoo Settings Configuration"
+                    style="width: 100%; border-radius: 12px; display: block; border: 1px solid #e0e0e0;">
+            </div>
+
+            <div
+                style="margin-bottom: 40px; background-color: #ffffff; padding: 20px; border-radius: 16px; border: 1px solid #e5e7eb; box-shadow: 0 4px 15px rgba(0,0,0,0.08);">
+                <h4 style="font-size: 1.5rem; font-weight: 700; color: #3B82F6 !important; margin-bottom: 10px;">🔒
+                    Secure OAuth Login</h4>
+                <p style="font-size: 1rem; color: #6c757d; margin-bottom: 15px;">Standard Google consent screens ensure
+                    your data is transferred securely and credentials stay safe.</p>
+                <img src="oauth_login.png" alt="Google OAuth Login"
+                    style="width: 100%; border-radius: 12px; display: block; border: 1px solid #e0e0e0;">
+            </div>
+
+            <div
+                style="margin-bottom: 40px; background-color: #ffffff; padding: 20px; border-radius: 16px; border: 1px solid #e5e7eb; box-shadow: 0 4px 15px rgba(0,0,0,0.08);">
+                <h4 style="font-size: 1.5rem; font-weight: 700; color: #10B981 !important; margin-bottom: 10px;">⏱️
+                    Automated Cron Scheduling</h4>
+                <p style="font-size: 1rem; color: #6c757d; margin-bottom: 15px;">Set your backup frequencies inside
+                    Odoo's native scheduled actions dashboard.</p>
+                <img src="cron_schedule.png" alt="Cron Job Setup"
+                    style="width: 100%; border-radius: 12px; display: block; border: 1px solid #e0e0e0;">
+            </div>
+
+            <div
+                style="margin-bottom: 40px; background-color: #ffffff; padding: 20px; border-radius: 16px; border: 1px solid #e5e7eb; box-shadow: 0 4px 15px rgba(0,0,0,0.08);">
+                <h4 style="font-size: 1.5rem; font-weight: 700; color: #F59E0B !important; margin-bottom: 10px;">🗑️
+                    Built-in Retention Rule</h4>
+                <p style="font-size: 1rem; color: #6c757d; margin-bottom: 15px;">Define how many days to keep an
+                    archive. The module will handle cleanup automatically.</p>
+                <img src="retention_policy.png" alt="Retention Policy View"
+                    style="width: 100%; border-radius: 12px; display: block; border: 1px solid #e0e0e0;">
+            </div>
+
+            <div
+                style="margin-bottom: 40px; background-color: #ffffff; padding: 20px; border-radius: 16px; border: 1px solid #e5e7eb; box-shadow: 0 4px 15px rgba(0,0,0,0.08);">
+                <h4 style="font-size: 1.5rem; font-weight: 700; color: #8B5CF6 !important; margin-bottom: 10px;">☁️
+                    Direct Google Drive Folder</h4>
+                <p style="font-size: 1rem; color: #6c757d; margin-bottom: 15px;">Your zipped database and filestores
+                    safely organized in the cloud.</p>
+                <img src="drive_results.png" alt="Google Drive Results"
+                    style="width: 100%; border-radius: 12px; display: block; border: 1px solid #e0e0e0;">
+            </div>
+
+        </div>
+
+        <div style="padding: 0 1rem; margin-bottom: 4rem; font-family: 'Segoe UI', Roboto, sans-serif;">
+            <div
+                style=" margin: 0 auto; background-color: #1a1a1a; background-image: linear-gradient(135deg, #1a1a1a 0%, #1a2a42 50%, #1a1a1a 100%); padding: 3rem; border-radius: 20px; text-align: center; color: #ffffff !important; box-shadow: 0 20px 60px rgba(0,0,0,0.3); border: 2px solid #3B82F6;">
+
+                <div
+                    style="width: 100px; height: 100px; background-color: #2d2d2d; background-image: linear-gradient(145deg, #3d3d3d, #1a1a1a); border-radius: 20px; margin: 0 auto 1.5rem auto; box-shadow: 0 8px 32px rgba(0,0,0,0.4); border: 2px solid #444444; display: table;">
+                    <div style="display: table-cell; vertical-align: middle; text-align: center;">
+                        <img src="icon.png" alt="Auto Backup Module"
+                            style="width: 60px; height: 60px; border-radius: 12px;">
+                    </div>
+                </div>
+
+                <h2 style="font-size: 2.5rem; font-weight: 700; margin-bottom: 15px; color: #ffffff !important;">
+                    Ready to Secure Your Database?
+                </h2>
+
+                <p
+                    style="font-size: 1.2rem; margin-bottom: 2rem; color: #cccccc !important; max-width: 600px; display: inline-block;">
+                    Don't leave your data to chance. Install Auto Backup to Google Drive today and ensure your business
+                    continuity.
+                </p>
+
+                <div style="margin-bottom: 1.5rem;">
+                    <span
+                        style="display: inline-block; background-color: #22C55E; color: white; font-size: 16px; font-weight: 700; padding: 12px 24px; border-radius: 8px; margin: 5px;">Odoo
+                        19</span>
+                    <span
+                        style="display: inline-block; background-color: #3B82F6; color: white; font-size: 16px; font-weight: 700; padding: 12px 24px; border-radius: 8px; margin: 5px;">Odoo
+                        18</span>
+                    <span
+                        style="display: inline-block; background-color: #8B5CF6; color: white; font-size: 16px; font-weight: 700; padding: 12px 24px; border-radius: 8px; margin: 5px;">Odoo
+                        17</span>
+                    <span
+                        style="display: inline-block; background-color: #F59E0B; color: white; font-size: 16px; font-weight: 700; padding: 12px 24px; border-radius: 8px; margin: 5px;">Odoo
+                        16</span>
+                </div>
+
+
+            </div>
+        </div>
+
+    </div>
+
+</body>
+
+</html>
