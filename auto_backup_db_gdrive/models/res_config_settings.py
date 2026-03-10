@@ -9,6 +9,8 @@ import zipfile
 from datetime import datetime
 import pytz
 from odoo.service import db
+import logging
+_logger = logging.getLogger(__name__)
 
 class GDriveBackupDb(models.Model):
     _name = 'gdrive.backup.db'
@@ -147,6 +149,12 @@ class ResConfigSettings(models.TransientModel):
             manual_db_ids = json.loads(manual_db_ids_str)
         except Exception:
             manual_db_ids = []
+
+        # Filter out non-existent IDs to prevent "Missing Record" error in UI
+        if auto_db_ids:
+            auto_db_ids = self.env['gdrive.backup.db'].sudo().browse(auto_db_ids).exists().ids
+        if manual_db_ids:
+            manual_db_ids = self.env['gdrive.backup.db'].sudo().browse(manual_db_ids).exists().ids
 
         res.update(
             gdrive_selected_db_ids=[(6, 0, auto_db_ids)],
@@ -462,47 +470,91 @@ class ResConfigSettings(models.TransientModel):
     def _apply_retention_policy(self, access_token, backup_type):
         """ List folders with the same prefix and delete based on policy. """
         ICP = self.env['ir.config_parameter'].sudo()
-        retention_type = ICP.get_param('auto_backup_db_gdrive.retention_type') or 'none'
+        
+        # 1. Safely retrieve the retention type
+        retention_type = ICP.get_param('auto_backup_db_gdrive.retention_type')
+        if not retention_type or retention_type == 'False':
+            retention_type = 'none'
+            
         if retention_type == 'none':
+            _logger.info("Retention policy is set to 'none'. Skipping cleanup.")
             return
             
         parent_id = ICP.get_param('auto_backup_db_gdrive.folder_id')
-        if not parent_id:
+        if not parent_id or parent_id == 'False':
+            _logger.warning("Retention policy skipped: No Google Drive Folder ID configured.")
             return
 
         headers = {"Authorization": f"Bearer {access_token}"}
-        # Search for folders with prefix (Auto_ or Manual_)
-        query = f"name contains '{backup_type}_' and mimeType = 'application/vnd.google-apps.folder' and '{parent_id}' in parents and trashed = false"
+        
+        # 2. Query folders (Looks for BOTH Auto and Manual folders to ensure the total limit is respected)
+        query = f"(name contains 'Auto_' or name contains 'Manual_') and mimeType = 'application/vnd.google-apps.folder' and '{parent_id}' in parents and trashed = false"
+        _logger.info("Applying retention policy: Total (Type: %s). Query: %s", retention_type, query)
+        
         params = {
             "q": query,
             "fields": "files(id, name, createdTime)",
-            "orderBy": "createdTime asc" # Oldest first
+            "orderBy": "createdTime asc", # Oldest first
+            "pageSize": 1000 # Increased to prevent pagination cutoff limits
         }
         
         response = requests.get("https://www.googleapis.com/drive/v3/files", headers=headers, params=params)
         if response.status_code != 200:
+            _logger.error("Failed to list files from Google Drive: %s", response.text)
             return
             
         files = response.json().get('files', [])
+        _logger.info("Found %s total backup folders matching query.", len(files))
         
+        if not files:
+            return
+        
+        # 3. Apply: "Keep Last X Backups"
         if retention_type == 'count':
-            retention_count = int(ICP.get_param('auto_backup_db_gdrive.retention_count') or 10)
+            try:
+                raw_count = ICP.get_param('auto_backup_db_gdrive.retention_count')
+                retention_count = int(raw_count) if raw_count and raw_count != 'False' else 10
+            except (ValueError, TypeError):
+                retention_count = 10
+                
             if len(files) > retention_count:
-                # Delete oldest files
                 to_delete = files[:len(files) - retention_count]
+                _logger.info("Pruning %s old backups to maintain limit of %s", len(to_delete), retention_count)
                 for f in to_delete:
-                    requests.delete(f"https://www.googleapis.com/drive/v3/files/{f['id']}", headers=headers)
+                    res = requests.delete(f"https://www.googleapis.com/drive/v3/files/{f['id']}", headers=headers)
+                    if res.status_code in [200, 204]:
+                        _logger.info("Successfully deleted old backup: %s (%s)", f['name'], f['id'])
+                    else:
+                        _logger.error("Failed to delete old backup %s: %s", f['name'], res.text)
                     
+        # 4. Apply: "Keep for X Days"
         elif retention_type == 'days':
-            retention_days = int(ICP.get_param('auto_backup_db_gdrive.retention_days') or 30)
-            from datetime import timedelta, datetime
-            limit_date = datetime.now() - timedelta(days=retention_days)
+            try:
+                raw_days = ICP.get_param('auto_backup_db_gdrive.retention_days')
+                retention_days = int(raw_days) if raw_days and raw_days != 'False' else 30
+            except (ValueError, TypeError):
+                retention_days = 30
+                
+            from datetime import timedelta
+            # Odoo fields.Datetime.now() is UTC, Drive createdTime is UTC
+            limit_date = fields.Datetime.now() - timedelta(days=retention_days)
+            _logger.info("Pruning backups older than %s days (before UTC %s)", retention_days, limit_date)
             
+            prune_count = 0
             for f in files:
-                # GDrive: "2026-03-09T06:44:28.000Z"
                 try:
-                    f_date = datetime.strptime(f['createdTime'].split('.')[0], '%Y-%m-%dT%H:%M:%S')
+                    # GDrive format: "2026-03-09T06:44:28.000Z"
+                    f_date_str = f['createdTime'].split('.')[0].replace('T', ' ').replace('Z', '')
+                    f_date = fields.Datetime.to_datetime(f_date_str)
+                    
                     if f_date < limit_date:
-                        requests.delete(f"https://www.googleapis.com/drive/v3/files/{f['id']}", headers=headers)
-                except Exception:
-                    continue
+                        res = requests.delete(f"https://www.googleapis.com/drive/v3/files/{f['id']}", headers=headers)
+                        if res.status_code in [200, 204]:
+                            _logger.info("Successfully deleted old backup (days policy): %s (%s)", f['name'], f['id'])
+                            prune_count += 1
+                        else:
+                            _logger.error("Failed to delete old backup %s: %s", f['name'], res.text)
+                except Exception as e:
+                    _logger.error("Error parsing date or deleting for %s: %s", f['name'], str(e))
+                    
+            _logger.info("Total folders pruned by days policy: %s", prune_count)
