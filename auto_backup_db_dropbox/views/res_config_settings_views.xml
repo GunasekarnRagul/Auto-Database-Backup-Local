@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.dropbox</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="100"/>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Back up Database" string="Back up Database" name="auto_backup_db_dropbox">
+                    <block title="Dropbox Integration" name="dropbox_integration_block">
+                        <field name="dropbox_refresh_token" invisible="1"/>
+                        <setting title="App Key" help="Enter your Dropbox App Key.">
+                            <field name="dropbox_app_key" placeholder="Enter App Key..."/>
+                        </setting>
+                        <setting title="App Secret" help="Enter your Dropbox App Secret.">
+                            <field name="dropbox_app_secret" password="True" placeholder="••••••••••••••••"/>
+                        </setting>
+                        <setting string="Authorization &amp; Setup" help="Connect Odoo to your Dropbox account.">
+                            <div class="content-group mt-2">
+                                <div class="alert alert-info py-2 mb-3 border-0 rounded-3 shadow-sm d-flex align-items-start">
+                                    <i class="fa fa-info-circle mt-1 me-3 fs-4 text-info"/>
+                                    <div>
+                                        <h6 class="alert-heading fw-bold mb-1">How to authorize:</h6>
+                                        <ol class="ps-3 mb-0 small">
+                                            <li>Go to the <a href="https://www.dropbox.com/developers/apps" target="_blank" class="fw-bold text-decoration-underline">Dropbox App Console</a>.</li>
+                                            <li>Under <b>OAuth 2 &gt; Redirect URIs</b>, add the <b>Redirect URI</b> below.</li>
+                                            <li>Copy your <b>App Key</b> and <b>App Secret</b> into the fields above.</li>
+                                        </ol>
+                                    </div>
+                                </div>
+
+                                <div class="p-3 border rounded-3 bg-light mb-4 shadow-sm">
+                                    <label for="dropbox_redirect_uri" class="d-block small text-muted text-uppercase fw-bold mb-1">Redirect URI</label>
+                                    <div class="d-flex align-items-center">
+                                        <field name="dropbox_redirect_uri" widget="copy_clipboard" readonly="1" class="fw-bold text-primary flex-grow-1"/>
+                                        <span class="ms-2 text-muted" title="This URI is automatically formed based on your current server URL and should be added to your Dropbox App configuration.">
+                                            <i class="fa fa-question-circle cursor-pointer"/>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Action Buttons & Status -->
+                                <div class="d-flex align-items-center flex-wrap gap-2">
+                                    <button name="action_dropbox_authenticate" 
+                                            type="object" 
+                                            string="Connect Dropbox" 
+                                            class="btn btn-primary" 
+                                            invisible="dropbox_refresh_token or not dropbox_app_key or not dropbox_app_secret">
+                                        <i class="fa fa-dropbox me-2"/> Connect
+                                    </button>
+                                    
+                                    <div class="d-flex align-items-center gap-2" invisible="not dropbox_refresh_token">
+                                        <div class="alert alert-success d-flex align-items-center py-2 px-3 m-0 border-0 rounded-3 shadow-sm">
+                                            <i class="fa fa-check-circle me-2 fs-5"/>
+                                            <span class="small fw-bold">Authorized Successfully</span>
+                                        </div>
+
+                                        <button name="action_dropbox_disconnect" 
+                                                type="object" 
+                                                class="btn btn-outline-danger btn-sm d-inline-flex flex-column align-items-center"
+                                                confirm="Are you sure you want to disconnect Dropbox and reset all credentials?"
+                                                invisible="not dropbox_refresh_token">
+                                            <i class="fa fa-power-off mb-1"/>
+                                            <span>Disconnect</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </setting>
+                        <setting title="Folder Path" help="Dropbox folder where backups will be stored (e.g. /Odoo_Backups).">
+                            <field name="dropbox_folder_path" placeholder="/Odoo_Backups"/>
+                        </setting>
+                    </block>
+
+                    <div invisible="not dropbox_refresh_token" class="mt-4">
+                        <notebook>
+                            <page string="1. Auto Backup Settings" name="dropbox_auto_backup_page">
+                                <block title="Auto Backup Configuration">
+                                    <setting title="Enable Auto Backup" help="Automatically backup the database to Dropbox at specified intervals.">
+                                        <field name="dropbox_backup_active"/>
+                                    </setting>
+                                    <setting title="Backup Frequency" help="Set how often the database should be backed up." invisible="not dropbox_backup_active">
+                                        <div class="content-group">
+                                            <div class="mt16">
+                                                <span>Every </span>
+                                                <field name="dropbox_backup_interval_number" class="oe_inline"/>
+                                                <field name="dropbox_backup_interval_type" class="oe_inline" style="margin-left:10px"/>
+                                            </div>
+                                        </div>
+                                    </setting>
+                                    <setting title="Sync Rules" help="Define which databases should be backed up automatically.">
+                                        <div class="content-group">
+                                            <field name="dropbox_sync_scope" widget="radio" class="w-50 mb-3"/>
+                                            <div invisible="dropbox_sync_scope != 'selective'" class="mt-2 mb-3">
+                                                <label for="dropbox_selected_db_ids" class="fw-bold small text-muted text-uppercase mb-1 d-block">Select Databases</label>
+                                                <field name="dropbox_selected_db_ids" widget="many2many_tags" placeholder="Search databases..." class="w-100"/>
+                                            </div>
+                                        </div>
+                                    </setting>
+                                    <setting title="Last Backup" help="Date and time of the last successful backup." invisible="not dropbox_backup_last_run">
+                                        <field name="dropbox_backup_last_run" widget="date"/>
+                                    </setting>
+                                </block>
+                            </page>
+                            
+                            <page string="2. Manual Backup Settings" name="dropbox_manual_backup_page">
+                                <block title="Manual Backup Configuration">
+                                    <setting title="Sync Rules" help="Define which databases to include in the manual backup.">
+                                        <div class="content-group">
+                                            <field name="dropbox_manual_sync_scope" widget="radio" class="w-50 mb-3"/>
+                                            <div invisible="dropbox_manual_sync_scope != 'selective'" class="mt-2 mb-3">
+                                                <label for="dropbox_manual_selected_db_ids" class="fw-bold small text-muted text-uppercase mb-1 d-block">Select Databases</label>
+                                                <field name="dropbox_manual_selected_db_ids" widget="many2many_tags" placeholder="Search databases..." class="w-100"/>
+                                            </div>
+                                        </div>
+                                    </setting>
+                                    <setting title="Manual Sync" help="Trigger a manual backup to Dropbox immediately.">
+                                        <div class="content-group">
+                                            <div class="mt-2">
+                                                <button name="action_manual_sync" 
+                                                        type="object" 
+                                                        string="Manual BackUp" 
+                                                        class="btn btn-primary"
+                                                        confirm="Start manual backup to Dropbox? (Note: This may take a while depending on DB size.)"/>
+                                            </div>
+                                        </div>
+                                    </setting>
+                                </block>
+                            </page>
+                            
+                            <page string="3. Retention Policy" name="dropbox_retention_policy_page">
+                                <block title="Retention Policy Configuration">
+                                    <div class="text-muted small mb-3">
+                                        Configure how long to keep your backups in Dropbox to save storage space.
+                                    </div>
+                                    <div class="row">
+                                        <setting class="col-12 col-lg-6" title="Retention Type" help="Choose how you want to prune old backups.">
+                                            <field name="dropbox_retention_type" widget="radio"/>
+                                        </setting>
+                                        <setting class="col-12 col-lg-6" title="Retention Limit" invisible="dropbox_retention_type == 'none'">
+                                            <div invisible="dropbox_retention_type != 'count'">
+                                                <div class="d-flex align-items-center">
+                                                    <span>Keep last </span>
+                                                    <field name="dropbox_retention_count" class="mx-2 oe_inline fw-bold"/>
+                                                    <span> backups</span>
+                                                </div>
+                                            </div>
+                                            <div invisible="dropbox_retention_type != 'days'">
+                                                <div class="d-flex align-items-center">
+                                                    <span>Keep for </span>
+                                                    <field name="dropbox_retention_days" class="mx-2 oe_inline fw-bold"/>
+                                                    <span> days</span>
+                                                </div>
+                                            </div>
+                                        </setting>
+                                    </div>
+                                </block>
+                            </page>
+                        </notebook>
+                    </div>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>
