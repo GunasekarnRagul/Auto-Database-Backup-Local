@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.auto.backup.onedrive</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="99"/>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="OneDrive Backup" string="OneDrive Backup" name="auto_backup_db_onedrive">
+                    <block title="OneDrive Integration" name="onedrive_integration_block">
+                        <setting title="Client ID" help="Enter your Application (client) ID from Azure Portal.">
+                            <field name="onedrive_client_id" placeholder="e.g. 00000000-0000-0000-0000-000000000000"/>
+                        </setting>
+                        <setting title="Client Secret" help="Enter your Client Secret from Azure Portal.">
+                            <field name="onedrive_client_secret" password="True" placeholder="••••••••••••••••"/>
+                        </setting>
+                        <setting title="Target Folder Path" help="OneDrive Folder Path (e.g. /backups) where backups will be stored. Leave empty for root.">
+                            <field name="onedrive_folder_path" placeholder="e.g. /odoo_backups1"/>
+                        </setting>
+
+                        <setting string="Authorization &amp; Setup" help="Connect Odoo to your OneDrive account.">
+                            <div class="content-group mt-2">
+                                <div class="alert alert-info py-2 mb-3 border-0 rounded-3 shadow-sm d-flex align-items-start">
+                                    <i class="fa fa-info-circle mt-1 me-3 fs-4 text-info"/>
+                                    <div>
+                                        <h6 class="alert-heading fw-bold mb-1">How to authorize:</h6>
+                                        <ol class="ps-3 mb-0 small">
+                                            <li>Go to the <a href="https://portal.azure.com/" target="_blank" class="fw-bold text-decoration-underline">Azure Portal</a>.</li>
+                                            <li>Under <b>Azure Active Directory &gt; App registrations</b>, create a new registration.</li>
+                                            <li>Add <b>Files.ReadWrite.All</b> and <b>offline_access</b> API permissions (Microsoft Graph).</li>
+                                            <li>Add the <b>Redirect URI</b> below to the <i>Authentication &gt; Web &gt; Redirect URIs</i> section.</li>
+                                        </ol>
+                                    </div>
+                                </div>
+
+                                <div class="p-3 border rounded-3 bg-light mb-4 shadow-sm">
+                                    <label for="onedrive_redirect_uri" class="d-block small text-muted text-uppercase fw-bold mb-1">Redirect URI</label>
+                                    <div class="d-flex align-items-center">
+                                        <field name="onedrive_redirect_uri" widget="copy_clipboard" readonly="1" class="fw-bold text-primary flex-grow-1"/>
+                                        <span class="ms-2 text-muted" title="This URI is automatically formed based on your current browser URL and should be added to your Azure App Registration.">
+                                            <i class="fa fa-question-circle cursor-pointer"/>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Action Buttons & Status -->
+                                <div class="d-flex align-items-center flex-wrap gap-2">
+                                    <button name="action_onedrive_authenticate" 
+                                            type="object" 
+                                            string="Connect OneDrive Account" 
+                                            class="btn btn-primary" 
+                                            invisible="onedrive_refresh_token or not onedrive_client_id or not onedrive_client_secret">
+                                        <i class="fa fa-windows me-2"/> Connect
+                                    </button>
+                                    
+                                    <div class="d-flex align-items-center gap-2" invisible="not onedrive_refresh_token">
+                                        <div class="alert alert-success d-flex align-items-center py-2 px-3 m-0 border-0 rounded-3 shadow-sm">
+                                            <i class="fa fa-check-circle me-2 fs-5"/>
+                                            <span class="small fw-bold">Authorized Successfully</span>
+                                        </div>
+                                        <button name="action_onedrive_authenticate" 
+                                                type="object" 
+                                                class="btn btn-outline-secondary btn-sm d-inline-flex flex-column align-items-center"
+                                                invisible="not onedrive_client_id or not onedrive_client_secret">
+                                            <i class="fa fa-refresh mb-1"/> 
+                                            <span>Re-connect</span>
+                                        </button>
+
+                                        <button name="action_onedrive_disconnect" 
+                                                type="object" 
+                                                class="btn btn-outline-danger btn-sm d-inline-flex flex-column align-items-center"
+                                                confirm="Are you sure you want to disconnect OneDrive and reset all credentials?"
+                                                invisible="not onedrive_refresh_token">
+                                            <i class="fa fa-power-off mb-1"/>
+                                            <span>Disconnect </span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <field name="onedrive_refresh_token" invisible="1"/>
+                            </div>
+                        </setting>
+                    </block>
+
+                    <notebook invisible="not onedrive_refresh_token">
+                        <page string="Auto Backup" name="auto_backup_page">
+                            <block title="Auto Backup Settings" name="onedrive_backup_config_block">
+                                <setting title="Enable Auto Backup" help="Automatically backup the database to OneDrive at specified intervals.">
+                                    <field name="onedrive_backup_active"/>
+                                </setting>
+                                <setting title="Backup Frequency" help="Set how often the database should be backed up." invisible="not onedrive_backup_active">
+                                    <div class="content-group">
+                                        <div class="mt16">
+                                            <span>Every </span>
+                                            <field name="onedrive_backup_interval_number" class="oe_inline"/>
+                                            <field name="onedrive_backup_interval_type" class="oe_inline" style="margin-left:16px"/>
+                                        </div>
+                                    </div>
+                                </setting>
+                                <setting title="Sync Rules" help="Define which databases should be backed up.">
+                                    <div class="content-group">
+                                        <field name="onedrive_sync_scope" widget="radio" class="w-50 mb-3"/>
+                                        <div invisible="onedrive_sync_scope != 'selective'" class="mt-2 mb-3">
+                                            <label for="onedrive_selected_db_ids" class="fw-bold small text-muted text-uppercase mb-1 d-block">Select Databases</label>
+                                            <field name="onedrive_selected_db_ids" widget="many2many_tags" placeholder="Search databases..." class="w-100"/>
+                                            <div class="small text-muted mt-1">
+                                                <i class="fa fa-info-circle me-1"/> 
+                                                Select the databases to include in the backup.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </setting>
+                                <setting title="Last Backup" help="Date and time of the last successful backup." invisible="not onedrive_backup_last_run">
+                                    <field name="onedrive_backup_last_run" widget="date"/>
+                                </setting>
+                            </block>
+                        </page>
+
+                        <page string="Manual Backup" name="manual_backup_page">
+                            <block title="Manual Backup Settings" name="onedrive_manual_backup_block">
+                                <setting title="Sync Rules" help="Define which databases to include in the manual backup.">
+                                    <div class="content-group">
+                                        <field name="onedrive_manual_sync_scope" widget="radio" class="w-50 mb-3"/>
+                                        <div invisible="onedrive_manual_sync_scope != 'selective'" class="mt-2 mb-3">
+                                            <label for="onedrive_manual_selected_db_ids" class="fw-bold small text-muted text-uppercase mb-1 d-block">Select Databases</label>
+                                            <field name="onedrive_manual_selected_db_ids" widget="many2many_tags" placeholder="Search databases..." class="w-100"/>
+                                            <div class="small text-muted mt-1">
+                                                <i class="fa fa-info-circle me-1"/> 
+                                                Select the databases to include in the manual backup.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </setting>
+                                <setting title="Manual Sync" help="Trigger a manual backup to OneDrive immediately using the settings above.">
+                                    <div class="content-group">
+                                        <div class="mt-2">
+                                            <button name="action_manual_sync" 
+                                                    type="object" 
+                                                    string="Manual BackUp" 
+                                                    class="btn btn-primary"
+                                                    confirm="Are you sure you want to start the manual backup? This may take some time depending on the database size."/>
+                                        </div>
+                                    </div>
+                                </setting>
+                            </block>
+                        </page>
+
+                        <page string="Retention Policy" name="retention_policy_page">
+                            <block title="Retention Policy" name="onedrive_retention_policy_block">
+                                <div class="text-muted small mb-3">
+                                    Configure how long to keep your backups in OneDrive to save storage space.
+                                </div>
+                                <div class="row">
+                                    <setting class="col-12 col-lg-6" title="Retention Type" help="Choose how you want to prune old backups.">
+                                        <field name="onedrive_retention_type" widget="radio"/>
+                                    </setting>
+                                    <setting class="col-12 col-lg-6" title="Retention Limit" invisible="onedrive_retention_type == 'none'">
+                                        <div invisible="onedrive_retention_type != 'count'">
+                                            <div class="d-flex align-items-center">
+                                                <span>Keep last </span>
+                                                <field name="onedrive_retention_count" class="mx-2 oe_inline fw-bold"/>
+                                                <span> backups</span>
+                                            </div>
+                                        </div>
+                                        <div invisible="onedrive_retention_type != 'days'">
+                                            <div class="d-flex align-items-center">
+                                                <span>Keep for </span>
+                                                <field name="onedrive_retention_days" class="mx-2 oe_inline fw-bold"/>
+                                                <span> days</span>
+                                            </div>
+                                        </div>
+                                    </setting>
+                                </div>
+                            </block>
+                        </page>
+                    </notebook>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>
