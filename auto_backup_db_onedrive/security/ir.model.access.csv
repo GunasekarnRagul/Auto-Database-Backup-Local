@@ -1,2 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_onedrive_backup_db,onedrive.backup.db,model_onedrive_backup_db,base.group_system,1,1,1,1
