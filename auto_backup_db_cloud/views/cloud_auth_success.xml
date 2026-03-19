@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="cloud_auth_success" name="Cloud Auth Success">
+        <t t-call="web.login_layout">
+            <div class="text-center" style="padding: 60px 20px;">
+                <div style="max-width: 480px; margin: 0 auto;">
+                    <div style="width: 80px; height: 80px; margin: 0 auto 24px; background: #28a745; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa fa-check fa-3x" style="color: white;"/>
+                    </div>
+                    <h2 style="color: #2c3e50; margin-bottom: 12px;">Connected Successfully</h2>
+                    <p style="color: #7f8c8d; font-size: 16px; margin-bottom: 30px;">
+                        Your <strong t-esc="provider_name"/> account has been connected and authorized.
+                        You can now configure auto backups.
+                    </p>
+                    <a href="/web#action=base_setup.action_general_configuration"
+                       class="btn btn-primary btn-lg"
+                       style="padding: 12px 40px; font-size: 16px; border-radius: 8px;">
+                        <i class="fa fa-arrow-left me-2"/>
+                        Go to Settings
+                    </a>
+                    <p class="text-muted mt-3" style="font-size: 13px;">
+                        You will be redirected automatically in <span id="countdown">5</span> seconds...
+                    </p>
+                </div>
+            </div>
+            <script>
+                var seconds = 5;
+                var countdown = document.getElementById('countdown');
+                var timer = setInterval(function() {
+                    seconds--;
+                    if (countdown) countdown.textContent = seconds;
+                    if (seconds &lt;= 0) {
+                        clearInterval(timer);
+                        window.location.href = '/web#action=base_setup.action_general_configuration';
+                    }
+                }, 1000);
+            </script>
+        </t>
+    </template>
+</odoo>

@@ -348,7 +348,7 @@ class ResConfigSettings(models.TransientModel):
                 sync_scope = ICP.get_param('auto_backup_db_aws_s3.sync_scope') or 'all'
                 db_ids_field = 'auto_backup_db_aws_s3.selected_db_ids'
             else:
-                sync_scope = ICP.get_param('auto_bac kup_db_aws_s3.manual_sync_scope') or 'all'
+                sync_scope = ICP.get_param('auto_backup_db_aws_s3.manual_sync_scope') or 'all'
                 db_ids_field = 'auto_backup_db_aws_s3.manual_selected_db_ids'
 
             if sync_scope == 'selective':
@@ -438,7 +438,7 @@ class ResConfigSettings(models.TransientModel):
     @api.model
     def _cron_auto_backup(self):
         ICP = self.env['ir.config_parameter'].sudo()
-        if not ICP.get_param('auto_backup_db_aws_s3.backup_active'):
+        if ICP.get_param('auto_backup_db_aws_s3.backup_active') != 'True':
             return
             
         config = self.create({})
