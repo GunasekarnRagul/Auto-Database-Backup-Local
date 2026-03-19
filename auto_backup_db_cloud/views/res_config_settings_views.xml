@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_cloud_backup" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.cloud.backup</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="90"/>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Cloud Backup" string="Cloud Backup" name="auto_backup_db_cloud">
+
+                    <!-- ─── Cloud Provider Selector ──────────────── -->
+                    <block title="Cloud Provider" name="cloud_provider_block">
+                        <setting string="Select Cloud Provider" help="Choose your cloud storage provider for database backups.">
+                            <field name="cloud_provider"/>
+                            <field name="cloud_is_connected" invisible="1"/>
+                        </setting>
+                    </block>
+
+
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>
