@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.ai.connector</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="10"/>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="AI Connector" string="AI Connector" name="ai_connecter_ca">
+                    <block title="AI Agents Configuration" name="ai_agents_config">
+                        <setting title="OpenAI (ChatGPT)" help="Configure OpenAI API Key">
+                            <field name="openai_api_key" password="True"/>
+                            <div class="text-muted mt-1">
+                                Get your key at <a href="https://platform.openai.com/" target="_blank">OpenAI Developer Platform</a>
+                            </div>
+                            <div class="mt-2">
+                                <button name="action_test_openai_connection" type="object" string="Test ChatGPT Connection" class="btn btn-primary"/>
+                            </div>
+                        </setting>
+                        <setting title="Google (Gemini)" help="Configure Gemini API Key">
+                            <field name="gemini_api_key" password="True"/>
+                            <div class="text-muted mt-1">
+                                Get your key at <a href="https://aistudio.google.com/" target="_blank">Google AI Studio</a>
+                            </div>
+                            <div class="mt-2">
+                                <button name="action_test_gemini_connection" type="object" string="Test Gemini Connection" class="btn btn-primary"/>
+                            </div>
+                        </setting>
+                        <setting title="Anthropic (Claude)" help="Configure Claude API Key">
+                            <field name="claude_api_key" password="True"/>
+                            <div class="text-muted mt-1">
+                                Get your key at <a href="https://console.anthropic.com/" target="_blank">Anthropic Web Console</a>
+                            </div>
+                            <div class="mt-2">
+                                <button name="action_test_claude_connection" type="object" string="Test Claude Connection" class="btn btn-primary"/>
+                            </div>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_ai_connector_config_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{'module': 'ai_connecter_ca'}</field>
+    </record>
+
+    <menuitem id="menu_ai_connector_root"
+              name="AI Connector"
+              sequence="100"
+              web_icon="base,static/description/settings.png"/>
+
+    <menuitem id="menu_ai_connector_settings"
+              name="Settings"
+              parent="menu_ai_connector_root"
+              action="action_ai_connector_config_settings"
+              sequence="10"/>
+</odoo>
