@@ -1,0 +1,13 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_connector_user,ai.connector,model_ai_connector,base.group_user,1,0,0,0
+access_ai_connector_manager,ai.connector,model_ai_connector,base.group_erp_manager,1,1,1,1
+access_ai_agent_user,ai.agent,model_ai_agent,base.group_user,1,0,0,0
+access_ai_agent_manager,ai.agent,model_ai_agent,base.group_erp_manager,1,1,1,1
+access_ai_agent_permission_user,ai.agent.permission,model_ai_agent_permission,base.group_user,1,0,0,0
+access_ai_agent_permission_manager,ai.agent.permission,model_ai_agent_permission,base.group_erp_manager,1,1,1,1
+access_ai_conversation_user,ai.conversation,model_ai_conversation,base.group_user,1,1,1,1
+access_ai_conversation_manager,ai.conversation,model_ai_conversation,base.group_erp_manager,1,1,1,1
+access_ai_message_user,ai.message,model_ai_message,base.group_user,1,1,1,1
+access_ai_message_manager,ai.message,model_ai_message,base.group_erp_manager,1,1,1,1
+access_ai_favorite_prompt_user,ai.favorite.prompt,model_ai_favorite_prompt,base.group_user,1,1,1,1
+access_ai_favorite_prompt_manager,ai.favorite.prompt,model_ai_favorite_prompt,base.group_erp_manager,1,1,1,1

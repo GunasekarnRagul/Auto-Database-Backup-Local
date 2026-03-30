@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- List view for history -->
+    <record id="view_chat_history_list" model="ir.ui.view">
+        <field name="name">ai.conversation.history.list</field>
+        <field name="model">ai.conversation</field>
+        <field name="arch" type="xml">
+            <list string="Chat History">
+                <field name="name" string="Conversation Title"/>
+                <field name="agent_id"/>
+                <field name="user_id"/>
+                <field name="create_date"/>
+                <field name="message_count"/>
+                <field name="is_favorite" widget="boolean_favorite" string="Starred"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Search view -->
+    <record id="view_chat_history_search" model="ir.ui.view">
+        <field name="name">ai.conversation.history.search</field>
+        <field name="model">ai.conversation</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" string="Conversation"/>
+                <field name="user_id"/>
+                <filter name="starred" string="Starred"
+                        domain="[('is_favorite', '=', True)]"/>
+                <group string="Group By">
+                    <filter name="by_user" string="User"
+                            context="{'group_by': 'user_id'}"/>
+                    <filter name="by_agent" string="Agent"
+                            context="{'group_by': 'agent_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action for AI Users (sees only own conversations) -->
+    <record id="action_chat_history_user" model="ir.actions.act_window">
+        <field name="name">Chat History</field>
+        <field name="res_model">ai.conversation</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('user_id', '=', uid)]</field>
+        <!-- <field name="search_view_id" ref="view_chat_history_search"/> -->
+    </record>
+
+</odoo>

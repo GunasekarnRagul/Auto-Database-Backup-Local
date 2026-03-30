@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<t t-name="chatgpt_ai_assistance_ca.ChatMessage">
+
+    <!-- USER MESSAGE -->
+    <t t-if="props.message.role === 'user'">
+        <div class="user-message-wrapper">
+            <div class="user-message">
+                <span t-esc="props.message.content"/>
+                <span class="fav-star" t-on-click="saveFavorite" title="Save as favorite">☆</span>
+            </div>
+        </div>
+    </t>
+
+    <!-- ASSISTANT MESSAGE -->
+    <t t-if="props.message.role === 'assistant'">
+        <div class="assistant-message-wrapper">
+            <div class="ai-avatar">✦</div>
+            <div class="assistant-message">
+
+                <!-- ERROR FORMAT -->
+                <t t-if="isError">
+                    <div class="error-message">
+                        <span class="error-icon">⚠</span>
+                        <span t-esc="props.message.content"/>
+                    </div>
+                </t>
+
+                <!-- NORMAL NARRATION -->
+                <t t-else="">
+                    <div class="narration" t-out="renderedContent"/>
+                </t>
+
+                <!-- FORMAT: TABLE -->
+                <t t-if="hasTableData">
+                    <div class="response-table-wrapper">
+                        <div class="table-meta">
+                            <span><t t-esc="props.message.records.length"/> records found</span>
+                            <button class="export-csv-btn" t-on-click="exportCSV">⬇ Export CSV</button>
+                        </div>
+                        <table class="response-table">
+                            <thead>
+                                <tr>
+                                    <t t-foreach="tableHeaders" t-as="field" t-key="field">
+                                        <th t-esc="field"/>
+                                    </t>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="tableRows" t-as="row" t-key="row_index">
+                                    <tr class="table-row" t-on-click="() => this.openRecord(row)">
+                                        <t t-foreach="tableHeaders" t-as="field" t-key="field">
+                                            <td t-esc="getCellValue(row, field)"/>
+                                        </t>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+
+                <!-- FORMAT: LIST -->
+                <t t-if="hasListData">
+                    <ul class="response-list">
+                        <t t-foreach="props.message.records" t-as="row" t-key="row_index">
+                            <li t-esc="getListItemText(row)"/>
+                        </t>
+                    </ul>
+                </t>
+
+                <!-- FORMAT: CARD -->
+                <t t-if="hasCardData">
+                    <div class="response-card">
+                        <t t-foreach="cardEntries" t-as="entry" t-key="entry[0]">
+                            <div class="card-row">
+                                <span class="card-label" t-esc="entry[0]"/>
+                                <span class="card-value" t-esc="entry[1]"/>
+                            </div>
+                        </t>
+                        <button class="open-record-btn"
+                                t-on-click="() => this.openRecord(props.message.records[0])">
+                            Open Record ↗
+                        </button>
+                    </div>
+                </t>
+
+                <!-- MESSAGE ACTIONS -->
+                <div class="message-actions">
+                    <button class="action-btn" t-on-click="copyContent" title="Copy">
+                        📋 Copy
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </t>
+
+</t>
+
+</templates>

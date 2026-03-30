@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Singleton server action: creates connector if none exists, then opens form -->
+    <record id="action_ai_connector" model="ir.actions.server">
+        <field name="name">Open AI Connector</field>
+        <field name="model_id" ref="model_ai_connector"/>
+        <field name="state">code</field>
+        <field name="code">
+connector = env['ai.connector'].search([('active', '=', True)], limit=1)
+if not connector:
+    connector = env['ai.connector'].create({'name': 'Default Connector'})
+action = {
+    'type': 'ir.actions.act_window',
+    'res_model': 'ai.connector',
+    'view_mode': 'form',
+    'res_id': connector.id,
+    'target': 'current',
+}
+        </field>
+    </record>
+
+    <!-- Form view -->
+    <record id="view_ai_connector_form" model="ir.ui.view">
+        <field name="name">ai.connector.form</field>
+        <field name="model">ai.connector</field>
+        <field name="arch" type="xml">
+            <form string="ChatGPT Connector">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>ChatGPT Connection</h1>
+                    </div>
+                    <group>
+                        <field name="api_key"
+                               widget="password"
+                               string="ChatGPT API Key"
+                               placeholder="sk-..."
+                               help="Enter your OpenAI API key. You can find it at platform.openai.com/api-keys"/>
+                    </group>
+                    <div style="color: #6b7280; font-size: 12px; margin-bottom: 12px;">
+                        Enter your OpenAI API key. You can find it at
+                        <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a>
+                    </div>
+                    <div>
+                        <button name="action_test_connection"
+                                type="object"
+                                string="Test Connection"
+                                class="btn btn-primary"
+                                style="width: 100%; height: 44px;"/>
+                    </div>
+                    <group invisible="not status_message">
+                        <field name="status_message" readonly="1"/>
+                        <field name="connection_status" readonly="1"/>
+                    </group>
+                    <group string="Advanced Settings" invisible="1">
+                        <field name="name"/>
+                        <field name="api_base_url"/>
+                        <field name="model_name"/>
+                        <field name="request_timeout"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</odoo>
