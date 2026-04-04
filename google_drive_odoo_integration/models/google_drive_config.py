@@ -11,6 +11,10 @@ class GoogleDriveRootFolder(models.Model):
     config_id = fields.Many2one('google.drive.config', string='Drive Configuration', ondelete='cascade')
     active = fields.Boolean('Active', default=True)
 
+    _sql_constraints = [
+        ('root_id_config_unique', 'unique(root_id, config_id)', 'This Folder ID is already configured for this drive!')
+    ]
+
     def unlink(self):
         # Clear files for this root
         self.env['google.drive.file'].sudo().search([
@@ -49,7 +53,7 @@ class GoogleDriveConfig(models.Model):
     redirect_uri = fields.Char('Redirect URI', compute='_compute_redirect_uri')
     refresh_token = fields.Char('Refresh Token')
     
-    drive_id = fields.Char('Drive ID?')
+    shared_drive_id = fields.Char('Shared Drive ID', help='Google Shared Drive (Team Drive) ID. Leave blank for personal drive.')
     root_ids = fields.One2many('google.drive.root.folder', 'config_id', string='Root Folders')
     
     group_ids = fields.Many2many('res.groups', string='Groups with access')
@@ -148,6 +152,18 @@ class GoogleDriveConfig(models.Model):
             'res_model': 'google.drive.root.folder',
             'view_mode': 'tree',
             'domain': [('config_id', '=', self.id)],
+            'context': {'default_config_id': self.id},
+            'target': 'new',
+        }
+
+    def action_bulk_add_folders(self):
+        """Open the bulk add wizard."""
+        self.ensure_one()
+        return {
+            'name': _('Bulk Add Folders'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'google.drive.folder.wizard',
+            'view_mode': 'form',
             'context': {'default_config_id': self.id},
             'target': 'new',
         }

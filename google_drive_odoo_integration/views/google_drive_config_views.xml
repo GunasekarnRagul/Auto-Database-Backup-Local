@@ -4,9 +4,13 @@
         <field name="model">google.drive.root.folder</field>
         <field name="arch" type="xml">
             <tree editable="bottom">
+                <header>
+                    <button name="%(action_google_drive_folder_wizard)d" string="Bulk Add Folders" type="action" class="btn-primary" icon="fa-plus-circle"/>
+                </header>
                 <field name="name" placeholder="e.g. Project Documents"/>
                 <field name="root_id" placeholder="Google Folder ID"/>
                 <field name="active" widget="boolean_toggle"/>
+                <button name="unlink" type="object" icon="fa-trash-o" title="Delete Root ID" string="Delete" class="btn-link text-danger"/>
             </tree>
         </field>
     </record>
@@ -31,12 +35,7 @@
                     <group>
                         <group name="general_settings" string="General Information">
                             <field name="drive_type" options="{'no_create': True, 'no_open': True}"/>
-                            <field name="readonly"/>
                             <field name="active" widget="boolean_toggle" readonly="state != 'connected'"/>
-                        </group>
-                        <group name="access_control" string="Access Control">
-                            <field name="group_ids" widget="many2many_tags" placeholder="Select groups..."/>
-                            <field name="user_ids" widget="many2many_tags" placeholder="Select users..."/>
                         </group>
                     </group>
                     <notebook>
@@ -69,15 +68,21 @@
                                 <field name="refresh_token" readonly="1" invisible="not refresh_token"/>
 
                             </group>
-                            <group string="Drive Settings">
-                                <field name="drive_id" placeholder="Google Drive ID (leave blank for personal drive)"/>
-                                <div colspan="2" class="d-flex align-items-center gap-2 mt-2">
-                                    <button name="action_configure_roots" string="Configure Root Folders" 
-                                            type="object" class="btn-primary" icon="fa-folder-open"
-                                            invisible="state != 'connected'"/>
-                                    <button name="action_sync_all" string="Sync All Now" 
-                                            type="object" class="btn-outline-secondary" icon="fa-refresh" 
-                                            invisible="state != 'connected'"/>
+                            <group string="Root Folders &amp; Sync Settings">
+                                <div colspan="2" class="d-flex flex-column gap-3 p-3 bg-light rounded" invisible="not refresh_token">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <button name="action_configure_roots" string="Configure the root folders ID" 
+                                                type="object" class="btn-primary w-50" icon="fa-folder-open"/>
+                                        <p class="mb-0 text-muted small"><i class="fa fa-info-circle me-1"/>Add and manage folder IDs in a dialog.</p>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3" invisible="state != 'connected'">
+                                        <button name="action_sync_all" string="Root folder sync" 
+                                                type="object" class="btn-outline-secondary w-50" icon="fa-refresh"/>
+                                        <p class="mb-0 text-muted small"><i class="fa fa-info-circle me-1"/>Synchronize All configured folders now.</p>
+                                    </div>
+                                </div>
+                                <div colspan="2" class="alert alert-warning" role="alert" invisible="refresh_token">
+                                    <i class="fa fa-exclamation-triangle me-2"/> Please <strong>Authenticate</strong> first to manage root folders and synchronize files.
                                 </div>
                             </group>
                         </page>
@@ -159,32 +164,6 @@
                                 </span>
                             </div>
 
-                            <!-- Details section -->
-                            <div class="o_cloud_card_details">
-                                <div class="o_cloud_detail_row">
-                                    <span class="o_cloud_detail_label"><i class="fa fa-eye me-1"/>Readonly</span>
-                                    <span t-if="record.readonly.raw_value" class="badge rounded-pill bg-info-light text-info">Yes</span>
-                                    <span t-if="!record.readonly.raw_value" class="badge rounded-pill bg-secondary-light text-muted">No</span>
-                                </div>
-                                <div class="o_cloud_detail_row">
-                                    <span class="o_cloud_detail_label"><i class="fa fa-users me-1"/>Groups</span>
-                                    <t t-if="record.group_ids.raw_value.length > 0">
-                                        <span class="o_cloud_detail_value text-truncate"><field name="group_ids" widget="many2many_tags"/></span>
-                                    </t>
-                                    <t t-else="">
-                                        <span class="text-muted">-</span>
-                                    </t>
-                                </div>
-                                <div class="o_cloud_detail_row">
-                                    <span class="o_cloud_detail_label"><i class="fa fa-user me-1"/>Users</span>
-                                    <t t-if="record.user_ids.raw_value.length > 0">
-                                        <span class="o_cloud_detail_value text-truncate"><field name="user_ids" widget="many2many_tags"/></span>
-                                    </t>
-                                    <t t-else="">
-                                        <span class="text-muted">-</span>
-                                    </t>
-                                </div>
-                            </div>
 
                             <!-- Footer: Status badge + Toggle -->
                             <div class="o_cloud_card_footer">

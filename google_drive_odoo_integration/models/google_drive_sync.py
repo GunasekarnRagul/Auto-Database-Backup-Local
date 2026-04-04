@@ -77,9 +77,13 @@ class GoogleDriveSync(models.AbstractModel):
 
     def _upload_via_client(self, service, attachment, config):
         """Upload using the official Google API client."""
+        # Use first active root folder for upload
+        first_root = config.root_ids.filtered(lambda r: r.active)[:1]
+        root_id = first_root.root_id if first_root else False
+        
         file_metadata = {
             'name': attachment.name,
-            'parents': [config.root_id] if config.root_id else []
+            'parents': [root_id] if root_id else []
         }
         file_content = base64.b64decode(attachment.datas) if attachment.datas else attachment.raw
         media = MediaIoBaseUpload(
@@ -104,9 +108,14 @@ class GoogleDriveSync(models.AbstractModel):
             return
 
         headers = {"Authorization": f"Bearer {access_token}"}
+        
+        # Use first active root folder for upload
+        first_root = config.root_ids.filtered(lambda r: r.active)[:1]
+        root_id = first_root.root_id if first_root else False
+
         metadata = {
             "name": attachment.name,
-            "parents": [config.root_id] if config.root_id else []
+            "parents": [root_id] if root_id else []
         }
         files = {
             'data': ('metadata', json.dumps(metadata), 'application/json; charset=UTF-8'),

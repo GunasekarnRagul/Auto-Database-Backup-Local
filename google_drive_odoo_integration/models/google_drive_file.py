@@ -9,8 +9,8 @@ class GoogleDriveFile(models.Model):
     _order = 'file_type desc, name asc'
 
     name = fields.Char('File Name', required=True)
-    drive_config_id = fields.Many2one('google.drive.config', string='Drive', required=True)
-    root_folder_id = fields.Many2one('google.drive.root.folder', string='Root Folder')
+    drive_config_id = fields.Many2one('google.drive.config', string='Drive', required=True, ondelete='cascade')
+    root_folder_id = fields.Many2one('google.drive.root.folder', string='Root Folder', ondelete='cascade')
     file_type = fields.Selection([
         ('file', 'File'),
         ('folder', 'Folder'),
