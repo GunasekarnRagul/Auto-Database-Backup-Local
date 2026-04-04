@@ -59,6 +59,12 @@ class GoogleDriveConfig(models.Model):
     group_ids = fields.Many2many('res.groups', string='Groups with access')
     user_ids = fields.Many2many('res.users', string='Users with access')
 
+    root_folder_count = fields.Integer('Root Folders', compute='_compute_counts')
+
+    def _compute_counts(self):
+        for config in self:
+            config.root_folder_count = len(config.root_ids)
+
     _sql_constraints = [
         ('client_id_unique', 'unique(client_id)', 'This Client ID is already in use. Each configuration must have a unique Client ID!')
     ]

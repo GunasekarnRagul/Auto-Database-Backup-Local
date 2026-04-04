@@ -36,6 +36,7 @@
                         <group name="general_settings" string="General Information">
                             <field name="drive_type" options="{'no_create': True, 'no_open': True}"/>
                             <field name="active" widget="boolean_toggle" readonly="state != 'connected'"/>
+                            <field name="root_folder_count" invisible="not refresh_token"/>
                         </group>
                     </group>
                     <notebook>
@@ -114,6 +115,7 @@
                 <field name="drive_type"/>
                 <field name="state"/>
                 <field name="active"/>
+                <field name="root_folder_count"/>
                 <field name="readonly"/>
                 <field name="group_ids"/>
                 <field name="user_ids"/>
@@ -162,6 +164,14 @@
                                 <span class="o_cloud_drive_tag" style="white-space: nowrap;">
                                     <i class="fa fa-hdd-o"/> Driver : <field name="drive_type"/>
                                 </span>
+                            </div>
+
+                            <!-- Details section: Counts -->
+                            <div class="o_cloud_card_details pt-2 border-top mx-3" style="font-size: 11px; color: #666;">
+                                <div class="d-flex justify-content-between">
+                                    <span><i class="fa fa-folder-open-o me-1"/> Folders Synced:</span>
+                                    <span class="fw-bold text-dark"><field name="root_folder_count"/></span>
+                                </div>
                             </div>
 
 
