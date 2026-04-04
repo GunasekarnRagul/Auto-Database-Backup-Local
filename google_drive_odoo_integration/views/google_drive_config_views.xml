@@ -1,0 +1,236 @@
+<odoo>
+    <record id="google_drive_root_folder_view_tree" model="ir.ui.view">
+        <field name="name">google.drive.root.folder.view.tree</field>
+        <field name="model">google.drive.root.folder</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom">
+                <field name="name" placeholder="e.g. Project Documents"/>
+                <field name="root_id" placeholder="Google Folder ID"/>
+                <field name="active" widget="boolean_toggle"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="google_drive_config_view_form" model="ir.ui.view">
+        <field name="name">google.drive.config.view.form</field>
+        <field name="model">google.drive.config</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_authenticate" string="Authenticate" type="object" class="btn-primary" invisible="refresh_token != False"/>
+                    <button name="action_authenticate" string="Re-Authenticate" type="object" invisible="refresh_token == False"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,connected"/>
+                    <field name="active" widget="boolean_toggle" invisible="1"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Local Drive"/></h1>
+                    </div>
+                    <group>
+                        <group name="general_settings" string="General Information">
+                            <field name="drive_type" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="readonly"/>
+                            <field name="active" widget="boolean_toggle" readonly="state != 'connected'"/>
+                        </group>
+                        <group name="access_control" string="Access Control">
+                            <field name="group_ids" widget="many2many_tags" placeholder="Select groups..."/>
+                            <field name="user_ids" widget="many2many_tags" placeholder="Select users..."/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Connection Settings" name="connection_settings">
+                            <group string="OAuth 2.0 Credentials">
+                                <field name="client_id" placeholder="Enter your Client ID"/>
+                                <field name="client_secret" password="True" placeholder="Enter your Client Secret"/>
+                                <div colspan="2" class="alert alert-info mt-3 mb-3" role="status">
+                                    <div class="d-flex align-items-center mb-2 border-bottom pb-2">
+                                        <i class="fa fa-info-circle me-2" style="font-size: 1.2rem;"/>
+                                        <strong class="text-info">Configuration Steps:</strong>
+                                    </div>
+                                    <ul class="mb-3 ms-4">
+                                        <li class="mb-1">Go to <a href="https://console.cloud.google.com/" target="_blank" class="alert-link">Google Cloud Console</a> &gt; <strong>APIs &amp; Services &gt; Credentials</strong>.</li>
+                                        <li class="mb-1">Edit your <strong>OAuth 2.0 Client ID</strong>.</li>
+                                        <li class="mb-1">Add the <strong>Redirect URI</strong> shown below to 'Authorized redirect URIs'.</li>
+                                    </ul>
+                                    <div class="border-top pt-2 mt-2">
+                                        <p class="mb-1 small text-muted"><strong>How is this URI formed?</strong></p>
+                                        <ol class="small text-muted mb-0">
+                                            <li>Your protocol &amp; domain (e.g., <code>https://yourdomain.com</code>)</li>
+                                            <li>The static suffix: <code>/google_account/authentication</code></li>
+                                        </ol>
+                                    </div>
+                                    <div class="d-flex align-items-center mt-2">
+                                        <field name="redirect_uri" widget="copy_clipboard" readonly="1" class="fw-bold bg-white p-2 rounded border flex-grow-1"/>
+                                    </div>
+                                </div>
+
+                                <field name="refresh_token" readonly="1" invisible="not refresh_token"/>
+
+                            </group>
+                            <group string="Drive Settings">
+                                <field name="drive_id" placeholder="Google Drive ID (leave blank for personal drive)"/>
+                                <div colspan="2" class="d-flex align-items-center gap-2 mt-2">
+                                    <button name="action_configure_roots" string="Configure Root Folders" 
+                                            type="object" class="btn-primary" icon="fa-folder-open"
+                                            invisible="state != 'connected'"/>
+                                    <button name="action_sync_all" string="Sync All Now" 
+                                            type="object" class="btn-outline-secondary" icon="fa-refresh" 
+                                            invisible="state != 'connected'"/>
+                                </div>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="google_drive_config_view_tree" model="ir.ui.view">
+        <field name="name">google.drive.config.view.tree</field>
+        <field name="model">google.drive.config</field>
+        <field name="arch" type="xml">
+            <tree decoration-success="state == 'connected'" decoration-info="state == 'draft'">
+                <field name="name"/>
+                <field name="drive_type"/>
+                <field name="state" widget="badge" decoration-success="state == 'connected'" decoration-info="state == 'draft'"/>
+                <field name="active" widget="boolean_toggle" readonly="state != 'connected'"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="google_drive_config_view_kanban" model="ir.ui.view">
+        <field name="name">google.drive.config.view.kanban</field>
+        <field name="model">google.drive.config</field>
+        <field name="arch" type="xml">
+            <kanban class="o_cloud_kanban" sample="1" quick_create="false">
+                <field name="name"/>
+                <field name="drive_type"/>
+                <field name="state"/>
+                <field name="active"/>
+                <field name="readonly"/>
+                <field name="group_ids"/>
+                <field name="user_ids"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_global_click oe_kanban_card o_cloud_card">
+                            <!-- Left accent stripe -->
+                            <div t-attf-class="o_cloud_card_accent #{record.state.raw_value == 'connected' ? 'accent-success' : (record.state.raw_value == 'error' ? 'accent-danger' : 'accent-warning')}"/>
+
+                            <!-- Header: Icon + Title + 3-dot menu -->
+                            <div class="o_cloud_card_header">
+                                <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
+                                    <div class="o_cloud_card_icon">
+                                        <t t-if="record.drive_type.raw_value == 'gdrive'">
+                                            <img src="/google_drive_odoo_integration/static/src/img/google-drive.png" alt="Google Drive" style="width: 24px; height: 24px;"/>
+                                        </t>
+                                        <i class="fa fa-cloud" t-if="record.drive_type.raw_value != 'gdrive'"/>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="o_cloud_card_title text-truncate">
+                                            <field name="name"/>
+                                        </div>
+                                        <div class="o_cloud_card_subtitle">
+                                            <i class="fa fa-lock me-1"/> OAuth 2.0 Authorization
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 3-dot dropdown menu -->
+                                <div class="o_cloud_card_menu o_dropdown_kanban dropdown">
+                                    <a class="dropdown-toggle o-no-caret" role="button" data-bs-toggle="dropdown" href="#">
+                                        <i class="fa fa-ellipsis-v" title="Actions"/>
+                                    </a>
+                                    <div class="dropdown-menu dropdown-menu-end" role="menu">
+                                        <a role="menuitem" type="edit" class="dropdown-item">
+                                            <i class="fa fa-pencil me-2 text-primary"/>Edit
+                                        </a>
+                                        <a role="menuitem" type="delete" class="dropdown-item text-danger">
+                                            <i class="fa fa-trash-o me-2"/>Delete
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Driver tag -->
+                            <div style="padding: 6px 16px 0 20px;">
+                                <span class="o_cloud_drive_tag" style="white-space: nowrap;">
+                                    <i class="fa fa-hdd-o"/> Driver : <field name="drive_type"/>
+                                </span>
+                            </div>
+
+                            <!-- Details section -->
+                            <div class="o_cloud_card_details">
+                                <div class="o_cloud_detail_row">
+                                    <span class="o_cloud_detail_label"><i class="fa fa-eye me-1"/>Readonly</span>
+                                    <span t-if="record.readonly.raw_value" class="badge rounded-pill bg-info-light text-info">Yes</span>
+                                    <span t-if="!record.readonly.raw_value" class="badge rounded-pill bg-secondary-light text-muted">No</span>
+                                </div>
+                                <div class="o_cloud_detail_row">
+                                    <span class="o_cloud_detail_label"><i class="fa fa-users me-1"/>Groups</span>
+                                    <t t-if="record.group_ids.raw_value.length > 0">
+                                        <span class="o_cloud_detail_value text-truncate"><field name="group_ids" widget="many2many_tags"/></span>
+                                    </t>
+                                    <t t-else="">
+                                        <span class="text-muted">-</span>
+                                    </t>
+                                </div>
+                                <div class="o_cloud_detail_row">
+                                    <span class="o_cloud_detail_label"><i class="fa fa-user me-1"/>Users</span>
+                                    <t t-if="record.user_ids.raw_value.length > 0">
+                                        <span class="o_cloud_detail_value text-truncate"><field name="user_ids" widget="many2many_tags"/></span>
+                                    </t>
+                                    <t t-else="">
+                                        <span class="text-muted">-</span>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <!-- Footer: Status badge + Toggle -->
+                            <div class="o_cloud_card_footer">
+                                <span t-if="record.state.raw_value == 'connected'" class="o_cloud_status_badge badge-connected">
+                                    <i class="fa fa-check-circle"/>Connected
+                                </span>
+                                <span t-if="record.state.raw_value == 'draft'" class="o_cloud_status_badge badge-draft">
+                                    <i class="fa fa-clock-o"/>Pending Setup
+                                </span>
+                                <span t-if="record.state.raw_value == 'error'" class="o_cloud_status_badge badge-error">
+                                    <i class="fa fa-times-circle"/>Error
+                                </span>
+                                <field name="active" widget="boolean_toggle" readonly="state != 'connected'"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="google_drive_config_view_search" model="ir.ui.view">
+        <field name="name">google.drive.config.view.search</field>
+        <field name="model">google.drive.config</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="drive_type"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="google_drive_config_action" model="ir.actions.act_window">
+        <field name="name">Drives</field>
+        <field name="res_model">google.drive.config</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="search_view_id" ref="google_drive_config_view_search"/>
+        <field name="context">{'active_test': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure your first Cloud Storage!
+            </p>
+            <p>
+                Connect Odoo with Google Drive to synchronize your documents seamlessly.
+            </p>
+        </field>
+    </record>
+
+</odoo>
