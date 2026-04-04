@@ -191,19 +191,17 @@ export class FileExplorer extends Component {
 
     async switchDrive(driveId) {
         this.state.activeDriveId = driveId;
+        this.state.activeSection = 'my_drive';
+        this.state.activeRootId = null;
+        this.state.activeFolderTreeId = null;
+        this.state.isRootTreeExpanded = false;
+        
         await this.loadRoots(driveId);
+        
         const driveName = this.activeDriveName;
         this.state.showAccountMenu = false;
         this.state.breadcrumbs = [{ id: 'section', name: driveName }];
-        if (this.state.activeRootId) {
-            const root = this.state.rootFolders.find(r => r.id === this.state.activeRootId);
-            if (root) {
-                this.state.breadcrumbs.push({ id: null, name: root.name });
-                this.state.currentFolderName = root.name;
-            }
-        } else {
-            this.state.currentFolderName = driveName;
-        }
+        this.state.currentFolderName = driveName;
 
         this.state.searchQuery = '';
         this.state.searchMode = false;

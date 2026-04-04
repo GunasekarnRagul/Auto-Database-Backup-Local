@@ -51,9 +51,6 @@
             <!-- ====== TOP HEADER BAR ====== -->
             <div class="gd_header" t-att-class="{ 'gd_header_hidden': state.selectionMode }">
                 <div class="gd_header_left">
-                    <button class="gd_sidebar_toggle" t-on-click="toggleSidebar" title="Toggle Sidebar">
-                        <i class="fa fa-bars"/>
-                    </button>
                     <div class="gd_logo">
                         <img src="/google_drive_odoo_integration/static/description/folders.png" alt="Drive" class="gd_logo_icon"/>
                         <span class="gd_logo_text">File Explorer</span>
@@ -307,6 +304,12 @@
                                 <span>Trash</span>
                             </a>
                         </nav>
+                    </div>
+                    <!-- Sidebar Footer with Toggle (Moved outside inner to stay fixed at bottom) -->
+                    <div class="gd_sidebar_footer">
+                        <button class="gd_sidebar_toggle" t-on-click="toggleSidebar" title="Toggle Sidebar">
+                            <img src="/google_drive_odoo_integration/static/description/bugermenu.png" alt="Menu" class="gd_sidebar_img_icon"/>
+                        </button>
                     </div>
                 </div>
 
