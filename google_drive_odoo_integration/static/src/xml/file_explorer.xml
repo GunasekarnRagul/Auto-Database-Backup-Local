@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates xml:space="preserve">
     <t t-name="google_drive_odoo_integration.FileExplorer">
-        <div class="gd_explorer">
+        <div class="gd_explorer" t-att-class="{ 'gd_sidebar_collapsed': state.sidebarCollapsed }">
             <!-- ====== SELECTION TOOLBAR (shown when files selected) ====== -->
             <t t-if="state.selectionMode">
                 <div class="gd_selection_bar">
@@ -51,6 +51,9 @@
             <!-- ====== TOP HEADER BAR ====== -->
             <div class="gd_header" t-att-class="{ 'gd_header_hidden': state.selectionMode }">
                 <div class="gd_header_left">
+                    <button class="gd_sidebar_toggle" t-on-click="toggleSidebar" title="Toggle Sidebar">
+                        <i class="fa fa-bars"/>
+                    </button>
                     <div class="gd_logo">
                         <img src="/google_drive_odoo_integration/static/description/folders.png" alt="Drive" class="gd_logo_icon"/>
                         <span class="gd_logo_text">File Explorer</span>
@@ -277,55 +280,10 @@
                                         <t t-if="state.activeRootId === root.id">
                                             <div class="gd_folder_tree">
                                                 <t t-foreach="getTreeRootChildren()" t-as="folder" t-key="folder.id">
-                                                    <div class="gd_tree_node_wrap">
-                                                        <div class="gd_tree_node" t-att-class="{ 'gd_tree_active': state.activeFolderTreeId === folder.id }" style="padding-left: 36px;">
-                                                            <span class="gd_tree_toggle" t-on-click.stop="() => this.toggleFolderTree(folder.id)">
-                                                                <i t-att-class="'fa ' + (isTreeNodeExpanded(folder.id) ? 'fa-caret-down' : 'fa-caret-right')"/>
-                                                            </span>
-                                                            <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" class="gd_tree_icon"/>
-                                                            <span class="gd_tree_name" t-on-click.stop="() => this.onTreeFolderClick(folder.id, folder.name)" t-esc="folder.name"/>
-                                                        </div>
-                                                        <!-- Level 2 children -->
-                                                        <t t-if="isTreeNodeExpanded(folder.id)">
-                                                            <t t-foreach="getTreeNodeChildren(folder.id)" t-as="child2" t-key="child2.id">
-                                                                <div class="gd_tree_node_wrap">
-                                                                    <div class="gd_tree_node" t-att-class="{ 'gd_tree_active': state.activeFolderTreeId === child2.id }" style="padding-left: 52px;">
-                                                                        <span class="gd_tree_toggle" t-on-click.stop="() => this.toggleFolderTree(child2.id)">
-                                                                            <i t-att-class="'fa ' + (isTreeNodeExpanded(child2.id) ? 'fa-caret-down' : 'fa-caret-right')"/>
-                                                                        </span>
-                                                                        <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" class="gd_tree_icon"/>
-                                                                        <span class="gd_tree_name" t-on-click.stop="() => this.onTreeFolderClick(child2.id, child2.name)" t-esc="child2.name"/>
-                                                                    </div>
-                                                                    <!-- Level 3 children -->
-                                                                    <t t-if="isTreeNodeExpanded(child2.id)">
-                                                                        <t t-foreach="getTreeNodeChildren(child2.id)" t-as="child3" t-key="child3.id">
-                                                                            <div class="gd_tree_node_wrap">
-                                                                                <div class="gd_tree_node" t-att-class="{ 'gd_tree_active': state.activeFolderTreeId === child3.id }" style="padding-left: 68px;">
-                                                                                    <span class="gd_tree_toggle" t-on-click.stop="() => this.toggleFolderTree(child3.id)">
-                                                                                        <i t-att-class="'fa ' + (isTreeNodeExpanded(child3.id) ? 'fa-caret-down' : 'fa-caret-right')"/>
-                                                                                    </span>
-                                                                                    <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" class="gd_tree_icon"/>
-                                                                                    <span class="gd_tree_name" t-on-click.stop="() => this.onTreeFolderClick(child3.id, child3.name)" t-esc="child3.name"/>
-                                                                                </div>
-                                                                                <!-- Level 4 children -->
-                                                                                <t t-if="isTreeNodeExpanded(child3.id)">
-                                                                                    <t t-foreach="getTreeNodeChildren(child3.id)" t-as="child4" t-key="child4.id">
-                                                                                        <div class="gd_tree_node" t-att-class="{ 'gd_tree_active': state.activeFolderTreeId === child4.id }" style="padding-left: 84px;">
-                                                                                            <span class="gd_tree_toggle" t-on-click.stop="() => this.toggleFolderTree(child4.id)">
-                                                                                                <i t-att-class="'fa ' + (isTreeNodeExpanded(child4.id) ? 'fa-caret-down' : 'fa-caret-right')"/>
-                                                                                            </span>
-                                                                                            <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" class="gd_tree_icon"/>
-                                                                                            <span class="gd_tree_name" t-on-click.stop="() => this.onTreeFolderClick(child4.id, child4.name)" t-esc="child4.name"/>
-                                                                                        </div>
-                                                                                    </t>
-                                                                                </t>
-                                                                            </div>
-                                                                        </t>
-                                                                    </t>
-                                                                </div>
-                                                            </t>
-                                                        </t>
-                                                    </div>
+                                                    <t t-call="google_drive_odoo_integration.FolderTreeNode">
+                                                        <t t-set="folder" t-value="folder"/>
+                                                        <t t-set="level" t-value="0"/>
+                                                    </t>
                                                 </t>
                                             </div>
                                         </t>
@@ -928,5 +886,25 @@
             </div>
             <t t-set-slot="footer"/>
         </Dialog>
+    </t>
+
+    <t t-name="google_drive_odoo_integration.FolderTreeNode">
+        <div class="gd_tree_node_wrap">
+            <div class="gd_tree_node" t-att-class="{ 'gd_tree_active': state.activeFolderTreeId === folder.id }" t-att-style="'padding-left: ' + (level * 16 + 36) + 'px;'">
+                <span class="gd_tree_toggle" t-on-click.stop="() => this.toggleFolderTree(folder.id)">
+                    <i t-att-class="'fa ' + (isTreeNodeExpanded(folder.id) ? 'fa-caret-down' : 'fa-caret-right')"/>
+                </span>
+                <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" class="gd_tree_icon"/>
+                <span class="gd_tree_name" t-on-click.stop="() => this.onTreeFolderClick(folder.id, folder.name)" t-esc="folder.name"/>
+            </div>
+            <t t-if="isTreeNodeExpanded(folder.id)">
+                <t t-foreach="getTreeNodeChildren(folder.id)" t-as="child" t-key="child.id">
+                    <t t-call="google_drive_odoo_integration.FolderTreeNode">
+                        <t t-set="folder" t-value="child"/>
+                        <t t-set="level" t-value="level + 1"/>
+                    </t>
+                </t>
+            </t>
+        </div>
     </t>
 </templates>

@@ -112,6 +112,7 @@ class GoogleDriveFile(models.Model):
             record.child_ids.action_archive_recursive()
             record.write({
                 'active': False,
+                'sync_state': 'pending_delete',
             })
         return True
 

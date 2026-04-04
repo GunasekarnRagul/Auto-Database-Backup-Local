@@ -2,6 +2,7 @@
 
 import { Component, onWillStart, useState, onMounted, onWillDestroy } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
+import { TrashRestrictedDialog } from "./trash_restricted_dialog";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 
@@ -39,6 +40,7 @@ export class FileExplorer extends Component {
             renameValue: '',
             // Search filters
             searchMode: false,
+            sidebarCollapsed: false,
             searchFilterDrive: null,
             searchRoots: [],
             searchFilterType: '',
@@ -702,11 +704,21 @@ export class FileExplorer extends Component {
 
         await this._updateNavigationState(null, this._sectionLabel(section));
 
-        if (section === 'trash') {
-            await this.loadFiles('trash_root');
-        } else {
+        if (section === 'my_drive') {
+            this.state.isRootTreeExpanded = !this.state.isRootTreeExpanded;
             await this.loadFiles(null);
+        } else {
+            this.state.isRootTreeExpanded = false;
+            if (section === 'trash') {
+                await this.loadFiles('trash_root');
+            } else {
+                await this.loadFiles(null);
+            }
         }
+    }
+
+    toggleSidebar() {
+        this.state.sidebarCollapsed = !this.state.sidebarCollapsed;
     }
 
     _sectionLabel(section) {
@@ -973,9 +985,15 @@ export class FileExplorer extends Component {
             }
 
             const children = await this.orm.searchRead("google.drive.file", domain, ["id", "name"]);
-            this.state.folderTree[cacheKey] = {
-                children: children,
-                loaded: true
+            
+            // Reactivity Fix: Update the folderTree object reference using spread operator 
+            // so Owl detects the change in the nested property.
+            this.state.folderTree = {
+                ...this.state.folderTree,
+                [cacheKey]: {
+                    children: children,
+                    loaded: true
+                }
             };
         } catch (e) {
             console.error("Failed to load tree children", e);
@@ -1165,6 +1183,11 @@ export class FileExplorer extends Component {
     }
 
     async onRestoreSelected() {
+        if (this._isActionRestrictedInTrash()) {
+            this.dialogService.add(TrashRestrictedDialog, { close: () => {} });
+            return;
+        }
+
         const files = this.selectedFilesList;
         if (files.length === 0) return;
 
@@ -1194,6 +1217,10 @@ export class FileExplorer extends Component {
     }
 
     onPermanentlyDeleteSelected() {
+        if (this._isActionRestrictedInTrash()) {
+            this.dialogService.add(TrashRestrictedDialog, { close: () => {} });
+            return;
+        }
         if (this.selectedCount === 0) return;
         this.state.showDeleteConfirm = true;
     }
@@ -1352,17 +1379,10 @@ export class FileExplorer extends Component {
 
     async onDeleteSelected() {
         const allSelected = this.selectedFilesList;
-        const files = allSelected.filter(f => f.file_type === 'file');
-        const folders = allSelected.filter(f => f.file_type === 'folder');
+        if (allSelected.length === 0) return;
 
-        if (folders.length > 0) {
-            this.notificationService.add("Folders cannot be moved to Trash. Moving selected files only.", { type: "warning" });
-        }
-
-        if (files.length === 0) return;
-
-        const ids = files.map(f => f.id);
-        const names = files.map(f => f.name);
+        const ids = allSelected.map(f => f.id);
+        const names = allSelected.map(f => f.name);
         const nameList = names.join(', ');
 
         this.clearSelection();
@@ -1757,6 +1777,12 @@ export class FileExplorer extends Component {
         } catch (e) {
             this.notificationService.add("Auto sync failed: " + (e.message || "Unknown error"), { type: "danger" });
         }
+    }
+
+    _isActionRestrictedInTrash() {
+        return this.state.activeSection === 'trash' && 
+               this.state.currentFolderId !== 'trash_root' && 
+               this.state.currentFolderId !== null;
     }
 }
 

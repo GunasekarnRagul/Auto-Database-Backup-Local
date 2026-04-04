@@ -30,7 +30,9 @@
             'google_drive_odoo_integration/static/src/css/file_explorer.css',
             'google_drive_odoo_integration/static/src/css/file_manager.css',
             'google_drive_odoo_integration/static/src/js/file_explorer/file_explorer.js',
+            'google_drive_odoo_integration/static/src/js/file_explorer/trash_restricted_dialog.js',
             'google_drive_odoo_integration/static/src/xml/file_explorer.xml',
+            'google_drive_odoo_integration/static/src/xml/trash_restricted_dialog.xml',
         ],
     },
 }

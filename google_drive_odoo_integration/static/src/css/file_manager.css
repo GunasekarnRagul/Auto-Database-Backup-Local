@@ -125,7 +125,34 @@
 }
 
 .gd_header_left {
-    flex: 0 0 240px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    min-width: 240px;
+}
+
+.gd_sidebar_toggle {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: #5f6368;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    margin-right: 12px;
+}
+
+.gd_sidebar_toggle:hover {
+    background: #f1f3f4;
+    color: #202124;
+}
+
+.gd_sidebar_toggle .fa {
+    font-size: 1.1rem;
 }
 
 .gd_logo {
@@ -573,8 +600,18 @@ img.gd_drive_icon {
     background: #f8fafd;
     border-right: 1px solid #e8eaed;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 12px 0 20px;
-    transition: opacity 0.3s ease;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, margin 0.3s ease;
+}
+
+.gd_sidebar_collapsed .gd_sidebar {
+    width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right: none;
+    margin-right: -1px;
+    opacity: 0;
 }
 
 .gd_sidebar_disabled {
@@ -585,6 +622,13 @@ img.gd_drive_icon {
 
 .gd_sidebar_inner {
     padding: 0 12px;
+    width: 260px;
+    transition: opacity 0.2s ease;
+}
+
+.gd_sidebar_collapsed .gd_sidebar_inner {
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* + New button */
