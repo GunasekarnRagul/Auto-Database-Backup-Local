@@ -30,6 +30,10 @@
                             <i class="fa fa-pencil"/>
                             <span>Rename</span>
                         </button>
+                        <button class="gd_sel_btn gd_sel_btn_cut" t-on-click="onCutSelected" title="Cut selected items">
+                            <i class="fa fa-scissors"/>
+                            <span>Cut</span>
+                        </button>
                         <button class="gd_sel_btn gd_sel_btn_delete" t-on-click="onDeleteSelected" title="Move to Trash">
                             <i class="fa fa-trash-o"/>
                             <span>Move To Trash</span>
@@ -338,6 +342,12 @@
                                     <span>Download</span>
                                 </button>
                             </t>
+                            <t t-if="state.clipboard.items.length > 0">
+                                <button class="gd_action_btn gd_btn_paste" t-on-click="onPaste" t-att-title="'Paste ' + state.clipboard.items.length + ' item(s)'">
+                                    <i class="fa fa-clipboard"/>
+                                    <span>Paste (<t t-esc="state.clipboard.items.length"/>)</span>
+                                </button>
+                            </t>
                             <t t-if="state.activeSection === 'recent' &amp;&amp; state.breadcrumbs.length === 1">
                                 <button class="gd_action_btn" t-on-click="clearRecent" title="Clear Recent Files" style="color: #d93025; border-color: #fad2cf; background: #fce8e6;">
                                     <i class="fa fa-trash-o"/>
@@ -387,14 +397,6 @@
                         </div>
                     </div>
 
-                    <!-- Loading State -->
-                    <t t-if="state.loading">
-                        <div class="gd_loading">
-                            <i class="fa fa-circle-o-notch fa-spin fa-2x"/>
-                            <span>Loading files...</span>
-                        </div>
-                    </t>
-
                     <!-- Uploading State -->
                     <t t-if="state.uploading">
                         <div class="gd_loading" style="background-color: #fce8e6; border: 1px solid #fad2cf; padding: 15px; border-radius: 8px; margin: 15px; color: #d93025;">
@@ -404,7 +406,7 @@
                     </t>
 
                     <!-- ===== LIST VIEW ===== -->
-                    <t t-elif="state.viewMode === 'list'">
+                    <t t-if="state.viewMode === 'list'">
                         <div class="gd_table_wrap">
                             <table class="gd_table">
                                 <thead>
@@ -448,6 +450,17 @@
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    <t t-if="state.loading">
+                                        <tr>
+                                            <td colspan="7">
+                                                <div class="gd_loading" style="padding: 100px 0;">
+                                                    <i class="fa fa-circle-o-notch fa-spin fa-2x"/>
+                                                    <span>Loading files...</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                    <t t-else="">
                                     <!-- Drive Overview: List Root Folders -->
                                     <t t-if="state.isDriveOverview">
                                         <t t-foreach="state.rootFolders" t-as="root" t-key="root.id">
@@ -539,7 +552,7 @@
                                         </tr>
                                     </t>
                                     <t t-foreach="sortedFiles" t-as="file" t-key="file.id">
-                                        <tr t-att-class="'gd_row' + (isFileSelected(file) ? ' gd_row_selected' : '')"
+                                        <tr t-att-class="'gd_row' + (isFileSelected(file) ? ' gd_row_selected' : '') + (isItemCut(file.id) ? ' gd_item_cut' : '')"
                                             t-on-click="(ev) => this.onFileClick(ev, file)">
                                             <td class="gd_cell_select" style="text-align: center;">
                                                 <div class="gd_row_select_wrap" t-on-click.stop="(ev) => this.toggleFileSelection(ev, file)">
@@ -601,6 +614,7 @@
                                             </td>
                                         </tr>
                                     </t>
+                                </t>
                                 </tbody>
                             </table>
                         </div>
@@ -609,12 +623,18 @@
                     <!-- ===== GRID VIEW ===== -->
                     <t t-elif="state.viewMode === 'grid'">
                         <div class="gd_grid_layout">
-
-                            <!-- Drive Overview: Grid View -->
-                            <t t-if="state.isDriveOverview">
-                                <div class="gd_grid_section_title">Root Folders</div>
-                                <div class="gd_grid_folders">
-                                    <t t-foreach="state.rootFolders" t-as="root" t-key="root.id">
+                            <t t-if="state.loading">
+                                <div class="gd_loading" style="padding: 100px 0; flex: 1; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fa fa-circle-o-notch fa-spin fa-2x"/>
+                                    <span>Loading files...</span>
+                                </div>
+                            </t>
+                            <t t-else="">
+                                <!-- Drive Overview: Grid View -->
+                                <t t-if="state.isDriveOverview">
+                                    <div class="gd_grid_section_title">Root Folders</div>
+                                    <div class="gd_grid_folders">
+                                        <t t-foreach="state.rootFolders" t-as="root" t-key="root.id">
                                         <div class="gd_grid_folder_card" t-on-click="() => this.switchRoot(root.id)">
                                             <img src="/google_drive_odoo_integration/static/description/folders.png" alt="folder" style="width: 24px; height: 24px; margin-right: 12px;"/>
                                             <span class="gd_grid_name gd_folder_name_pill" t-esc="root.name"/>
@@ -725,7 +745,7 @@
                                 <div class="gd_grid_section_title">Files</div>
                                 <div class="gd_grid_files">
                                     <t t-foreach="gridFiles" t-as="file" t-key="file.id">
-                                        <div t-att-class="'gd_grid_card' + (isFileSelected(file) ? ' gd_grid_selected' : '')"
+                                        <div t-att-class="'gd_grid_card' + (isFileSelected(file) ? ' gd_grid_selected' : '') + (isItemCut(file.id) ? ' gd_item_cut' : '')"
                                              t-on-click="(ev) => this.onFileClick(ev, file)">
                                             
                                             <div class="gd_grid_select_toggle" t-on-click.stop="(ev) => this.toggleFileSelection(ev, file)">
@@ -776,6 +796,7 @@
                                     </t>
                                 </div>
                             </t>
+                        </t>
                         </div>
                     </t>
                 </div>

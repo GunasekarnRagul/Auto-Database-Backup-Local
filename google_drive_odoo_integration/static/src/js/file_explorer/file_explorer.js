@@ -66,7 +66,13 @@ export class FileExplorer extends Component {
             isDriveOverview: false,
 
             uploading: false,
-            uploadProgress: { current: 0, total: 0 }
+            uploadProgress: { current: 0, total: 0 },
+
+            // Clipboard for Cut & Paste
+            clipboard: {
+                items: [],
+                sourceDriveId: null,
+            },
         });
 
         const onWindowClick = (ev) => this.onWindowClick(ev);
@@ -887,6 +893,10 @@ export class FileExplorer extends Component {
         return !!this.state.selectedFiles[file.id];
     }
 
+    isItemCut(fileId) {
+        return this.state.clipboard.items.includes(fileId);
+    }
+
     get selectedCount() {
         return Object.keys(this.state.selectedFiles).length;
     }
@@ -918,6 +928,67 @@ export class FileExplorer extends Component {
             });
             this.state.selectedFiles = selected;
             this.state.selectionMode = true;
+        }
+    }
+
+    // ─── Cut & Paste ───
+
+    onCutSelected() {
+        const items = this.selectedFilesList.map(f => f.id);
+        if (items.length === 0) return;
+
+        this.state.clipboard = {
+            items: items,
+            sourceDriveId: this.state.activeDriveId,
+        };
+
+        this.notificationService.add(`${items.length} item(s) cut to clipboard.`, { type: "info" });
+        this.clearSelection();
+    }
+
+    async onPaste() {
+        if (!this.state.clipboard.items.length) return;
+
+        // Validation: Drive must match
+        if (this.state.activeDriveId !== this.state.clipboard.sourceDriveId) {
+            this.notificationService.add("Other drive not pasted. Moving items across different Google Drives is not supported.", { 
+                type: "danger",
+                sticky: true 
+            });
+            return;
+        }
+
+        this.state.loading = true;
+        try {
+            const success = await this.orm.call(
+                "google.drive.file",
+                "action_move_items",
+                [this.state.clipboard.items],
+                {
+                    target_parent_id: this.state.currentFolderId,
+                    target_root_id: !this.state.currentFolderId ? this.state.activeRootId : false,
+                }
+            );
+
+            if (success) {
+                this.notificationService.add("Items moved successfully.", { type: "success" });
+                this.state.clipboard = { items: [], sourceDriveId: null };
+                
+                // Refresh view
+                await this.loadFiles(this.state.currentFolderId);
+                
+                // Refresh folder tree if needed
+                if (this.state.activeRootId) {
+                    await this._loadTreeChildren(`root_${this.state.activeRootId}`);
+                }
+            } else {
+                this.notificationService.add("Move failed. Please check folder permissions.", { type: "danger" });
+            }
+        } catch (e) {
+            this.notificationService.add("An error occurred while moving items.", { type: "danger" });
+            console.error(e);
+        } finally {
+            this.state.loading = false;
         }
     }
 

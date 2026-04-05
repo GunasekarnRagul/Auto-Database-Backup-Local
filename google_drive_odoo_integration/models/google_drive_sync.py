@@ -198,6 +198,39 @@ class GoogleDriveSync(models.AbstractModel):
             _logger.error("Error deleting file from Drive: %s", str(e))
             return False
 
+    def move_file(self, file_record, old_parent_id, new_parent_id):
+        """Move a file or folder on Google Drive."""
+        if not file_record.google_file_id or not new_parent_id:
+            return False
+
+        config = file_record.drive_config_id
+        access_token = self._get_access_token(config)
+        if not access_token:
+            return False
+
+        headers = {"Authorization": f"Bearer {access_token}"}
+        url = f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}"
+        
+        # Use addParents and removeParents to move the file in one request
+        params = {
+            'addParents': new_parent_id,
+            'fields': 'id, parents'
+        }
+        if old_parent_id:
+            params['removeParents'] = old_parent_id
+        
+        try:
+            response = http_requests.patch(url, headers=headers, params=params)
+            if response.status_code == 200:
+                _logger.info("Successfully moved file %s on Drive", file_record.google_file_id)
+                return True
+            else:
+                _logger.warning("Failed to move file on Drive: %s", response.text)
+                return False
+        except Exception as e:
+            _logger.error("Error moving file on Drive: %s", str(e))
+            return False
+
     # ─── Odoo → Drive: Create folder ───
 
     def create_folder_in_drive(self, folder_name, config, parent_gdrive_id=None):

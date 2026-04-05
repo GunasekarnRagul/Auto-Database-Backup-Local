@@ -190,6 +190,55 @@ class GoogleDriveFile(models.Model):
         return super(GoogleDriveFile, self).write(vals)
 
     @api.model
+    def action_move_items(self, item_ids, target_parent_id=None, target_root_id=None):
+        """Move multiple files or folders to a new location."""
+        if not item_ids:
+            return False
+            
+        items = self.browse(item_ids)
+        if not items:
+            return False
+            
+        # Resolve target GDrive ID
+        new_parent_gdrive_id = False
+        if target_parent_id:
+            target_parent = self.browse(target_parent_id)
+            new_parent_gdrive_id = target_parent.google_file_id
+        elif target_root_id:
+            target_root = self.env['google.drive.root.folder'].browse(target_root_id)
+            new_parent_gdrive_id = target_root.root_id
+            
+        if not new_parent_gdrive_id:
+            return False
+            
+        sync_service = self.env['google.drive.sync'].sudo()
+        
+        for item in items:
+            # Get current GDrive parent ID
+            old_parent_gdrive_id = self._resolve_parent_gdrive_id(
+                parent_folder_id=item.parent_folder_id.id,
+                root_folder_id=item.root_folder_id.id
+            )
+            
+            # Sync to Drive
+            success = sync_service.move_file(
+                item, old_parent_gdrive_id, new_parent_gdrive_id
+            )
+            
+            if success:
+                # Update Odoo record
+                item.write({
+                    'parent_folder_id': target_parent_id,
+                    'root_folder_id': target_root_id if not target_parent_id else False,
+                    'sync_state': 'synced',
+                    'last_synced': fields.Datetime.now(),
+                })
+            else:
+                item.write({'sync_state': 'error'})
+                
+        return True
+
+    @api.model
     def get_trash_roots(self):
         """Return only the top-level archived items for the Trash tab.
         An item is a trash root if it is inactive AND:
