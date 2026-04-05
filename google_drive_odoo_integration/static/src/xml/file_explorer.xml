@@ -397,14 +397,6 @@
                         </div>
                     </div>
 
-                    <!-- Uploading State -->
-                    <t t-if="state.uploading">
-                        <div class="gd_loading" style="background-color: #fce8e6; border: 1px solid #fad2cf; padding: 15px; border-radius: 8px; margin: 15px; color: #d93025;">
-                            <i class="fa fa-cloud-upload fa-2x fa-bounce" style="margin-bottom: 10px;"/>
-                            <span style="font-weight: 500;">Uploading <t t-esc="state.uploadProgress.current + 1"/> of <t t-esc="state.uploadProgress.total"/> files to <t t-esc="state.currentFolderName"/>...</span>
-                        </div>
-                    </t>
-
                     <!-- ===== LIST VIEW ===== -->
                     <t t-if="state.viewMode === 'list'">
                         <div class="gd_table_wrap">
@@ -456,6 +448,16 @@
                                                 <div class="gd_loading" style="padding: 100px 0;">
                                                     <i class="fa fa-circle-o-notch fa-spin fa-2x"/>
                                                     <span>Loading files...</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                    <t t-elif="state.uploading">
+                                        <tr>
+                                            <td colspan="7">
+                                                <div class="gd_loading" style="background-color: #fef2f2; padding: 80px 0; border: 1px solid #fee2e2; color: #d93025; border-radius: 12px; margin: 20px;">
+                                                    <i class="fa fa-cloud-upload fa-2x fa-bounce" style="margin-bottom: 10px;"/>
+                                                    <span style="font-weight: 500;">Uploading <t t-esc="state.uploadProgress.current + 1"/> of <t t-esc="state.uploadProgress.total"/> files...</span>
                                                 </div>
                                             </td>
                                         </tr>
@@ -627,6 +629,12 @@
                                 <div class="gd_loading" style="padding: 100px 0; flex: 1; display: flex; align-items: center; justify-content: center;">
                                     <i class="fa fa-circle-o-notch fa-spin fa-2x"/>
                                     <span>Loading files...</span>
+                                </div>
+                            </t>
+                            <t t-elif="state.uploading">
+                                <div class="gd_loading" style="background-color: #fef2f2; padding: 100px 0; flex: 1; display: flex; align-items: center; justify-content: center; color: #d93025; border: 1px solid #fee2e2; border-radius: 12px; margin: 20px;">
+                                    <i class="fa fa-cloud-upload fa-2x fa-bounce" style="margin-bottom: 10px;"/>
+                                    <span style="font-weight: 500;">Uploading <t t-esc="state.uploadProgress.current + 1"/> of <t t-esc="state.uploadProgress.total"/> files...</span>
                                 </div>
                             </t>
                             <t t-else="">

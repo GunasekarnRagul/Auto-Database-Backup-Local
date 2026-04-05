@@ -977,9 +977,15 @@ export class FileExplorer extends Component {
                 // Refresh view
                 await this.loadFiles(this.state.currentFolderId);
                 
-                // Refresh folder tree if needed
+                // Refresh folder tree for both source and target
                 if (this.state.activeRootId) {
-                    await this._loadTreeChildren(`root_${this.state.activeRootId}`);
+                    const sourceParent = this.state.clipboard.sourceParentId;
+                    const targetParent = this.state.currentFolderId;
+                    
+                    // Refresh source
+                    await this._refreshTreeForParent(sourceParent);
+                    // Refresh target and expand it
+                    await this._refreshTreeForParent(targetParent, true);
                 }
             } else {
                 this.notificationService.add("Move failed. Please check folder permissions.", { type: "danger" });
@@ -1069,11 +1075,19 @@ export class FileExplorer extends Component {
         }
     }
 
-    async _refreshTreeForParent(parentId) {
-        const id = (parentId === false || parentId === null) ? `root_${this.state.activeRootId}` : parentId;
-        // Only refresh if already loaded or if it's the root being updated
-        if (this.state.folderTree[id] || String(id).startsWith("root_")) {
-            await this._loadTreeChildren(id);
+    async _refreshTreeForParent(parentId, expand = false) {
+        const id = (parentId === false || parentId === null || parentId === undefined) 
+            ? `root_${this.state.activeRootId}` 
+            : parentId;
+            
+        // Always refresh the cache for this parent
+        await this._loadTreeChildren(id);
+        
+        // If expansion requested and it's a folder (not root string), expand it
+        if (expand && !String(id).startsWith("root_")) {
+            if (!this.state.expandedFolders.includes(id)) {
+                this.state.expandedFolders.push(id);
+            }
         }
     }
 
@@ -1272,7 +1286,7 @@ export class FileExplorer extends Component {
             )];
 
             for (const parentId of folderParents) {
-                await this._refreshTreeForParent(parentId);
+                await this._refreshTreeForParent(parentId, true);
             }
 
             this.clearSelection();
@@ -1545,6 +1559,11 @@ export class FileExplorer extends Component {
             return;
         }
 
+        if (this.checkNameConflict(newName, file.file_type, file.id)) {
+            this.notificationService.add(`A ${file.file_type} named "${newName}" already exists here.`, { type: "danger", title: "Name Conflict" });
+            return;
+        }
+
         this.state.renamingFileId = null;
         this.state.renameValue = '';
 
@@ -1664,6 +1683,14 @@ export class FileExplorer extends Component {
         this.state.newFolderName = ev.target.value;
     }
 
+    checkNameConflict(name, type, excludeId = null) {
+        return this.state.allFiles.some(f => 
+            f.name.toLowerCase() === name.toLowerCase() && 
+            f.file_type === type && 
+            f.id !== excludeId
+        );
+    }
+
     onFolderNameKeydown(ev) {
         if (ev.key === 'Enter') {
             this.confirmCreateFolder();
@@ -1678,6 +1705,11 @@ export class FileExplorer extends Component {
         const name = this.state.newFolderName.trim();
         if (!name) {
             this.notificationService.add("Please enter a folder name.", { type: "warning" });
+            return;
+        }
+
+        if (this.checkNameConflict(name, 'folder')) {
+            this.notificationService.add(`A folder named "${name}" already exists here.`, { type: "danger", title: "Name Conflict" });
             return;
         }
 
@@ -1710,7 +1742,7 @@ export class FileExplorer extends Component {
             this.notificationService.add(`Folder "${name}" created!`, { type: "success" });
 
             // Sync tree
-            await this._refreshTreeForParent(this.state.currentFolderId);
+            await this._refreshTreeForParent(this.state.currentFolderId, true);
 
             // Auto sync in background (non-blocking)
             if (this.state.syncMode === 'auto') {
@@ -1742,10 +1774,33 @@ export class FileExplorer extends Component {
             const targetFolderId = this.state.currentFolderId;
             const targetRootId = this.state.activeRootId;
 
-            this.state.uploading = true;
-            this.state.uploadProgress = { current: 0, total: files.length };
+            const validFiles = [];
+            const conflictedNames = [];
 
             for (const file of files) {
+                if (this.checkNameConflict(file.name, 'file')) {
+                    conflictedNames.push(file.name);
+                } else {
+                    validFiles.push(file);
+                }
+            }
+
+            if (conflictedNames.length > 0) {
+                this.notificationService.add(
+                    `The following files already exist and were skipped: ${conflictedNames.join(', ')}`,
+                    { type: "danger", title: "Upload Conflict" }
+                );
+            }
+
+            if (validFiles.length === 0) {
+                this.state.uploading = false;
+                return;
+            }
+
+            this.state.uploading = true;
+            this.state.uploadProgress = { current: 0, total: validFiles.length };
+
+            for (const file of validFiles) {
                 await this._uploadSingleFile(file, targetFolderId, targetRootId);
                 this.state.uploadProgress.current += 1;
             }
