@@ -1429,35 +1429,36 @@ export class FileExplorer extends Component {
         const files = this.selectedFilesList;
         if (files.length === 0) return;
 
-        let downloadCount = 0;
-        for (const file of files) {
-            if (file.file_type !== 'folder') {
-                const downloadUrl = `/google_drive/download/${file.id}`;
+        // Condition for ZIP: Multiple items OR at least one folder
+        const hasFolder = files.some(f => f.file_type === 'folder');
+        const isMulti = files.length > 1;
 
-                // Create a temporary anchor element to trigger download without opening a new tab
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = downloadUrl;
-                // Adding the download attribute prompts a file download prompt rather than navigation
-                a.download = file.name;
-
-                document.body.appendChild(a);
-                a.click();
-
-                // Clean up the DOM afterwards
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                }, 100);
-
-                downloadCount++;
-            }
+        if (hasFolder || isMulti) {
+            const ids = files.map(f => f.id).join(',');
+            const downloadUrl = `/google_drive/download_zip?file_ids=${ids}`;
+            
+            this.notificationService.add("Preparing your ZIP download...", { type: "info" });
+            
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = downloadUrl;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => document.body.removeChild(a), 100);
+            return;
         }
 
-        if (downloadCount > 0) {
-            this.notificationService.add(`Downloading ${downloadCount} file(s)...`, { type: "info" });
-        } else {
-            this.notificationService.add("Folders cannot be downloaded.", { type: "warning" });
-        }
+        // Single file download (existing logic)
+        const file = files[0];
+        const downloadUrl = `/google_drive/download/${file.id}`;
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = downloadUrl;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => document.body.removeChild(a), 100);
+        this.notificationService.add(`Downloading "${file.name}"...`, { type: "info" });
     }
 
     async onDeleteSelected() {

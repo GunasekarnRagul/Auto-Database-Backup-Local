@@ -3,6 +3,8 @@ from odoo import http
 from odoo.http import request
 import requests
 import werkzeug
+import io
+import zipfile
 
 class GoogleDriveController(http.Controller):
 
@@ -90,3 +92,76 @@ class GoogleDriveController(http.Controller):
             return request.make_response(response.content, headers=headers)
         except Exception as e:
             return f"Download error: {str(e)}"
+    @http.route('/google_drive/download_zip', type='http', auth='user')
+    def google_drive_download_zip(self, file_ids, **kw):
+        """Build and stream a ZIP file of the selected files and folders."""
+        if not file_ids:
+            return "No files selected."
+            
+        try:
+            ids = [int(i) for i in file_ids.split(',')]
+            file_model = request.env['google.drive.file']
+            
+            # Resolve all files recursively (Model method)
+            all_files = file_model.sudo().get_recursive_files_for_zip(ids)
+            if not all_files:
+                return "No files found to download."
+                
+            sync_service = request.env['google.drive.sync'].sudo()
+            # Use the first record to get the drive configuration
+            first_rec = all_files[0][0]
+            config = first_rec.drive_config_id
+            access_token = sync_service._get_access_token(config)
+            
+            if not access_token:
+                return "Failed to authenticate with Google Drive."
+                
+            zip_buffer = io.BytesIO()
+            headers = {'Authorization': f'Bearer {access_token}'}
+            
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                for record, rel_path in all_files:
+                    if not record.google_file_id:
+                        continue
+                        
+                    g_id = record.google_file_id
+                    mimetype = record.mime_type or ''
+                    
+                    # Construct download URL
+                    if 'vnd.google-apps' in mimetype:
+                        # Handle Google-native docs (export required)
+                        export_map = {
+                            'application/vnd.google-apps.document': ('application/pdf', '.pdf'),
+                            'application/vnd.google-apps.spreadsheet': ('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.xlsx'),
+                            'application/vnd.google-apps.presentation': ('application/pdf', '.pdf'),
+                            'application/vnd.google-apps.drawing': ('image/png', '.png'),
+                        }
+                        target_mime, ext = export_map.get(mimetype, ('application/pdf', '.pdf'))
+                        url = f"https://www.googleapis.com/drive/v3/files/{g_id}/export?mimeType={target_mime}"
+                        if not rel_path.lower().endswith(ext):
+                            rel_path += ext
+                    else:
+                        # Normal files
+                        url = f"https://www.googleapis.com/drive/v3/files/{g_id}?alt=media"
+                    
+                    try:
+                        response = requests.get(url, headers=headers, timeout=30)
+                        if response.status_code == 200:
+                            zip_file.writestr(rel_path, response.content)
+                    except Exception as loop_e:
+                        print(f"Error zipping file {rel_path}: {str(loop_e)}")
+            
+            zip_buffer.seek(0)
+            zip_filename = "google_drive_export.zip"
+            if len(ids) == 1:
+                zip_filename = f"{file_model.sudo().browse(ids[0]).name}.zip"
+                
+            return request.make_response(
+                zip_buffer.getvalue(),
+                headers=[
+                    ('Content-Type', 'application/zip'),
+                    ('Content-Disposition', http.content_disposition(zip_filename))
+                ]
+            )
+        except Exception as e:
+            return f"ZIP Download Error: {str(e)}"

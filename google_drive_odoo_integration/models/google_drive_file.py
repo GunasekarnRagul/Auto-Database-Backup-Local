@@ -184,6 +184,26 @@ class GoogleDriveFile(models.Model):
             all_to_unlink.unlink()
         
         return len(success_ids) == len(record_ids)
+    def get_recursive_files_for_zip(self, record_ids):
+        """Recursively collect all files under the given IDs, with their relative paths for a ZIP archive."""
+        records = self.browse(record_ids)
+        all_files = [] # List of tuples: (file_record, relative_path)
+        
+        def collect(recs, current_path=""):
+            for rec in recs:
+                # Sanitize name for ZIP paths (remove leading/trailing slashes)
+                name = rec.name.strip('/')
+                path = f"{current_path}/{name}" if current_path else name
+                
+                if rec.file_type == 'file':
+                    all_files.append((rec, path))
+                else:
+                    # Empty folder? We could add it, but usually ZIPs care about files.
+                    # Recurse into children
+                    collect(rec.child_ids, path)
+        
+        collect(records)
+        return all_files
 
     def write(self, vals):
         # We handle Drive rename asynchronously from JS to keep UI instant
