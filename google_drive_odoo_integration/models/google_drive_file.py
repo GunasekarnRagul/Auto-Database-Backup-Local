@@ -107,60 +107,48 @@ class GoogleDriveFile(models.Model):
         return super(GoogleDriveFile, self).unlink()
 
     def action_archive_recursive(self):
-        """Archive records and their children, marking them for background Drive deletion."""
+        """Archive records locally only. No changes made to Google Drive."""
         for record in self:
             record.child_ids.action_archive_recursive()
             record.write({
                 'active': False,
-                'sync_state': 'pending_delete',
+                'sync_state': 'synced',
             })
         return True
 
     def action_unarchive(self):
-        """Restore archived records and their children."""
+        """Restore archived records locally. No changes made to Google Drive."""
         for record in self.with_context(active_test=False):
             record.write({
                 'active': True,
-                'sync_state': 'synced'
+                'sync_state': 'synced',
+                'last_synced': fields.Datetime.now(),
             })
             record.child_ids.action_unarchive()
         return True
 
+
     @api.model
     def delete_on_drive_and_unlink(self, record_ids):
-        """Delete records from Google Drive and then unlink them from Odoo.
-        Called from JS after records are archived.
+        """Move records to Google Drive Trash and then unlink them from Odoo.
+        Called from Odoo's Trash Tab (Manual selection).
         """
         records = self.browse(record_ids).with_context(active_test=False)
         if not records:
             return True
         
-        # We need the drive config - assume they all share one or use the first
-        config = records[0].drive_config_id
         sync = self.env['google.drive.sync'].sudo()
-        access_token = sync._get_access_token(config)
-        
-        if not access_token:
-            return False
-            
-        import requests as http_requests
-        headers = {"Authorization": f"Bearer {access_token}"}
-        
         success_ids = []
+
         for record in records:
+            # If no Drive ID, it's already "deleted" from Drive's perspective
             if not record.google_file_id:
                 success_ids.append(record.id)
                 continue
             
-            try:
-                url = f"https://www.googleapis.com/drive/v3/files/{record.google_file_id}"
-                response = http_requests.delete(url, headers=headers)
-                # If deleted or not found (404), it's a success for us
-                if response.status_code in [200, 204, 404]:
-                    success_ids.append(record.id)
-            except Exception:
-                # If network fails, we'll try again during next sync
-                pass
+            # Use trash_file instead of hard delete per user request
+            if sync.trash_file(record, trashed=True):
+                success_ids.append(record.id)
                 
         if success_ids:
             records_to_unlink = self.browse(success_ids).with_context(active_test=False)
@@ -378,76 +366,76 @@ class GoogleDriveFile(models.Model):
 
         return explorer_record.id
 
-    def sync_pending_to_drive(self):
-        """Push all pending folders and files to Google Drive.
-        Called during the sync process. Folders are synced first (depth-first)
-        so that child items can be placed in the correct parent.
-        """
+
+    @api.model
+    def get_pending_sync_ids(self, drive_config_id=None):
+        """Returns a list of IDs for records that need syncing (push) for a drive."""
+        domain = [('sync_state', '=', 'pending'), ('active', '=', True)]
+        if drive_config_id:
+            domain.append(('drive_config_id', '=', drive_config_id))
+        # Important: Order folders first so they exist on Drive before files are uploaded to them
+        records = self.sudo().search(domain, order='file_type desc, id asc')
+        return records.ids
+
+    def action_sync_single_record(self):
+        """Frontend entry point to sync a single record."""
+        self.ensure_one()
+        return self._sync_single_record(self)
+
+    def _sync_single_record(self, record):
+        """Internal helper to sync one record. Logic extracted from sync_pending_to_drive."""
         sync = self.env['google.drive.sync'].sudo()
-
-        # 1. Sync pending folders (parents first, then children)
-        pending_folders = self.sudo().search([
-            ('sync_state', '=', 'pending'),
-            ('file_type', '=', 'folder'),
-            ('google_file_id', '=', False),
-        ], order='id asc')
-
-        for folder in pending_folders:
-            parent_gdrive_id = folder._resolve_parent_gdrive_id(
-                folder.parent_folder_id.id if folder.parent_folder_id else False,
-                folder.root_folder_id.id if folder.root_folder_id else False,
+        
+        # 1. New Folder
+        if record.file_type == 'folder' and not record.google_file_id:
+            parent_gdrive_id = record._resolve_parent_gdrive_id(
+                record.parent_folder_id.id if record.parent_folder_id else False,
+                record.root_folder_id.id if record.root_folder_id else False,
             )
             try:
-                result = sync.create_folder_in_drive(
-                    folder.name, folder.drive_config_id, parent_gdrive_id=parent_gdrive_id
-                )
+                result = sync.create_folder_in_drive(record.name, record.drive_config_id, parent_gdrive_id=parent_gdrive_id)
                 if result:
-                    folder.write({
+                    record.write({
                         'google_file_id': result['google_file_id'],
                         'google_url': result['google_url'],
                         'sync_state': 'synced',
                         'last_synced': fields.Datetime.now(),
                     })
+                    return True
+                else:
+                    record.write({'sync_state': 'error'})
             except Exception:
-                folder.write({'sync_state': 'error'})
+                record.write({'sync_state': 'error'})
+            return False
 
-        # 2. Sync pending files
-        pending_files = self.sudo().search([
-            ('sync_state', '=', 'pending'),
-            ('file_type', '=', 'file'),
-            ('google_file_id', '=', False),
-        ], order='id asc')
-
-        for file_rec in pending_files:
-            parent_gdrive_id = file_rec._resolve_parent_gdrive_id(
-                file_rec.parent_folder_id.id if file_rec.parent_folder_id else False,
-                file_rec.root_folder_id.id if file_rec.root_folder_id else False,
+        # 2. New File
+        if record.file_type == 'file' and not record.google_file_id:
+            parent_gdrive_id = record._resolve_parent_gdrive_id(
+                record.parent_folder_id.id if record.parent_folder_id else False,
+                record.root_folder_id.id if record.root_folder_id else False,
             )
-            # Find the corresponding ir.attachment using strong res_id matching
             attachment = self.env['ir.attachment'].sudo().search([
                 ('res_model', '=', 'google.drive.file'),
-                ('res_id', '=', file_rec.id),
+                ('res_id', '=', record.id),
                 ('google_file_id', '=', False),
             ], limit=1)
-
-            # Fallback for old records or unexpectedly created attachments
             if not attachment:
                 attachment = self.env['ir.attachment'].sudo().search([
-                    ('name', '=', file_rec.name),
+                    ('name', '=', record.name),
                     ('google_file_id', '=', False),
                 ], limit=1)
 
             if not attachment or not attachment.raw:
-                continue
+                return False
 
             try:
                 result = sync.upload_file_to_drive(
-                    file_rec.name, attachment.raw,
-                    file_rec.mime_type or 'application/octet-stream',
-                    file_rec.drive_config_id, parent_gdrive_id=parent_gdrive_id
+                    record.name, attachment.raw,
+                    record.mime_type or 'application/octet-stream',
+                    record.drive_config_id, parent_gdrive_id=parent_gdrive_id
                 )
                 if result:
-                    file_rec.write({
+                    record.write({
                         'google_file_id': result['google_file_id'],
                         'google_url': result['google_url'],
                         'sync_state': 'synced',
@@ -456,15 +444,15 @@ class GoogleDriveFile(models.Model):
                     attachment.with_context(skip_gdrive_sync=True).write({
                         'google_file_id': result['google_file_id'],
                     })
+                    return True
+                else:
+                    record.write({'sync_state': 'error'})
             except Exception:
-                file_rec.write({'sync_state': 'error'})
+                record.write({'sync_state': 'error'})
+            return False
 
-        # 3. Sync pending renames (where google_file_id already exists)
-        pending_renames = self.sudo().search([
-            ('sync_state', '=', 'pending'),
-            ('google_file_id', '!=', False),
-        ])
-        for record in pending_renames:
+        # 3. Rename / Existing
+        if record.google_file_id:
             try:
                 success = sync.rename_file(record, record.name)
                 if success:
@@ -472,17 +460,30 @@ class GoogleDriveFile(models.Model):
                         'sync_state': 'synced',
                         'last_synced': fields.Datetime.now(),
                     })
+                    return True
+                else:
+                    record.write({'sync_state': 'error'})
             except Exception:
                 record.write({'sync_state': 'error'})
+            return False
+            
+        return False
 
-        # 4. Sync pending deletions
-        pending_deletions = self.sudo().with_context(active_test=False).search([
-            ('sync_state', '=', 'pending_delete'),
-            ('active', '=', False),
-        ])
-        if pending_deletions:
-            # Group by config to avoid repeated token fetches
-            configs = pending_deletions.mapped('drive_config_id')
-            for config in configs:
-                config_deletions = pending_deletions.filtered(lambda r: r.drive_config_id == config)
-                self.delete_on_drive_and_unlink(config_deletions.ids)
+    def sync_pending_to_drive(self, drive_config_id=None):
+        """Unified entry point for background/bulk sync.
+        Now uses the per-record helper for consistency.
+        """
+        drive_domain = [('drive_config_id', '=', drive_config_id)] if drive_config_id else []
+        pending_ids = self.get_pending_sync_ids(drive_config_id=drive_config_id)
+        pending_records = self.sudo().browse(pending_ids)
+        
+        success_count = 0
+        error_count = 0
+        
+        for record in pending_records:
+            if self._sync_single_record(record):
+                success_count += 1
+            else:
+                error_count += 1
+                
+        return {'success': success_count, 'error': error_count}

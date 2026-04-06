@@ -173,10 +173,40 @@ class GoogleDriveSync(models.AbstractModel):
             _logger.error("Error renaming file on Drive: %s", str(e))
             return False
 
-    def delete_file_from_drive(self, file_record):
-        """Delete (trash) a file or folder on Google Drive."""
+    def trash_file(self, file_record, trashed=True):
+        """Move a file or folder to the Google Drive Trash (or restore it)."""
         if not file_record.google_file_id:
-            return True  # Nothing to delete on Drive
+            return True
+
+        config = file_record.drive_config_id
+        access_token = self._get_access_token(config)
+        if not access_token:
+            return False
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        url = f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}"
+        data = {"trashed": trashed}
+
+        try:
+            response = http_requests.patch(url, headers=headers, data=json.dumps(data))
+            if response.status_code == 200:
+                action = "Trashed" if trashed else "Restored from trash"
+                _logger.info("%s file %s on Drive", action, file_record.google_file_id)
+                return True
+            else:
+                _logger.warning("Failed to trash/untrash file on Drive: %s", response.text)
+                return False
+        except Exception as e:
+            _logger.error("Error trashing/untrashing file on Drive: %s", str(e))
+            return False
+
+    def delete_file_from_drive(self, file_record):
+        """Permanently delete a file or folder from Google Drive."""
+        if not file_record.google_file_id:
+            return True
 
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
@@ -188,14 +218,14 @@ class GoogleDriveSync(models.AbstractModel):
 
         try:
             response = http_requests.delete(url, headers=headers)
-            if response.status_code in (200, 204):
-                _logger.info("Deleted file %s from Drive", file_record.google_file_id)
+            if response.status_code in (200, 204, 404):
+                _logger.info("Permanently deleted file %s from Drive", file_record.google_file_id)
                 return True
             else:
-                _logger.warning("Failed to delete file from Drive: %s", response.text)
+                _logger.warning("Failed to permanently delete file from Drive: %s", response.text)
                 return False
         except Exception as e:
-            _logger.error("Error deleting file from Drive: %s", str(e))
+            _logger.error("Error permanently deleting file from Drive: %s", str(e))
             return False
 
     def move_file(self, file_record, old_parent_id, new_parent_id):
@@ -264,7 +294,15 @@ class GoogleDriveSync(models.AbstractModel):
         return False
 
     def upload_file_to_drive(self, file_name, file_content, mime_type, config, parent_gdrive_id=None):
-        """Upload a file to Google Drive with optional parent folder placement."""
+        """Upload a file to Google Drive with optional parent folder placement.
+        Automatically switches to resumable upload for large files (>= 5 MB).
+        """
+        RESUMABLE_THRESHOLD = 5 * 1024 * 1024  # 5 MB
+        if isinstance(file_content, (bytes, bytearray)) and len(file_content) >= RESUMABLE_THRESHOLD:
+            return self.upload_file_to_drive_resumable(
+                file_name, file_content, mime_type, config, parent_gdrive_id=parent_gdrive_id
+            )
+
         access_token = self._get_access_token(config)
         if not access_token:
             return False
@@ -291,6 +329,67 @@ class GoogleDriveSync(models.AbstractModel):
         _logger.warning("Failed to upload file to Drive: %s", response.text)
         return False
 
+    def upload_file_to_drive_resumable(self, file_name, file_content, mime_type, config, parent_gdrive_id=None):
+        """Upload a large file to Google Drive using the resumable upload API.
+
+        The resumable upload API is designed for files >= 5 MB. It initiates an
+        upload session and streams the file in a single request, which avoids
+        HTTP timeouts that occur with the multipart upload for large files.
+        """
+        access_token = self._get_access_token(config)
+        if not access_token:
+            return False
+
+        metadata = {"name": file_name, "mimeType": mime_type}
+        if parent_gdrive_id:
+            metadata["parents"] = [parent_gdrive_id]
+
+        # Step 1: Initiate a resumable session
+        init_headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json; charset=UTF-8",
+            "X-Upload-Content-Type": mime_type,
+            "X-Upload-Content-Length": str(len(file_content)),
+        }
+        try:
+            init_resp = http_requests.post(
+                "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,webViewLink",
+                headers=init_headers,
+                data=json.dumps(metadata),
+                timeout=30,
+            )
+            if init_resp.status_code != 200:
+                _logger.warning("Failed to initiate resumable upload for %s: %s", file_name, init_resp.text)
+                return False
+
+            upload_url = init_resp.headers.get("Location")
+            if not upload_url:
+                _logger.warning("No upload URL returned for resumable session of %s", file_name)
+                return False
+
+            # Step 2: Upload the file content in one PUT request
+            upload_headers = {
+                "Content-Length": str(len(file_content)),
+                "Content-Type": mime_type,
+            }
+            upload_resp = http_requests.put(
+                upload_url,
+                headers=upload_headers,
+                data=file_content,
+                timeout=300,  # 5-minute timeout for large files
+            )
+            if upload_resp.status_code in (200, 201):
+                data = upload_resp.json()
+                return {
+                    'google_file_id': data.get('id'),
+                    'google_url': data.get('webViewLink', ''),
+                }
+            _logger.warning("Resumable upload failed for %s: %s", file_name, upload_resp.text)
+            return False
+        except Exception as e:
+            _logger.error("Error during resumable upload of %s: %s", file_name, str(e))
+            return False
+
 
     # ─── Drive → Odoo: Backward sync ───
 
@@ -300,71 +399,103 @@ class GoogleDriveSync(models.AbstractModel):
             for root in config.root_ids.filtered(lambda r: r.active):
                 self._sync_config_files(config, root_folder_id=root.id, gdrive_parent_id=root.root_id)
 
-    def _sync_config_files(self, config, root_folder_id=False, parent_folder_id=False, gdrive_parent_id=False):
+    def _sync_config_files(self, config, root_folder_id=False, gdrive_parent_id=False):
+        """Iterative sync with incremental commits for large drive support."""
         access_token = self._get_access_token(config)
         if not access_token:
             return
 
         headers = {"Authorization": f"Bearer {access_token}"}
-        current_parent = gdrive_parent_id
 
-        if current_parent:
-            query = f"'{current_parent}' in parents and trashed = false"
-        else:
-            # Fallback for syncs triggered without a specific parent
-            # But normally _sync_config_files is called with a root or parent
-            return
+        # Work stack stores: (odoo_parent_id, google_parent_id)
+        # We start with the root configuration
+        work_stack = [(False, gdrive_parent_id)]
 
-        # Collect all Google file IDs seen during this sync pass
-        synced_google_ids = []
+        while work_stack:
+            parent_folder_id, current_google_parent = work_stack.pop()
 
-        # Paginate through all results
-        page_token = None
-        while True:
-            url = (
-                f"https://www.googleapis.com/drive/v3/files"
-                f"?q={query}"
-                f"&pageSize=1000"
-                f"&fields=nextPageToken,files(id,name,mimeType,size,webViewLink,owners,modifiedTime,starred)"
-            )
-            if page_token:
-                url += f"&pageToken={page_token}"
+            # Step 1: Fetch all remote children for the current Google folder
+            query = f"'{current_google_parent}' in parents and trashed = false"
+            synced_google_ids = []
 
-            response = http_requests.get(url, headers=headers)
-            if response.status_code != 200:
-                _logger.warning("Drive API error: %s", response.text)
-                break
+            page_token = None
+            while True:
+                url = (
+                    f"https://www.googleapis.com/drive/v3/files"
+                    f"?q={query}"
+                    f"&pageSize=1000"
+                    f"&fields=nextPageToken,files(id,name,mimeType,size,webViewLink,owners,modifiedTime,starred)"
+                )
+                if page_token:
+                    url += f"&pageToken={page_token}"
 
-            result = response.json()
-            files = result.get('files', [])
-            for file_data in files:
-                synced_google_ids.append(file_data.get('id'))
-                self._process_drive_file(file_data, config, root_folder_id, parent_folder_id, headers)
+                try:
+                    response = http_requests.get(url, headers=headers)
+                    if response.status_code != 200:
+                        _logger.warning("Drive API error for parent %s: %s", current_google_parent, response.text)
+                        break
+                except Exception as e:
+                    _logger.error("Network error during sync of parent %s: %s", current_google_parent, str(e))
+                    break
 
-            page_token = result.get('nextPageToken')
-            if not page_token:
-                break
+                result = response.json()
+                files_batch = result.get('files', [])
 
-        # Remove Odoo records whose Google Drive file no longer exists
-        # (i.e. deleted from Google Drive)
-        stale_domain = [
-            ('drive_config_id', '=', config.id),
-            ('root_folder_id', '=', root_folder_id),
-            ('parent_folder_id', '=', parent_folder_id),
-            # Ignore pending un-uploaded records which don't have a google_file_id yet
-            ('google_file_id', '!=', False),
-        ]
-        if synced_google_ids:
-            stale_domain.append(('google_file_id', 'not in', synced_google_ids))
+                for file_data in files_batch:
+                    g_id = file_data.get('id')
+                    synced_google_ids.append(g_id)
 
-        stale_records = self.env['google.drive.file'].sudo().search(stale_domain)
-        if stale_records:
-            _logger.info(
-                "Removing %d stale file(s) from Odoo (deleted in Google Drive): %s",
-                len(stale_records),
-                ', '.join(stale_records.mapped('name'))
-            )
-            stale_records.unlink()
+                    # Process the single file/folder record (create or update)
+                    is_folder = file_data.get('mimeType') == 'application/vnd.google-apps.folder'
+                    explorer_record = self._process_drive_file(
+                        file_data, config, root_folder_id, parent_folder_id, headers
+                    )
+
+                    # If it's a folder, push it onto the stack to process its children later
+                    if is_folder and explorer_record:
+                        work_stack.append((explorer_record.id, g_id))
+
+                page_token = result.get('nextPageToken')
+                if not page_token:
+                    break
+
+            # Step 2: Cleanup stale records for THIS SPECIFIC folder only
+            # This is more efficient than a full drive cleanup in a single pass
+            stale_domain = [
+                ('drive_config_id', '=', config.id),
+                ('root_folder_id', '=', root_folder_id),
+                ('parent_folder_id', '=', parent_folder_id),
+                ('google_file_id', '!=', False),
+            ]
+            if synced_google_ids:
+                stale_domain.append(('google_file_id', 'not in', synced_google_ids))
+
+            stale_records = self.env['google.drive.file'].sudo().search(stale_domain)
+            if stale_records:
+                _logger.info("Sync: Removing %d stale record(s) from Folder %s", len(stale_records), parent_folder_id)
+                stale_records.unlink()
+
+            # Step 3: Incremental Commit
+            # This ensures progress is persistent even if a timeout occurs afterwards
+            self.env.cr.commit()
+            _logger.info("Sync: Completed Folder %s (%s). Progress Saved.", current_google_parent, parent_folder_id)
+
+            # Step 4: Notify the frontend about the updated folder
+            # This allows real-time UI refresh per folder
+            self._notify_folder_sync(parent_folder_id)
+
+    def _notify_folder_sync(self, folder_id):
+        """Send a notification to the Odoo bus for real-time UI refresh."""
+        try:
+            # We use the current user's partner_id as the target
+            target = self.env.user.partner_id
+            if target:
+                self.env['bus.bus']._sendone(target, 'google.drive.sync', {
+                    'folder_id': folder_id or False,
+                    'type': 'folder_synced'
+                })
+        except Exception as e:
+            _logger.warning("Failed to send bus notification: %s", str(e))
 
     def _process_drive_file(self, file_data, config, root_folder_id, parent_folder_id, headers):
         """Process a single file from the Google Drive API response."""
@@ -439,5 +570,4 @@ class GoogleDriveSync(models.AbstractModel):
                 except Exception as e:
                     _logger.warning("Failed to download %s: %s", name, str(e))
 
-        if is_folder:
-            self._sync_config_files(config, root_folder_id, explorer_record.id, g_id)
+        return explorer_record

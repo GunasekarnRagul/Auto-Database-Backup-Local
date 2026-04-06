@@ -175,14 +175,16 @@ class GoogleDriveConfig(models.Model):
         }
 
     @api.model
-    def action_trigger_sync(self, root_folder_id=None):
+    def action_trigger_sync(self, root_folder_id=None, drive_config_id=None):
         """Trigger sync for active configs. Called from file explorer JS.
+        If drive_config_id is provided, only sync that drive.
         If root_folder_id is provided, only sync that specific root.
         
         Flow: 1) Push pending local items to Drive  2) Pull from Drive
         """
         # Step 1: Push any pending folders/files to Google Drive first
-        self.env['google.drive.file'].sudo().sync_pending_to_drive()
+        # Scope push to drive if provided
+        self.env['google.drive.file'].sudo().sync_pending_to_drive(drive_config_id=drive_config_id)
 
         # Step 2: Pull from Drive (backward sync)
         if root_folder_id:
@@ -193,11 +195,38 @@ class GoogleDriveConfig(models.Model):
                 )
             return True
 
-        configs = self.search([('active', '=', True)])
+        # Determine which configs to sync
+        domain = [('active', '=', True)]
+        if drive_config_id:
+            domain.append(('id', '=', drive_config_id))
+
+        configs = self.search(domain)
         for config in configs:
             for root in config.root_ids.filtered(lambda r: r.active):
                 self.env['google.drive.sync'].sudo()._sync_config_files(
                     config, root_folder_id=root.id, gdrive_parent_id=root.root_id
                 )
         return True
+
+    @api.model
+    def action_auto_sync_drive(self, drive_config_id=None):
+        """One-way auto-sync: push pending items for a specific drive to Google Drive.
+
+        This is the method called by auto-sync mode in the file explorer. It is
+        intentionally ONE-WAY (Odoo → Google Drive only) to keep auto-sync fast
+        and safe while the user is actively working.
+
+        It does NOT pull changes from Google Drive. Use action_trigger_sync
+        (Manual Sync) for a full bi-directional sync.
+
+        Args:
+            drive_config_id (int|None): ID of the google.drive.config to sync.
+                If None, syncs ALL active drives.
+
+        Returns:
+            dict: {'success': int, 'error': int} — counts from sync_pending_to_drive.
+        """
+        return self.env['google.drive.file'].sudo().sync_pending_to_drive(
+            drive_config_id=drive_config_id
+        )
 

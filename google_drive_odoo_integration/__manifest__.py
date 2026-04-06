@@ -11,7 +11,7 @@
         - Sync files from Google Drive back to Odoo.
     """,
     'author': 'Antigravity',
-    'depends': ['base', 'mail'],
+    'depends': ['base', 'mail', 'bus'],
     'data': [
         'security/ir.model.access.csv',
         'data/cron_sync.xml',

@@ -79,11 +79,22 @@
                     <div class="gd_sync_mode_wrapper" t-on-click.stop="">
                         <div class="gd_sync_mode_badge" t-on-click="toggleSyncModeMenu"
                              t-att-class="{ 'gd_sync_auto': state.syncMode === 'auto', 'gd_sync_manual': state.syncMode === 'manual' }">
-                            <i t-att-class="state.syncMode === 'auto' ? 'fa fa-bolt' : 'fa fa-hand-paper-o'"/>
+                            <!-- Rotating spinner replaces the bolt icon while auto-syncing -->
+                            <t t-if="state.syncMode === 'auto' and isAutoSyncingCurrentDrive">
+                                <i class="fa fa-refresh fa-spin gd_auto_sync_spinner" title="Auto-syncing to Google Drive..."/>
+                            </t>
+                            <t t-else="">
+                                <i t-att-class="state.syncMode === 'auto' ? 'fa fa-bolt' : 'fa fa-hand-paper-o'"/>
+                            </t>
                             <span t-if="state.syncMode === 'auto'" class="d-flex align-items-center">
                                 Auto Sync
-                                <i class="fa fa-info-circle text-warning" style="margin-left: 5px; font-size: 0.9rem;" 
-                                   title="Warning: Auto Sync works fine but for intense work it's not recommended; switch to manual sync. Auto Sync is only a one-way sync (Odoo to Google Drive), but Manual Sync is a bi-directional sync."/>
+                                <t t-if="isAutoSyncingCurrentDrive">
+                                    <span class="gd_auto_sync_label" style="margin-left: 5px; font-size: 0.78rem; opacity: 0.8;">syncing…</span>
+                                </t>
+                                <t t-else="">
+                                    <i class="fa fa-info-circle text-warning" style="margin-left: 5px; font-size: 0.9rem;" 
+                                       title="Auto Sync is one-way (Odoo → Google Drive). Use Manual Sync for a full bi-directional sync."/>
+                                </t>
                             </span>
                             <span t-else="">Manual Sync</span>
                             <i class="fa fa-caret-down" style="margin-left: 4px; font-size: 0.7rem;"/>
@@ -98,7 +109,7 @@
                                     <span class="gd_sync_mode_desc d-flex align-items-center">
                                         Syncs immediately after changes
                                         <i class="fa fa-info-circle text-warning" style="margin-left: 6px; font-size: 0.85rem;" 
-                                           title="Warning: Auto Sync works fine but for intense work it's not recommended; switch to manual sync. Auto Sync is only a one-way sync (Odoo to Google Drive), but Manual Sync is a bi-directional sync."/>
+                                           title="Auto Sync is one-way (Odoo → Google Drive). Use Manual Sync for a bi-directional sync."/>
                                     </span>
                                 </div>
                                 <i t-if="state.syncMode === 'auto'" class="fa fa-check gd_sync_mode_check"/>
@@ -114,6 +125,7 @@
                             </a>
                         </div>
                     </div>
+
                     <!-- Account / Drive Switcher -->
                     <div class="gd_account_wrapper" t-if="state.drives.some(d => d.state === 'connected')" t-on-click.stop="">
                         <div class="gd_user_avatar" t-on-click="toggleAccountMenu">
@@ -365,9 +377,9 @@
                                 </button>
                                 <t t-if="state.syncMode === 'manual'">
                                     <button class="gd_action_btn gd_btn_sync" 
-                                            t-att-class="{ 'gd_btn_syncing': state.syncing, 'gd_btn_sync_completed': state.syncCompleted, 'gd_btn_sync_needed': state.hasPendingChanges }"
+                                            t-att-class="{ 'gd_btn_syncing': isManualSyncingCurrentDrive, 'gd_btn_sync_completed': isManualSyncCompletedCurrentDrive, 'gd_btn_sync_needed': state.hasPendingChanges }"
                                             t-on-click="onManualSync" t-att-title="state.hasPendingChanges ? 'Push changes to Google Drive' : 'Sync with Google Drive'">
-                                        <i class="fa fa-refresh" t-att-class="{ 'fa-spin': state.syncing }"/>
+                                        <i class="fa fa-refresh" t-att-class="{ 'fa-spin': isManualSyncingCurrentDrive }"/>
                                         <div t-if="state.hasPendingChanges" class="gd_sync_dot_action"/>
                                     </button>
                                 </t>

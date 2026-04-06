@@ -12,6 +12,24 @@ export class FileExplorer extends Component {
         this.actionService = useService("action");
         this.notificationService = useService("notification");
         this.dialogService = useService("dialog");
+        this.busService = this.env.services.bus_service;
+
+        if (this.busService) {
+            // Subscribe to real-time sync notifications
+            this.busService.addChannel('google.drive.sync');
+            this.busService.subscribe('notification', (notifications) => {
+                notifications.forEach(notif => {
+                    if (notif.type === 'google.drive.sync' && notif.payload.type === 'folder_synced') {
+                        const payload = notif.payload;
+                        // If the updated folder is the one we are currently looking at, refresh the view
+                        if (payload.folder_id === this.state.currentFolderId || (payload.folder_id === false && !this.state.currentFolderId)) {
+                             this.loadFiles(this.state.currentFolderId);
+                        }
+                    }
+                });
+            });
+        }
+
         this.state = useState({
             files: [],
             allFiles: [],
@@ -35,6 +53,15 @@ export class FileExplorer extends Component {
             selectionMode: false,
             syncing: false,
             syncCompleted: false,
+            // Per-drive auto-sync tracking
+            // { driveId: true }  — true while that drive's auto-sync is in progress
+            autoSyncingDrives: {},
+            // { driveId: true }  — briefly true after sync completes (for icon hide timing)
+            autoSyncCompleted: {},
+
+            // Per-drive manual-sync tracking
+            manualSyncingDrives: {},
+            manualSyncCompleted: {},
             // Inline renaming
             renamingFileId: null,
             renameValue: '',
@@ -135,6 +162,18 @@ export class FileExplorer extends Component {
 
     get hasNoDrives() {
         return this.state.drives.length === 0;
+    }
+
+    get isAutoSyncingCurrentDrive() {
+        return !!this.state.autoSyncingDrives[this.state.activeDriveId];
+    }
+
+    get isManualSyncingCurrentDrive() {
+        return !!this.state.manualSyncingDrives[this.state.activeDriveId];
+    }
+
+    get isManualSyncCompletedCurrentDrive() {
+        return !!this.state.manualSyncCompleted[this.state.activeDriveId];
     }
 
     get activeDriveName() {
@@ -1486,31 +1525,11 @@ export class FileExplorer extends Component {
                 await this._refreshTreeForParent(this.state.currentFolderId);
             }
 
-            // Step 2: Try background delete ONLY in Auto Sync mode
-            if (this.state.syncMode === 'auto') {
-                this.orm.call("google.drive.file", "delete_on_drive_and_unlink", [ids])
-                    .then((success) => {
-                        if (success) {
-                            this.notificationService.add(
-                                `Deleted from Google Drive: ${nameList}`,
-                                { type: "success" }
-                            );
-                        } else {
-                            this.notificationService.add(
-                                "Odoo items hidden. Some items will be deleted from Google Drive during the next sync.",
-                                { type: "info" }
-                            );
-                        }
-                    }).catch(() => {
-                        console.log("Background Drive deletion deferred to next sync.");
-                    });
-            } else {
-                // Manual Sync Mode
-                this.notificationService.add(
-                    "Item(s) archived locally. Please click 'Sync' to remove from Google Drive.",
-                    { type: "info" }
-                );
-            }
+            // Feed back to user
+            this.notificationService.add(
+                `Moved to Odoo Trash: ${nameList}. These items will remain active on Google Drive until permanently deleted from the Trash tab.`,
+                { type: "info" }
+            );
             await this.checkPendingChanges();
         } catch (e) {
             this.notificationService.add("Failed to delete: " + (e.message || "Unknown error"), { type: "danger" });
@@ -1714,10 +1733,7 @@ export class FileExplorer extends Component {
             return;
         }
 
-        let driveConfigId = false;
-        if (this.state.drives.length > 0) {
-            driveConfigId = this.state.drives[0].id;
-        }
+        const driveConfigId = this.state.activeDriveId;
 
         if (!driveConfigId) {
             this.notificationService.add("No active drive configured.", { type: "warning" });
@@ -1745,9 +1761,9 @@ export class FileExplorer extends Component {
             // Sync tree
             await this._refreshTreeForParent(this.state.currentFolderId, true);
 
-            // Auto sync in background (non-blocking)
+            // Auto sync in background (non-blocking) — pass current drive ID
             if (this.state.syncMode === 'auto') {
-                this.triggerAutoSync();
+                this.triggerAutoSync(this.state.activeDriveId);
             } else {
                 await this.checkPendingChanges();
             }
@@ -1814,9 +1830,9 @@ export class FileExplorer extends Component {
             }
             this.notificationService.add("Files uploaded successfully!", { type: "success" });
 
-            // Auto sync in background (non-blocking)
+            // Auto sync in background (non-blocking) — pass current drive ID
             if (this.state.syncMode === 'auto') {
-                this.triggerAutoSync();
+                this.triggerAutoSync(this.state.activeDriveId);
             } else {
                 await this.checkPendingChanges();
             }
@@ -1834,10 +1850,7 @@ export class FileExplorer extends Component {
             reader.readAsDataURL(file);
         });
 
-        let driveConfigId = false;
-        if (this.state.drives.length > 0) {
-            driveConfigId = this.state.drives[0].id;
-        }
+        const driveConfigId = this.state.activeDriveId;
 
         if (!driveConfigId) {
             this.notificationService.add("No active drive configured.", { type: "warning" });
@@ -1857,25 +1870,46 @@ export class FileExplorer extends Component {
     // ─── Manual Sync ───
 
     async onManualSync() {
-        this.state.syncing = true;
-        this.state.syncCompleted = false;
-        this.notificationService.add("Sync started...", { type: "info" });
+        const driveId = this.state.activeDriveId;
+        if (!driveId) return;
+
+        // Validation: Don't start manual sync if auto sync is running for this drive
+        if (this.state.autoSyncingDrives[driveId]) {
+            this.notificationService.add("Automatic sync is already in progress for this drive. Please wait.", { type: "warning" });
+            return;
+        }
+
+        // Skip if already manual syncing this drive
+        if (this.state.manualSyncingDrives[driveId]) return;
+
+        this.state.manualSyncingDrives[driveId] = true;
+        this.state.manualSyncCompleted[driveId] = false;
+        
+        this.notificationService.add(`Sync started for ${this.activeDriveName}...`, { type: "info" });
+
         try {
-            // Only sync the active root folder as requested
+            // Bi-directional sync for the whole drive or active root
             await this.orm.call("google.drive.config", "action_trigger_sync", [], {
+                drive_config_id: driveId,
                 root_folder_id: this.state.activeRootId || false
             });
-            await this.loadFiles(this.state.currentFolderId);
-            this.notificationService.add("Sync completed!", { type: "success" });
-            this.state.syncCompleted = true;
+
+            // If we are still looking at the same drive, refresh view
+            if (this.state.activeDriveId === driveId) {
+                await this.loadFiles(this.state.currentFolderId);
+            }
+
+            this.notificationService.add(`Sync completed for ${this.activeDriveName}!`, { type: "success" });
+            this.state.manualSyncCompleted[driveId] = true;
             await this.checkPendingChanges();
+
             setTimeout(() => {
-                this.state.syncCompleted = false;
+                this.state.manualSyncCompleted[driveId] = false;
             }, 3000);
         } catch (e) {
-            this.notificationService.add("Sync failed: " + (e.message || "Unknown error"), { type: "danger" });
+            this.notificationService.add(`Sync failed for ${this.activeDriveName}: ` + (e.message || "Unknown error"), { type: "danger" });
         } finally {
-            this.state.syncing = false;
+            this.state.manualSyncingDrives[driveId] = false;
         }
     }
 
@@ -1893,15 +1927,101 @@ export class FileExplorer extends Component {
         localStorage.setItem('gd_sync_mode', mode);
     }
 
-    async triggerAutoSync() {
+    /**
+     * Trigger a one-way auto-sync (Odoo → Google Drive) for a specific drive.
+     *
+     * Each drive maintains its own syncing state so that switching drives
+     * mid-sync does not cancel or interfere with ongoing uploads.
+     *
+     * The rotating spinner on the Auto Sync badge is shown while
+     * `autoSyncingDrives[driveId]` is true and hidden once sync completes.
+     *
+     * @param {number|null} driveId  google.drive.config ID to sync.
+     *   Defaults to the currently active drive.
+     */
+    async triggerAutoSync(driveId) {
+        const targetDriveId = driveId || this.state.activeDriveId;
+        if (!targetDriveId) return;
+
+        // Skip if manual sync is running for this drive (mutual exclusion)
+        if (this.state.manualSyncingDrives[targetDriveId]) return;
+
+        // Guard: skip if this drive is already syncing
+        if (this.state.autoSyncingDrives[targetDriveId]) return;
+
+        // Mark this drive as syncing — triggers spinner in the template
+        this.state.autoSyncingDrives = {
+            ...this.state.autoSyncingDrives,
+            [targetDriveId]: true,
+        };
+
         try {
-            await this.orm.call("google.drive.config", "action_trigger_sync", [], {
-                root_folder_id: this.state.activeRootId || false
-            });
-            await this.loadFiles(this.state.currentFolderId);
+            // Get all pending IDs for this drive to process them individually for real-time feedback
+            const pendingIds = await this.orm.call(
+                "google.drive.file",
+                "get_pending_sync_ids",
+                [],
+                { drive_config_id: targetDriveId }
+            );
+
+            if (pendingIds && pendingIds.length > 0) {
+                for (const id of pendingIds) {
+                    try {
+                        await this.orm.call(
+                            "google.drive.file",
+                            "action_sync_single_record",
+                            [[id]]
+                        );
+
+                        // If the user is still on this drive/view, update the specific file record in real-time
+                        if (this.state.activeDriveId === targetDriveId) {
+                            const updated = await this.orm.read("google.drive.file", [id], [
+                                "sync_state", "google_file_id", "google_url", "last_synced"
+                            ]);
+                            if (updated && updated.length > 0) {
+                                const idx = this.state.files.findIndex(f => f.id === id);
+                                if (idx !== -1) {
+                                    // Update the record in place to trigger Owl reactivity
+                                    Object.assign(this.state.files[idx], updated[0]);
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Single file sync failed", id, err);
+                    }
+                }
+            }
+
+            // Briefly mark as completed so the template can react if needed
+            this.state.autoSyncCompleted = {
+                ...this.state.autoSyncCompleted,
+                [targetDriveId]: true,
+            };
+
+            // Final safety reload of the file list
+            if (this.state.activeDriveId === targetDriveId) {
+                await this.loadFiles(this.state.currentFolderId);
+            }
+
+            // Remove the completed flag after 2 s (icon disappears)
+            setTimeout(() => {
+                const completed = { ...this.state.autoSyncCompleted };
+                delete completed[targetDriveId];
+                this.state.autoSyncCompleted = completed;
+            }, 2000);
         } catch (e) {
-            this.notificationService.add("Auto sync failed: " + (e.message || "Unknown error"), { type: "danger" });
+            console.error("Auto sync failed for drive", targetDriveId, e);
+        } finally {
+            // Always clear the syncing flag for this drive
+            const syncing = { ...this.state.autoSyncingDrives };
+            delete syncing[targetDriveId];
+            this.state.autoSyncingDrives = syncing;
         }
+    }
+
+    /** True when the currently-viewed drive has an auto-sync in progress. */
+    get isAutoSyncingCurrentDrive() {
+        return !!this.state.autoSyncingDrives[this.state.activeDriveId];
     }
 
     _isActionRestrictedInTrash() {
