@@ -95,14 +95,15 @@ export class FileExplorer extends Component {
             uploading: false,
             uploadProgress: { current: 0, total: 0 },
 
-            // Clipboard for Cut & Paste
             clipboard: {
                 items: [],
                 sourceDriveId: null,
+                sourceParentId: null,
             },
 
             showShareLoader: false,
             showDownloadLoader: false,
+            showPasteLoader: false,
             loaderMessage: 'Loading...',
         });
 
@@ -983,6 +984,7 @@ export class FileExplorer extends Component {
         this.state.clipboard = {
             items: items,
             sourceDriveId: this.state.activeDriveId,
+            sourceParentId: this.state.currentFolderId,
         };
 
         this.notificationService.add(`${items.length} item(s) cut to clipboard.`, { type: "info" });
@@ -1001,7 +1003,8 @@ export class FileExplorer extends Component {
             return;
         }
 
-        this.state.loading = true;
+        this.state.loaderMessage = 'Moving items...';
+        this.state.showPasteLoader = true;
         try {
             const success = await this.orm.call(
                 "google.drive.file",
@@ -1015,18 +1018,21 @@ export class FileExplorer extends Component {
 
             if (success) {
                 this.notificationService.add("Items moved successfully.", { type: "success" });
-                this.state.clipboard = { items: [], sourceDriveId: null };
+                
+                // Save sourceParent before resetting clipboard
+                const savedSourceParent = this.state.clipboard.sourceParentId;
+                
+                this.state.clipboard = { items: [], sourceDriveId: null, sourceParentId: null };
                 
                 // Refresh view
                 await this.loadFiles(this.state.currentFolderId);
                 
                 // Refresh folder tree for both source and target
                 if (this.state.activeRootId) {
-                    const sourceParent = this.state.clipboard.sourceParentId;
                     const targetParent = this.state.currentFolderId;
                     
                     // Refresh source
-                    await this._refreshTreeForParent(sourceParent);
+                    await this._refreshTreeForParent(savedSourceParent);
                     // Refresh target and expand it
                     await this._refreshTreeForParent(targetParent, true);
                 }
@@ -1037,7 +1043,7 @@ export class FileExplorer extends Component {
             this.notificationService.add("An error occurred while moving items.", { type: "danger" });
             console.error(e);
         } finally {
-            this.state.loading = false;
+            this.state.showPasteLoader = false;
         }
     }
 
