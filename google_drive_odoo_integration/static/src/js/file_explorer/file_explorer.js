@@ -100,6 +100,10 @@ export class FileExplorer extends Component {
                 items: [],
                 sourceDriveId: null,
             },
+
+            showShareLoader: false,
+            showDownloadLoader: false,
+            loaderMessage: 'Loading...',
         });
 
         const onWindowClick = (ev) => this.onWindowClick(ev);
@@ -1382,8 +1386,20 @@ export class FileExplorer extends Component {
         const files = this.selectedFilesList;
         if (files.length === 0) return;
 
+        // Prevent double clicks
+        if (this.state.showShareLoader) return;
+        this.state.loaderMessage = 'Loading sharing info...';
+        this.state.showShareLoader = true;
+
         this.dialogService.add(ShareDriveLinkDialog, {
             files: files,
+            onReady: () => {
+                this.state.showShareLoader = false;
+            },
+        }, {
+            onClose: () => {
+                this.state.showShareLoader = false;
+            },
         });
     }
 
@@ -1468,6 +1484,13 @@ export class FileExplorer extends Component {
         const files = this.selectedFilesList;
         if (files.length === 0) return;
 
+        // Prevent double clicks
+        if (this.state.showDownloadLoader) return;
+
+        // Show fullscreen loader
+        this.state.loaderMessage = 'Preparing download...';
+        this.state.showDownloadLoader = true;
+
         // Condition for ZIP: Multiple items OR at least one folder
         const hasFolder = files.some(f => f.file_type === 'folder');
         const isMulti = files.length > 1;
@@ -1475,19 +1498,23 @@ export class FileExplorer extends Component {
         if (hasFolder || isMulti) {
             const ids = files.map(f => f.id).join(',');
             const downloadUrl = `/google_drive/download_zip?file_ids=${ids}`;
-            
-            this.notificationService.add("Preparing your ZIP download...", { type: "info" });
-            
+
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = downloadUrl;
             document.body.appendChild(a);
             a.click();
             setTimeout(() => document.body.removeChild(a), 100);
+
+            // Hide loader after a brief moment (browser handles the download)
+            setTimeout(() => {
+                this.state.showDownloadLoader = false;
+                this.notificationService.add("Your ZIP download has started.", { type: "success" });
+            }, 2000);
             return;
         }
 
-        // Single file download (existing logic)
+        // Single file download
         const file = files[0];
         const downloadUrl = `/google_drive/download/${file.id}`;
         const a = document.createElement('a');
@@ -1497,7 +1524,12 @@ export class FileExplorer extends Component {
         document.body.appendChild(a);
         a.click();
         setTimeout(() => document.body.removeChild(a), 100);
-        this.notificationService.add(`Downloading "${file.name}"...`, { type: "info" });
+
+        // Hide loader after a brief moment
+        setTimeout(() => {
+            this.state.showDownloadLoader = false;
+            this.notificationService.add(`Downloading "${file.name}"...`, { type: "success" });
+        }, 1500);
     }
 
     async onDeleteSelected() {
@@ -2058,32 +2090,362 @@ class ShareDriveLinkDialog extends Component {
     static props = {
         files: Array,
         close: Function,
+        onReady: { type: Function, optional: true },
     };
 
     setup() {
+        this.orm = useService("orm");
+        this.notificationService = useService("notification");
+
         this.state = useState({
             copied: false,
+            loading: true,
+            // Permissions
+            permissions: [],
+            generalAccess: 'restricted',
+            anyoneRole: 'reader',
+            // Settings
+            writersCanShare: true,
+            copyRequiresWriterPermission: false,
+            // Add people
+            addEmail: '',
+            addRole: 'reader',
+            addingPerson: false,
+            // Dropdowns
+            showGeneralAccessDropdown: false,
+            showAnyoneRoleDropdown: false,
+            showSettingsPanel: false,
+            activePermRoleDropdown: null,
+            // Loader
+            showActionLoader: false,
+            loaderMessage: 'Loading...',
+            // Error
+            error: null,
         });
+
+        onWillStart(async () => {
+            if (this.props.files.length === 1 && this.props.files[0].google_file_id) {
+                await this.loadShareInfo();
+            } else {
+                this.state.loading = false;
+            }
+            if (this.props.onReady) this.props.onReady();
+        });
+    }
+
+    get file() {
+        return this.props.files[0];
+    }
+
+    get isSingleFile() {
+        return this.props.files.length === 1;
     }
 
     get shareableFiles() {
         return this.props.files.filter(f => f.google_url);
     }
 
-    async onCopyLink() {
-        const links = this.shareableFiles.map(f => f.google_url);
-        if (links.length === 0) return;
+    get shareLink() {
+        const file = this.file;
+        if (!file || !file.google_file_id) return '';
+        if (file.file_type === 'folder') {
+            return `https://drive.google.com/drive/folders/${file.google_file_id}?usp=sharing`;
+        }
+        return `https://drive.google.com/file/d/${file.google_file_id}/view?usp=sharing`;
+    }
 
-        const linkText = links.join('\n');
+    async loadShareInfo() {
+        this.state.loading = true;
+        this.state.error = null;
         try {
-            await navigator.clipboard.writeText(linkText);
+            const result = await this.orm.call(
+                "google.drive.file",
+                "action_get_share_info",
+                [[this.file.id]]
+            );
+            if (result.error) {
+                this.state.error = result.error;
+            } else {
+                this.state.permissions = result.permissions || [];
+                this.state.generalAccess = result.generalAccess || 'restricted';
+                this.state.anyoneRole = result.anyoneRole || 'reader';
+                this.state.writersCanShare = result.writersCanShare !== false;
+                this.state.copyRequiresWriterPermission = result.copyRequiresWriterPermission || false;
+            }
+        } catch (e) {
+            console.error("Failed to load share info", e);
+            this.state.error = "Failed to load sharing information.";
+        } finally {
+            this.state.loading = false;
+        }
+    }
+
+    // ─── Add People ───
+
+    onEmailInput(ev) {
+        this.state.addEmail = ev.target.value;
+    }
+
+    onEmailKeydown(ev) {
+        if (ev.key === 'Enter') {
+            this.addPerson();
+        }
+    }
+
+    setAddRole(role) {
+        this.state.addRole = role;
+    }
+
+    async addPerson() {
+        const email = this.state.addEmail.trim();
+        if (!email) return;
+
+        // Basic email validation
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            this.notificationService.add("Please enter a valid email address.", { type: "warning" });
+            return;
+        }
+
+        this.state.addingPerson = true;
+        this.state.loaderMessage = 'Sending invitation...';
+        this.state.showActionLoader = true;
+        try {
+            const result = await this.orm.call(
+                "google.drive.file",
+                "action_add_permission",
+                [[this.file.id]],
+                { email: email, role: this.state.addRole, send_notification: true }
+            );
+            if (result.error) {
+                this.notificationService.add(result.error, { type: "danger" });
+            } else if (result.success) {
+                this.state.permissions.push(result.permission);
+                this.state.addEmail = '';
+                this.notificationService.add(`Shared with ${email}`, { type: "success" });
+            }
+        } catch (e) {
+            this.notificationService.add("Failed to add person.", { type: "danger" });
+        } finally {
+            this.state.addingPerson = false;
+            this.state.showActionLoader = false;
+        }
+    }
+
+    // ─── Permission Role Dropdown ───
+
+    togglePermRoleDropdown(permId) {
+        if (this.state.activePermRoleDropdown === permId) {
+            this.state.activePermRoleDropdown = null;
+        } else {
+            this.state.activePermRoleDropdown = permId;
+        }
+    }
+
+    async updatePermissionRole(perm, role) {
+        this.state.activePermRoleDropdown = null;
+        if (perm.role === role) return;
+
+        this.state.loaderMessage = 'Updating permission...';
+        this.state.showActionLoader = true;
+        try {
+            const result = await this.orm.call(
+                "google.drive.file",
+                "action_update_permission",
+                [[this.file.id]],
+                { permission_id: perm.id, role: role }
+            );
+            if (result.error) {
+                this.notificationService.add(result.error, { type: "danger" });
+            } else {
+                perm.role = role;
+                this.notificationService.add(`Role updated to ${this.getRoleLabel(role)}`, { type: "success" });
+            }
+        } catch (e) {
+            this.notificationService.add("Failed to update permission.", { type: "danger" });
+        } finally {
+            this.state.showActionLoader = false;
+        }
+    }
+
+    async removePermission(perm) {
+        this.state.activePermRoleDropdown = null;
+        this.state.loaderMessage = 'Removing access...';
+        this.state.showActionLoader = true;
+        try {
+            const result = await this.orm.call(
+                "google.drive.file",
+                "action_remove_permission",
+                [[this.file.id]],
+                { permission_id: perm.id }
+            );
+            if (result.error) {
+                this.notificationService.add(result.error, { type: "danger" });
+            } else {
+                this.state.permissions = this.state.permissions.filter(p => p.id !== perm.id);
+                this.notificationService.add("Access removed.", { type: "success" });
+            }
+        } catch (e) {
+            this.notificationService.add("Failed to remove access.", { type: "danger" });
+        } finally {
+            this.state.showActionLoader = false;
+        }
+    }
+
+    getRoleLabel(role) {
+        const labels = {
+            'owner': 'Owner',
+            'writer': 'Editor',
+            'commenter': 'Commenter',
+            'reader': 'Viewer',
+        };
+        return labels[role] || role;
+    }
+
+    getPermInitial(perm) {
+        if (perm.displayName) return perm.displayName.charAt(0).toUpperCase();
+        if (perm.emailAddress) return perm.emailAddress.charAt(0).toUpperCase();
+        return '?';
+    }
+
+    // ─── General Access ───
+
+    toggleGeneralAccessDropdown() {
+        const tgt = !this.state.showGeneralAccessDropdown;
+        this.closeAllShareMenus();
+        this.state.showGeneralAccessDropdown = tgt;
+    }
+
+    toggleAnyoneRoleDropdown() {
+        const tgt = !this.state.showAnyoneRoleDropdown;
+        this.closeAllShareMenus();
+        this.state.showAnyoneRoleDropdown = tgt;
+    }
+
+    closeAllShareMenus() {
+        this.state.showGeneralAccessDropdown = false;
+        this.state.showAnyoneRoleDropdown = false;
+        this.state.activePermRoleDropdown = null;
+    }
+
+    async setGeneralAccess(accessType) {
+        this.state.showGeneralAccessDropdown = false;
+
+        if (accessType === this.state.generalAccess) return;
+
+        this.state.loaderMessage = 'Updating general access...';
+        this.state.showActionLoader = true;
+        try {
+            const result = await this.orm.call(
+                "google.drive.file",
+                "action_set_general_access",
+                [[this.file.id]],
+                { access_type: accessType, role: this.state.anyoneRole }
+            );
+            if (result.error) {
+                this.notificationService.add(result.error, { type: "danger" });
+            } else {
+                this.state.generalAccess = accessType;
+                if (accessType === 'anyone') {
+                    this.notificationService.add("Anyone with the link can now access this file.", { type: "success" });
+                } else {
+                    this.notificationService.add("Access restricted to specific people only.", { type: "success" });
+                }
+            }
+        } catch (e) {
+            this.notificationService.add("Failed to update general access.", { type: "danger" });
+        } finally {
+            this.state.showActionLoader = false;
+        }
+    }
+
+    async setAnyoneRole(role) {
+        this.state.showAnyoneRoleDropdown = false;
+        if (role === this.state.anyoneRole) return;
+
+        this.state.loaderMessage = 'Updating access role...';
+        this.state.showActionLoader = true;
+        try {
+            // Need to remove old anyone permission and create new one with new role
+            const result = await this.orm.call(
+                "google.drive.file",
+                "action_set_general_access",
+                [[this.file.id]],
+                { access_type: 'anyone', role: role }
+            );
+            if (result.error) {
+                this.notificationService.add(result.error, { type: "danger" });
+            } else {
+                this.state.anyoneRole = role;
+            }
+        } catch (e) {
+            this.notificationService.add("Failed to update access role.", { type: "danger" });
+        } finally {
+            this.state.showActionLoader = false;
+        }
+    }
+
+    // ─── Settings ───
+
+    toggleSettingsPanel() {
+        this.state.showSettingsPanel = !this.state.showSettingsPanel;
+    }
+
+    async onToggleWritersCanShare(ev) {
+        const newVal = ev.target.checked;
+        try {
+            const result = await this.orm.call(
+                "google.drive.file",
+                "action_update_sharing_settings",
+                [[this.file.id]],
+                { writers_can_share: newVal }
+            );
+            if (result.error) {
+                this.notificationService.add(result.error, { type: "danger" });
+                ev.target.checked = !newVal; // revert
+            } else {
+                this.state.writersCanShare = newVal;
+            }
+        } catch (e) {
+            this.notificationService.add("Failed to update setting.", { type: "danger" });
+            ev.target.checked = !newVal;
+        }
+    }
+
+    async onToggleCopyRequiresWriter(ev) {
+        const newVal = ev.target.checked;
+        try {
+            const result = await this.orm.call(
+                "google.drive.file",
+                "action_update_sharing_settings",
+                [[this.file.id]],
+                { copy_requires_writer: newVal }
+            );
+            if (result.error) {
+                this.notificationService.add(result.error, { type: "danger" });
+                ev.target.checked = !newVal;
+            } else {
+                this.state.copyRequiresWriterPermission = newVal;
+            }
+        } catch (e) {
+            this.notificationService.add("Failed to update setting.", { type: "danger" });
+            ev.target.checked = !newVal;
+        }
+    }
+
+    // ─── Copy Link ───
+
+    async onCopyLink() {
+        const link = this.shareLink || this.shareableFiles.map(f => f.google_url).join('\n');
+        if (!link) return;
+
+        try {
+            await navigator.clipboard.writeText(link);
             this.state.copied = true;
             setTimeout(() => {
                 this.state.copied = false;
             }, 2000);
         } catch {
-            // Fallback for older browsers
-            prompt("Copy link:", linkText);
+            prompt("Copy link:", link);
         }
     }
 }

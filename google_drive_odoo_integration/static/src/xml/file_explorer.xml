@@ -2,6 +2,14 @@
 <templates xml:space="preserve">
     <t t-name="google_drive_odoo_integration.FileExplorer">
         <div class="gd_explorer" t-att-class="{ 'gd_sidebar_collapsed': state.sidebarCollapsed }">
+            <!-- ====== FULLSCREEN LOADER ====== -->
+            <div class="gd_fullscreen_loader" t-if="state.showShareLoader || state.showDownloadLoader">
+                <div class="gd_fullscreen_loader_content">
+                    <div class="gd_fullscreen_spinner"/>
+                    <span t-esc="state.loaderMessage"/>
+                </div>
+            </div>
+
             <!-- ====== SELECTION TOOLBAR (shown when files selected) ====== -->
             <t t-if="state.selectionMode">
                 <div class="gd_selection_bar">
@@ -860,7 +868,7 @@
     <!-- ====== SHARE DRIVE LINK DIALOG ====== -->
     <t t-name="google_drive_odoo_integration.ShareDriveLinkDialog">
         <Dialog title="''" size="'md'">
-            <div class="gd_share_dialog">
+            <div class="gd_share_dialog" t-on-click="closeAllShareMenus">
                 <!-- Header with file name -->
                 <div class="gd_share_header">
                     <div class="gd_share_header_icon">
@@ -878,40 +886,235 @@
                     </div>
                 </div>
 
-                <!-- Link Section -->
-                <div class="gd_share_link_section">
-                    <t t-foreach="shareableFiles" t-as="file" t-key="file.id">
-                        <div class="gd_share_link_row">
-                            <div class="gd_share_link_icon">
-                                <i class="fa fa-link"/>
-                            </div>
-                            <div class="gd_share_link_input_wrap">
-                                <span class="gd_share_file_label" t-if="shareableFiles.length > 1" t-esc="file.name"/>
-                                <input type="text" class="gd_share_link_input" t-att-value="file.google_url" readonly="true"/>
-                            </div>
-                        </div>
-                    </t>
-                    <t t-if="shareableFiles.length === 0">
-                        <div class="gd_share_no_link">
-                            <i class="fa fa-exclamation-circle"/>
-                            <span>No shareable links available. Please sync the file(s) first.</span>
-                        </div>
-                    </t>
-                </div>
+                <!-- Loading State -->
+                <t t-if="state.loading">
+                    <div class="gd_share_loading">
+                        <i class="fa fa-circle-o-notch fa-spin"/>
+                        <span>Loading sharing info...</span>
+                    </div>
+                </t>
 
-                <!-- General Access Section -->
-                <div class="gd_share_access_section">
-                    <div class="gd_share_access_label">General access</div>
-                    <div class="gd_share_access_row">
-                        <div class="gd_share_access_icon">
-                            <i class="fa fa-lock"/>
-                        </div>
-                        <div class="gd_share_access_info">
-                            <span class="gd_share_access_level">Restricted</span>
-                            <span class="gd_share_access_desc">Only people with access can open with the link</span>
+                <!-- Error State -->
+                <t t-elif="state.error">
+                    <div class="gd_share_error">
+                        <i class="fa fa-exclamation-triangle"/>
+                        <span t-esc="state.error"/>
+                    </div>
+                </t>
+
+                <!-- Multi-file: simple link copy -->
+                <t t-elif="!isSingleFile">
+                    <div class="gd_share_link_section">
+                        <t t-foreach="shareableFiles" t-as="file" t-key="file.id">
+                            <div class="gd_share_link_row">
+                                <div class="gd_share_link_icon">
+                                    <i class="fa fa-link"/>
+                                </div>
+                                <div class="gd_share_link_input_wrap">
+                                    <span class="gd_share_file_label" t-esc="file.name"/>
+                                    <input type="text" class="gd_share_link_input" t-att-value="file.google_url" readonly="true"/>
+                                </div>
+                            </div>
+                        </t>
+                        <t t-if="shareableFiles.length === 0">
+                            <div class="gd_share_no_link">
+                                <i class="fa fa-exclamation-circle"/>
+                                <span>No shareable links available. Please sync the file(s) first.</span>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+
+                <!-- Single file: full sharing UI -->
+                <t t-else="">
+                    <!-- Add People Section -->
+                    <div class="gd_share_add_section" t-if="file.google_file_id">
+                        <div class="gd_share_add_row">
+                            <div class="gd_share_add_input_wrap">
+                                <i class="fa fa-user-plus gd_share_add_icon"/>
+                                <input type="email" class="gd_share_add_input"
+                                       placeholder="Add people by email"
+                                       t-att-value="state.addEmail"
+                                       t-on-input="onEmailInput"
+                                       t-on-keydown="onEmailKeydown"
+                                       t-att-disabled="state.addingPerson"/>
+                            </div>
+                            <div class="gd_share_add_role_wrap" t-on-click.stop="">
+                                <select class="gd_share_add_role_select" t-on-change="(ev) => this.setAddRole(ev.target.value)">
+                                    <option value="reader" t-att-selected="state.addRole === 'reader'">Viewer</option>
+                                    <option value="commenter" t-att-selected="state.addRole === 'commenter'">Commenter</option>
+                                    <option value="writer" t-att-selected="state.addRole === 'writer'">Editor</option>
+                                </select>
+                            </div>
+                            <button class="gd_share_add_btn" t-on-click="addPerson"
+                                    t-att-disabled="!state.addEmail.trim() || state.addingPerson">
+                                <t t-if="state.addingPerson">
+                                    <i class="fa fa-spinner fa-spin"/>
+                                </t>
+                                <t t-else="">
+                                    <i class="fa fa-paper-plane"/>
+                                </t>
+                            </button>
                         </div>
                     </div>
-                </div>
+
+                    <!-- People with Access -->
+                    <div class="gd_share_people_section" t-if="state.permissions.length > 0">
+                        <div class="gd_share_section_label">People with access</div>
+                        <div class="gd_share_people_list">
+                            <t t-foreach="state.permissions" t-as="perm" t-key="perm.id">
+                                <div class="gd_share_person_row">
+                                    <div class="gd_share_person_avatar">
+                                        <t t-if="perm.photoLink">
+                                            <img t-att-src="perm.photoLink" alt="avatar" class="gd_share_person_img"/>
+                                        </t>
+                                        <t t-else="">
+                                            <span class="gd_share_person_initial" t-esc="getPermInitial(perm)"/>
+                                        </t>
+                                    </div>
+                                    <div class="gd_share_person_info">
+                                        <span class="gd_share_person_name" t-esc="perm.displayName || perm.emailAddress"/>
+                                        <span class="gd_share_person_email" t-if="perm.displayName and perm.emailAddress" t-esc="perm.emailAddress"/>
+                                    </div>
+                                    <div class="gd_share_person_role_wrap" t-on-click.stop="">
+                                        <t t-if="perm.role === 'owner'">
+                                            <span class="gd_share_role_badge gd_role_owner">Owner</span>
+                                        </t>
+                                        <t t-else="">
+                                            <div class="gd_share_role_selector" t-on-click="() => this.togglePermRoleDropdown(perm.id)">
+                                                <span t-esc="getRoleLabel(perm.role)"/>
+                                                <i class="fa fa-caret-down"/>
+                                            </div>
+                                            <div class="gd_share_role_dropdown" t-if="state.activePermRoleDropdown === perm.id">
+                                                <div class="gd_share_role_option" t-att-class="{ active: perm.role === 'reader' }"
+                                                     t-on-click="() => this.updatePermissionRole(perm, 'reader')">
+                                                    <i class="fa fa-eye"/> Viewer
+                                                </div>
+                                                <div class="gd_share_role_option" t-att-class="{ active: perm.role === 'commenter' }"
+                                                     t-on-click="() => this.updatePermissionRole(perm, 'commenter')">
+                                                    <i class="fa fa-comment-o"/> Commenter
+                                                </div>
+                                                <div class="gd_share_role_option" t-att-class="{ active: perm.role === 'writer' }"
+                                                     t-on-click="() => this.updatePermissionRole(perm, 'writer')">
+                                                    <i class="fa fa-pencil"/> Editor
+                                                </div>
+                                                <div class="gd_share_role_divider"/>
+                                                <div class="gd_share_role_option gd_role_remove"
+                                                     t-on-click="() => this.removePermission(perm)">
+                                                    <i class="fa fa-times-circle"/> Remove access
+                                                </div>
+                                            </div>
+                                        </t>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+
+                    <!-- General Access Section -->
+                    <div class="gd_share_access_section" t-if="file.google_file_id">
+                        <div class="gd_share_section_label">General access</div>
+                        <div class="gd_share_access_row">
+                            <div class="gd_share_access_icon" t-att-class="{ 'gd_access_anyone': state.generalAccess === 'anyone' }">
+                                <i t-att-class="state.generalAccess === 'anyone' ? 'fa fa-globe' : 'fa fa-lock'"/>
+                            </div>
+                            <div class="gd_share_access_info">
+                                <div class="gd_share_access_selector_wrap" t-on-click.stop="">
+                                    <div class="gd_share_access_selector" t-on-click="toggleGeneralAccessDropdown">
+                                        <span class="gd_share_access_level" t-esc="state.generalAccess === 'anyone' ? 'Anyone with the link' : 'Restricted'"/>
+                                        <i class="fa fa-caret-down"/>
+                                    </div>
+                                    <div class="gd_share_ga_dropdown" t-if="state.showGeneralAccessDropdown">
+                                        <div class="gd_share_ga_option" t-att-class="{ active: state.generalAccess === 'restricted' }"
+                                             t-on-click="() => this.setGeneralAccess('restricted')">
+                                            <div class="gd_share_ga_option_icon"><i class="fa fa-lock"/></div>
+                                            <div class="gd_share_ga_option_info">
+                                                <span class="gd_share_ga_option_title">Restricted</span>
+                                                <span class="gd_share_ga_option_desc">Only people with access can open with the link</span>
+                                            </div>
+                                        </div>
+                                        <div class="gd_share_ga_option" t-att-class="{ active: state.generalAccess === 'anyone' }"
+                                             t-on-click="() => this.setGeneralAccess('anyone')">
+                                            <div class="gd_share_ga_option_icon gd_access_anyone"><i class="fa fa-globe"/></div>
+                                            <div class="gd_share_ga_option_info">
+                                                <span class="gd_share_ga_option_title">Anyone with the link</span>
+                                                <span class="gd_share_ga_option_desc">Anyone on the internet with the link can access</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <t t-if="state.generalAccess === 'anyone'">
+                                    <div class="gd_share_anyone_role_wrap" t-on-click.stop="">
+                                        <div class="gd_share_anyone_role" t-on-click="toggleAnyoneRoleDropdown">
+                                            <span t-esc="getRoleLabel(state.anyoneRole)"/>
+                                            <i class="fa fa-caret-down"/>
+                                        </div>
+                                        <div class="gd_share_role_dropdown" t-if="state.showAnyoneRoleDropdown">
+                                            <div class="gd_share_role_option" t-att-class="{ active: state.anyoneRole === 'reader' }"
+                                                 t-on-click="() => this.setAnyoneRole('reader')">
+                                                <i class="fa fa-eye"/> Viewer
+                                            </div>
+                                            <div class="gd_share_role_option" t-att-class="{ active: state.anyoneRole === 'commenter' }"
+                                                 t-on-click="() => this.setAnyoneRole('commenter')">
+                                                <i class="fa fa-comment-o"/> Commenter
+                                            </div>
+                                            <div class="gd_share_role_option" t-att-class="{ active: state.anyoneRole === 'writer' }"
+                                                 t-on-click="() => this.setAnyoneRole('writer')">
+                                                <i class="fa fa-pencil"/> Editor
+                                            </div>
+                                        </div>
+                                    </div>
+                                </t>
+                                <t t-else="">
+                                    <span class="gd_share_access_desc">Only people with access can open with the link</span>
+                                </t>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- No Google ID warning -->
+                    <t t-if="!file.google_file_id">
+                        <div class="gd_share_no_link">
+                            <i class="fa fa-exclamation-circle"/>
+                            <span>This file is not synced to Google Drive yet. Please sync first to enable sharing.</span>
+                        </div>
+                    </t>
+
+                    <!-- Settings Panel -->
+                    <div class="gd_share_settings_section" t-if="file.google_file_id">
+                        <div class="gd_share_settings_toggle" t-on-click="toggleSettingsPanel">
+                            <i class="fa fa-cog"/>
+                            <span>Sharing settings</span>
+                            <i t-att-class="'fa ' + (state.showSettingsPanel ? 'fa-chevron-up' : 'fa-chevron-down')" style="margin-left: auto;"/>
+                        </div>
+                        <div class="gd_share_settings_panel" t-if="state.showSettingsPanel">
+                            <label class="gd_share_setting_row">
+                                <div class="gd_share_setting_info">
+                                    <span class="gd_share_setting_title">Editors can change permissions and share</span>
+                                    <span class="gd_share_setting_desc">Allow editors to add people and change access</span>
+                                </div>
+                                <div class="gd_share_toggle_switch">
+                                    <input type="checkbox" class="gd_share_toggle_input"
+                                           t-att-checked="state.writersCanShare"
+                                           t-on-change="onToggleWritersCanShare"/>
+                                    <span class="gd_share_toggle_slider"/>
+                                </div>
+                            </label>
+                            <label class="gd_share_setting_row">
+                                <div class="gd_share_setting_info">
+                                    <span class="gd_share_setting_title">Viewers and commenters can download, print, and copy</span>
+                                    <span class="gd_share_setting_desc">Disable to restrict viewers from downloading</span>
+                                </div>
+                                <div class="gd_share_toggle_switch">
+                                    <input type="checkbox" class="gd_share_toggle_input"
+                                           t-att-checked="!state.copyRequiresWriterPermission"
+                                           t-on-change="onToggleCopyRequiresWriter"/>
+                                    <span class="gd_share_toggle_slider"/>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </t>
 
                 <!-- Footer -->
                 <div class="gd_share_footer">
@@ -926,6 +1129,13 @@
                         </t>
                     </button>
                     <button class="gd_share_done_btn" t-on-click="props.close">Done</button>
+                </div>
+                <!-- Fullscreen Loader for background actions -->
+                <div class="gd_fullscreen_loader" t-if="state.showActionLoader">
+                    <div class="gd_fullscreen_loader_content">
+                        <div class="gd_fullscreen_spinner"/>
+                        <span t-esc="state.loaderMessage"/>
+                    </div>
                 </div>
             </div>
             <t t-set-slot="footer"/>

@@ -571,3 +571,306 @@ class GoogleDriveSync(models.AbstractModel):
                     _logger.warning("Failed to download %s: %s", name, str(e))
 
         return explorer_record
+
+    # ─── Google Drive Permissions API ───
+
+    def get_file_permissions(self, file_record):
+        """Get all permissions for a file/folder on Google Drive."""
+        if not file_record.google_file_id:
+            return {'permissions': [], 'generalAccess': 'restricted', 'role': 'reader'}
+
+        config = file_record.drive_config_id
+        access_token = self._get_access_token(config)
+        if not access_token:
+            return {'error': 'Could not get access token'}
+
+        headers = {"Authorization": f"Bearer {access_token}"}
+        url = (
+            f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}"
+            f"?fields=permissions(id,type,role,emailAddress,displayName,photoLink,domain),"
+            f"copyRequiresWriterPermission,writersCanShare"
+        )
+
+        try:
+            response = http_requests.get(url, headers=headers, timeout=15)
+            if response.status_code == 200:
+                data = response.json()
+                permissions = data.get('permissions', [])
+
+                general_access = 'restricted'
+                anyone_role = 'reader'
+                people_permissions = []
+
+                for perm in permissions:
+                    if perm.get('type') == 'anyone':
+                        general_access = 'anyone'
+                        anyone_role = perm.get('role', 'reader')
+                    elif perm.get('type') == 'user' and perm.get('role') != 'owner':
+                        people_permissions.append({
+                            'id': perm.get('id'),
+                            'type': perm.get('type'),
+                            'role': perm.get('role'),
+                            'emailAddress': perm.get('emailAddress', ''),
+                            'displayName': perm.get('displayName', ''),
+                            'photoLink': perm.get('photoLink', ''),
+                        })
+                    elif perm.get('type') == 'user' and perm.get('role') == 'owner':
+                        people_permissions.insert(0, {
+                            'id': perm.get('id'),
+                            'type': perm.get('type'),
+                            'role': 'owner',
+                            'emailAddress': perm.get('emailAddress', ''),
+                            'displayName': perm.get('displayName', ''),
+                            'photoLink': perm.get('photoLink', ''),
+                        })
+                    elif perm.get('type') == 'domain':
+                        people_permissions.append({
+                            'id': perm.get('id'),
+                            'type': perm.get('type'),
+                            'role': perm.get('role'),
+                            'emailAddress': '',
+                            'displayName': perm.get('domain', 'Domain'),
+                            'photoLink': '',
+                            'domain': perm.get('domain', ''),
+                        })
+
+                return {
+                    'permissions': people_permissions,
+                    'generalAccess': general_access,
+                    'anyoneRole': anyone_role,
+                    'copyRequiresWriterPermission': data.get('copyRequiresWriterPermission', False),
+                    'writersCanShare': data.get('writersCanShare', True),
+                }
+            else:
+                _logger.warning("Failed to get permissions: %s", response.text)
+                return {'error': f'API error: {response.status_code}'}
+        except Exception as e:
+            _logger.error("Error getting permissions: %s", str(e))
+            return {'error': str(e)}
+
+    def create_permission(self, file_record, email, role='reader', send_notification=True):
+        """Add a permission (share with a person) on Google Drive."""
+        if not file_record.google_file_id:
+            return {'error': 'File not synced to Google Drive'}
+
+        config = file_record.drive_config_id
+        access_token = self._get_access_token(config)
+        if not access_token:
+            return {'error': 'Could not get access token'}
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        url = (
+            f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}/permissions"
+            f"?sendNotificationEmail={'true' if send_notification else 'false'}"
+            f"&fields=id,type,role,emailAddress,displayName,photoLink"
+        )
+
+        body = {
+            'type': 'user',
+            'role': role,
+            'emailAddress': email,
+        }
+
+        try:
+            response = http_requests.post(url, headers=headers, data=json.dumps(body), timeout=15)
+            if response.status_code == 200:
+                perm = response.json()
+                return {
+                    'success': True,
+                    'permission': {
+                        'id': perm.get('id'),
+                        'type': perm.get('type'),
+                        'role': perm.get('role'),
+                        'emailAddress': perm.get('emailAddress', email),
+                        'displayName': perm.get('displayName', email),
+                        'photoLink': perm.get('photoLink', ''),
+                    }
+                }
+            else:
+                error_data = response.json() if response.content else {}
+                error_msg = error_data.get('error', {}).get('message', response.text)
+                _logger.warning("Failed to create permission: %s", error_msg)
+                return {'error': error_msg}
+        except Exception as e:
+            _logger.error("Error creating permission: %s", str(e))
+            return {'error': str(e)}
+
+    def update_permission(self, file_record, permission_id, role):
+        """Update a permission role on Google Drive."""
+        if not file_record.google_file_id:
+            return {'error': 'File not synced to Google Drive'}
+
+        config = file_record.drive_config_id
+        access_token = self._get_access_token(config)
+        if not access_token:
+            return {'error': 'Could not get access token'}
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        url = (
+            f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}"
+            f"/permissions/{permission_id}"
+            f"?fields=id,type,role,emailAddress,displayName"
+        )
+        body = {'role': role}
+
+        try:
+            response = http_requests.patch(url, headers=headers, data=json.dumps(body), timeout=15)
+            if response.status_code == 200:
+                return {'success': True, 'permission': response.json()}
+            else:
+                error_data = response.json() if response.content else {}
+                error_msg = error_data.get('error', {}).get('message', response.text)
+                return {'error': error_msg}
+        except Exception as e:
+            _logger.error("Error updating permission: %s", str(e))
+            return {'error': str(e)}
+
+    def delete_permission(self, file_record, permission_id):
+        """Delete a permission from a file on Google Drive."""
+        if not file_record.google_file_id:
+            return {'error': 'File not synced to Google Drive'}
+
+        config = file_record.drive_config_id
+        access_token = self._get_access_token(config)
+        if not access_token:
+            return {'error': 'Could not get access token'}
+
+        headers = {"Authorization": f"Bearer {access_token}"}
+        url = (
+            f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}"
+            f"/permissions/{permission_id}"
+        )
+
+        try:
+            response = http_requests.delete(url, headers=headers, timeout=15)
+            if response.status_code in (200, 204):
+                return {'success': True}
+            else:
+                error_data = response.json() if response.content else {}
+                error_msg = error_data.get('error', {}).get('message', response.text)
+                return {'error': error_msg}
+        except Exception as e:
+            _logger.error("Error deleting permission: %s", str(e))
+            return {'error': str(e)}
+
+    def set_general_access(self, file_record, access_type, role='reader'):
+        """Set general access to 'anyone' or 'restricted'.
+        
+        access_type: 'anyone' or 'restricted'
+        role: 'reader', 'commenter', or 'writer' (only for 'anyone')
+        """
+        if not file_record.google_file_id:
+            return {'error': 'File not synced to Google Drive'}
+
+        config = file_record.drive_config_id
+        access_token = self._get_access_token(config)
+        if not access_token:
+            return {'error': 'Could not get access token'}
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+
+        if access_type == 'anyone':
+            # Create "anyone" permission
+            url = (
+                f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}/permissions"
+                f"?fields=id,type,role"
+            )
+            body = {
+                'type': 'anyone',
+                'role': role,
+            }
+            try:
+                response = http_requests.post(url, headers=headers, data=json.dumps(body), timeout=15)
+                if response.status_code == 200:
+                    perm = response.json()
+                    link = f"https://drive.google.com/file/d/{file_record.google_file_id}/view?usp=sharing"
+                    if file_record.file_type == 'folder':
+                        link = f"https://drive.google.com/drive/folders/{file_record.google_file_id}?usp=sharing"
+                    return {
+                        'success': True,
+                        'link': link,
+                        'permissionId': perm.get('id'),
+                    }
+                else:
+                    error_data = response.json() if response.content else {}
+                    error_msg = error_data.get('error', {}).get('message', response.text)
+                    return {'error': error_msg}
+            except Exception as e:
+                return {'error': str(e)}
+
+        elif access_type == 'restricted':
+            # Find and remove the "anyone" permission
+            get_url = (
+                f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}"
+                f"?fields=permissions(id,type)"
+            )
+            try:
+                get_resp = http_requests.get(get_url, headers=headers, timeout=15)
+                if get_resp.status_code != 200:
+                    return {'error': 'Could not fetch permissions'}
+
+                permissions = get_resp.json().get('permissions', [])
+                anyone_perms = [p for p in permissions if p.get('type') == 'anyone']
+
+                for perm in anyone_perms:
+                    del_url = (
+                        f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}"
+                        f"/permissions/{perm['id']}"
+                    )
+                    http_requests.delete(del_url, headers=headers, timeout=15)
+
+                return {'success': True}
+            except Exception as e:
+                return {'error': str(e)}
+
+        return {'error': 'Invalid access type'}
+
+    def update_file_sharing_settings(self, file_record, writers_can_share=None, copy_requires_writer=None):
+        """Update file sharing settings on Google Drive.
+        
+        writers_can_share: Allow editors to change permissions and share
+        copy_requires_writer: Restrict download/copy/print for commenters/viewers
+        """
+        if not file_record.google_file_id:
+            return {'error': 'File not synced to Google Drive'}
+
+        config = file_record.drive_config_id
+        access_token = self._get_access_token(config)
+        if not access_token:
+            return {'error': 'Could not get access token'}
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        url = f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}"
+
+        body = {}
+        if writers_can_share is not None:
+            body['writersCanShare'] = writers_can_share
+        if copy_requires_writer is not None:
+            body['copyRequiresWriterPermission'] = copy_requires_writer
+
+        if not body:
+            return {'success': True}
+
+        try:
+            response = http_requests.patch(url, headers=headers, data=json.dumps(body), timeout=15)
+            if response.status_code == 200:
+                return {'success': True}
+            else:
+                error_data = response.json() if response.content else {}
+                error_msg = error_data.get('error', {}).get('message', response.text)
+                return {'error': error_msg}
+        except Exception as e:
+            _logger.error("Error updating sharing settings: %s", str(e))
+            return {'error': str(e)}

@@ -487,3 +487,45 @@ class GoogleDriveFile(models.Model):
                 error_count += 1
                 
         return {'success': success_count, 'error': error_count}
+
+    # ─── Sharing / Permissions ───
+
+    def action_get_share_info(self):
+        """Get sharing permissions info for a file. Called from the share dialog."""
+        self.ensure_one()
+        sync = self.env['google.drive.sync'].sudo()
+        return sync.get_file_permissions(self)
+
+    def action_add_permission(self, email, role='reader', send_notification=True):
+        """Add a person to a file's sharing. Called from the share dialog."""
+        self.ensure_one()
+        sync = self.env['google.drive.sync'].sudo()
+        return sync.create_permission(self, email, role=role, send_notification=send_notification)
+
+    def action_update_permission(self, permission_id, role):
+        """Update a person's role on a shared file."""
+        self.ensure_one()
+        sync = self.env['google.drive.sync'].sudo()
+        return sync.update_permission(self, permission_id, role)
+
+    def action_remove_permission(self, permission_id):
+        """Remove a person's access from a shared file."""
+        self.ensure_one()
+        sync = self.env['google.drive.sync'].sudo()
+        return sync.delete_permission(self, permission_id)
+
+    def action_set_general_access(self, access_type, role='reader'):
+        """Set general access for a file (anyone / restricted)."""
+        self.ensure_one()
+        sync = self.env['google.drive.sync'].sudo()
+        return sync.set_general_access(self, access_type, role=role)
+
+    def action_update_sharing_settings(self, writers_can_share=None, copy_requires_writer=None):
+        """Update sharing settings for a file."""
+        self.ensure_one()
+        sync = self.env['google.drive.sync'].sudo()
+        return sync.update_file_sharing_settings(
+            self,
+            writers_can_share=writers_can_share,
+            copy_requires_writer=copy_requires_writer
+        )
