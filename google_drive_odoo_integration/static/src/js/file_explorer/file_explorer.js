@@ -106,6 +106,7 @@ export class FileExplorer extends Component {
             showPasteLoader: false,
             showDeleteLoader: false,
             showUploadLoader: false,
+            showRenameLoader: false,
             loaderMessage: 'Loading...',
         });
 
@@ -1628,6 +1629,10 @@ export class FileExplorer extends Component {
         this.state.renamingFileId = null;
         this.state.renameValue = '';
 
+        // Show loader
+        this.state.loaderMessage = `Renaming ${file.file_type}...`;
+        this.state.showRenameLoader = true;
+
         try {
             // Step 1: Update Odoo instantly
             await this.orm.write("google.drive.file", [fileId], {
@@ -1650,23 +1655,27 @@ export class FileExplorer extends Component {
                 await this._refreshTreeForParent(file.parent_folder_id ? file.parent_folder_id[0] : null);
             }
 
-            // Step 3: Call Drive rename in background only if in Auto Sync mode
-            if (file.google_file_id && this.state.syncMode === 'auto') {
-                this.orm.call("google.drive.file", "rename_on_drive_by_id", [], {
-                    record_id: fileId,
-                    new_name: newName
-                }).then(() => {
+            // Step 3: Call Drive rename immediately if it has a Google file ID
+            if (file.google_file_id) {
+                try {
+                    await this.orm.call("google.drive.file", "rename_on_drive_by_id", [], {
+                        record_id: fileId,
+                        new_name: newName
+                    });
                     this.loadFiles(this.state.currentFolderId); // Refresh to clear 'pending'
                     this.notificationService.add(`Renamed to "${newName}" on Google Drive`, { type: "success" });
-                }).catch(() => {
+                } catch (e) {
                     this.notificationService.add(`Failed to rename "${newName}" on Google Drive`, { type: "warning" });
-                });
+                }
             } else {
                 this.notificationService.add("Item renamed successfully locally!", { type: "success" });
                 await this.checkPendingChanges();
             }
         } catch (e) {
             this.notificationService.add("Failed to rename item.", { type: "danger" });
+        } finally {
+            // Hide loader
+            this.state.showRenameLoader = false;
         }
     }
 

@@ -3,7 +3,7 @@
     <t t-name="google_drive_odoo_integration.FileExplorer">
         <div class="gd_explorer" t-att-class="{ 'gd_sidebar_collapsed': state.sidebarCollapsed }">
             <!-- ====== FULLSCREEN LOADER ====== -->
-            <div class="gd_fullscreen_loader" t-if="state.showShareLoader || state.showDownloadLoader || state.showPasteLoader || state.showDeleteLoader || state.showUploadLoader">
+            <div class="gd_fullscreen_loader" t-if="state.showShareLoader || state.showDownloadLoader || state.showPasteLoader || state.showDeleteLoader || state.showUploadLoader || state.showRenameLoader">
                 <div class="gd_fullscreen_loader_content">
                     <div class="gd_fullscreen_spinner"/>
                     <span t-esc="state.loaderMessage"/>
