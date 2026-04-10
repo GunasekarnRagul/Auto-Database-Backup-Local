@@ -367,6 +367,10 @@
                                     <i class="fa fa-clipboard"/>
                                     <span>Paste (<t t-esc="state.clipboard.items.length"/>)</span>
                                 </button>
+                                <button class="gd_action_btn gd_btn_cancel" t-on-click="clearClipboard" title="Cancel cut operation" style="color: #d93025; border-color: #fad2cf; background: #fce8e6;">
+                                    <i class="fa fa-times"/>
+                                    <span>Cancel</span>
+                                </button>
                             </t>
                             <t t-if="state.activeSection === 'recent' &amp;&amp; state.breadcrumbs.length === 1">
                                 <button class="gd_action_btn" t-on-click="clearRecent" title="Clear Recent Files" style="color: #d93025; border-color: #fad2cf; background: #fce8e6;">

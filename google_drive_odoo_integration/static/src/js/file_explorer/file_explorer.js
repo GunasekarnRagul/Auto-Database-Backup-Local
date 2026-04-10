@@ -1050,6 +1050,11 @@ export class FileExplorer extends Component {
         }
     }
 
+    clearClipboard() {
+        this.state.clipboard = { items: [], sourceDriveId: null, sourceParentId: null };
+        this.notificationService.add("Cut operation cancelled.", { type: "info" });
+    }
+
     // ─── Sidebar Tree Logic ───
 
     getTreeRootChildren() {
