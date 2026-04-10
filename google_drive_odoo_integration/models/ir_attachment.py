@@ -14,7 +14,7 @@ class IrAttachment(models.Model):
             return attachments
             
         for attachment in attachments:
-            if not attachment.res_model or attachment.res_model == 'mail.message':
+            if attachment.res_model != 'google.drive.file':
                 continue
             if not attachment.google_file_id:
                 self.env['google.drive.sync'].sudo().upload_file(attachment)

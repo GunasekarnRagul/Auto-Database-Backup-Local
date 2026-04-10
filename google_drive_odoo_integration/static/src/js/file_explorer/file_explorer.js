@@ -105,6 +105,7 @@ export class FileExplorer extends Component {
             showDownloadLoader: false,
             showPasteLoader: false,
             showDeleteLoader: false,
+            showUploadLoader: false,
             loaderMessage: 'Loading...',
         });
 
@@ -1856,6 +1857,8 @@ export class FileExplorer extends Component {
 
             this.state.uploading = true;
             this.state.uploadProgress = { current: 0, total: validFiles.length };
+            this.state.loaderMessage = 'Uploading files...';
+            this.state.showUploadLoader = true;
 
             for (const file of validFiles) {
                 await this._uploadSingleFile(file, targetFolderId, targetRootId);
@@ -1863,12 +1866,81 @@ export class FileExplorer extends Component {
             }
 
             this.state.uploading = false;
+            this.state.showUploadLoader = false;
 
             // Only reload the view if the user is still looking at the folder where the files were uploaded
             if (this.state.currentFolderId === targetFolderId) {
                 await this.loadFiles(targetFolderId);
             }
             this.notificationService.add("Files uploaded successfully!", { type: "success" });
+
+            // Auto sync in background (non-blocking) — pass current drive ID
+            if (this.state.syncMode === 'auto') {
+                this.triggerAutoSync(this.state.activeDriveId);
+            } else {
+                await this.checkPendingChanges();
+            }
+        });
+        input.click();
+    }
+
+    // ─── Upload Folder ───
+
+    onUploadFolder() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.webkitdirectory = true;
+        input.directory = true;
+        input.multiple = true;
+        input.addEventListener('change', async (ev) => {
+            const files = ev.target.files;
+            if (!files || files.length === 0) return;
+
+            // Capture target folder ID and root folder ID at the time the upload is initiated
+            const targetFolderId = this.state.currentFolderId;
+            const targetRootId = this.state.activeRootId;
+
+            const validFiles = [];
+            const conflictedNames = [];
+
+            for (const file of files) {
+                if (this.checkNameConflict(file.name, 'file')) {
+                    conflictedNames.push(file.name);
+                } else {
+                    validFiles.push(file);
+                }
+            }
+
+            if (conflictedNames.length > 0) {
+                this.notificationService.add(
+                    `The following files already exist and were skipped: ${conflictedNames.join(', ')}`,
+                    { type: "danger", title: "Upload Conflict" }
+                );
+            }
+
+            if (validFiles.length === 0) {
+                this.state.uploading = false;
+                return;
+            }
+
+            this.state.uploading = true;
+            this.state.uploadProgress = { current: 0, total: validFiles.length };
+            this.state.loaderMessage = 'Uploading folder...';
+            this.state.showUploadLoader = true;
+
+            for (const file of validFiles) {
+                await this._uploadSingleFile(file, targetFolderId, targetRootId);
+                this.state.uploadProgress.current += 1;
+            }
+
+            this.state.uploading = false;
+            this.state.showUploadLoader = false;
+
+            // Only reload the view if the user is still looking at the folder where the files were uploaded
+            if (this.state.currentFolderId === targetFolderId) {
+                await this.loadFiles(targetFolderId);
+            }
+            this.notificationService.add("Folder uploaded successfully!", { type: "success" });
 
             // Auto sync in background (non-blocking) — pass current drive ID
             if (this.state.syncMode === 'auto') {

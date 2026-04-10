@@ -3,7 +3,7 @@
     <t t-name="google_drive_odoo_integration.FileExplorer">
         <div class="gd_explorer" t-att-class="{ 'gd_sidebar_collapsed': state.sidebarCollapsed }">
             <!-- ====== FULLSCREEN LOADER ====== -->
-            <div class="gd_fullscreen_loader" t-if="state.showShareLoader || state.showDownloadLoader || state.showPasteLoader || state.showDeleteLoader">
+            <div class="gd_fullscreen_loader" t-if="state.showShareLoader || state.showDownloadLoader || state.showPasteLoader || state.showDeleteLoader || state.showUploadLoader">
                 <div class="gd_fullscreen_loader_content">
                     <div class="gd_fullscreen_spinner"/>
                     <span t-esc="state.loaderMessage"/>
@@ -383,6 +383,10 @@
                                     <i class="fa fa-cloud-upload"/>
                                     <span>Upload File</span>
                                 </button>
+                                <button class="gd_action_btn gd_btn_upload" t-on-click="onUploadFolder" title="Upload Folder">
+                                    <i class="fa fa-folder-open"/>
+                                    <span>Upload Folder</span>
+                                </button>
                                 <t t-if="state.syncMode === 'manual'">
                                     <button class="gd_action_btn gd_btn_sync" 
                                             t-att-class="{ 'gd_btn_syncing': isManualSyncingCurrentDrive, 'gd_btn_sync_completed': isManualSyncCompletedCurrentDrive, 'gd_btn_sync_needed': state.hasPendingChanges }"
@@ -567,6 +571,9 @@
                                                             <button class="gd_action_btn gd_btn_upload" t-on-click="onUploadFile">
                                                                 <i class="fa fa-cloud-upload"/> Upload File
                                                             </button>
+                                                            <button class="gd_action_btn gd_btn_upload" t-on-click="onUploadFolder">
+                                                                <i class="fa fa-folder-open"/> Upload Folder
+                                                            </button>
                                                         </div>
                                                     </t>
                                                 </div>
@@ -710,6 +717,9 @@
                                             </button>
                                             <button class="gd_action_btn gd_btn_upload" t-on-click="onUploadFile">
                                                 <i class="fa fa-cloud-upload"/> Upload File
+                                            </button>
+                                            <button class="gd_action_btn gd_btn_upload" t-on-click="onUploadFolder">
+                                                <i class="fa fa-folder-open"/> Upload Folder
                                             </button>
                                         </div>
                                     </t>
