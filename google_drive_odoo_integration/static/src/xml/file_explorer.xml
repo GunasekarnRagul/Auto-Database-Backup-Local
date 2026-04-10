@@ -993,21 +993,21 @@
                                                 <span t-esc="getRoleLabel(perm.role)"/>
                                                 <i class="fa fa-caret-down"/>
                                             </div>
-                                            <div class="gd_share_role_dropdown" t-if="state.activePermRoleDropdown === perm.id">
-                                                <div class="gd_share_role_option" t-att-class="{ active: perm.role === 'reader' }"
+                                            <div class="gd_share_person_role_dropdown" t-if="state.activePermRoleDropdown === perm.id">
+                                                <div class="gd_share_person_role_option" t-att-class="{ active: perm.role === 'reader' }"
                                                      t-on-click="() => this.updatePermissionRole(perm, 'reader')">
                                                     <i class="fa fa-eye"/> Viewer
                                                 </div>
-                                                <div class="gd_share_role_option" t-att-class="{ active: perm.role === 'commenter' }"
+                                                <div class="gd_share_person_role_option" t-att-class="{ active: perm.role === 'commenter' }"
                                                      t-on-click="() => this.updatePermissionRole(perm, 'commenter')">
                                                     <i class="fa fa-comment-o"/> Commenter
                                                 </div>
-                                                <div class="gd_share_role_option" t-att-class="{ active: perm.role === 'writer' }"
+                                                <div class="gd_share_person_role_option" t-att-class="{ active: perm.role === 'writer' }"
                                                      t-on-click="() => this.updatePermissionRole(perm, 'writer')">
                                                     <i class="fa fa-pencil"/> Editor
                                                 </div>
                                                 <div class="gd_share_role_divider"/>
-                                                <div class="gd_share_role_option gd_role_remove"
+                                                <div class="gd_share_person_role_option gd_role_remove"
                                                      t-on-click="() => this.removePermission(perm)">
                                                     <i class="fa fa-times-circle"/> Remove access
                                                 </div>
@@ -1057,19 +1057,19 @@
                                             <span t-esc="getRoleLabel(state.anyoneRole)"/>
                                             <i class="fa fa-caret-down"/>
                                         </div>
-                                        <div class="gd_share_role_dropdown" t-if="state.showAnyoneRoleDropdown">
-                                            <div class="gd_share_role_option" t-att-class="{ active: state.anyoneRole === 'reader' }"
-                                                 t-on-click="() => this.setAnyoneRole('reader')">
-                                                <i class="fa fa-eye"/> Viewer
-                                            </div>
-                                            <div class="gd_share_role_option" t-att-class="{ active: state.anyoneRole === 'commenter' }"
-                                                 t-on-click="() => this.setAnyoneRole('commenter')">
-                                                <i class="fa fa-comment-o"/> Commenter
-                                            </div>
-                                            <div class="gd_share_role_option" t-att-class="{ active: state.anyoneRole === 'writer' }"
-                                                 t-on-click="() => this.setAnyoneRole('writer')">
-                                                <i class="fa fa-pencil"/> Editor
-                                            </div>
+                                    </div>
+                                    <div class="gd_share_anyone_role_dropdown" t-if="state.showAnyoneRoleDropdown">
+                                        <div class="gd_share_anyone_role_option" t-att-class="{ active: state.anyoneRole === 'reader' }"
+                                             t-on-click="() => this.setAnyoneRole('reader')">
+                                            <i class="fa fa-eye"/> Viewer
+                                        </div>
+                                        <div class="gd_share_anyone_role_option" t-att-class="{ active: state.anyoneRole === 'commenter' }"
+                                             t-on-click="() => this.setAnyoneRole('commenter')">
+                                            <i class="fa fa-comment-o"/> Commenter
+                                        </div>
+                                        <div class="gd_share_anyone_role_option" t-att-class="{ active: state.anyoneRole === 'writer' }"
+                                             t-on-click="() => this.setAnyoneRole('writer')">
+                                            <i class="fa fa-pencil"/> Editor
                                         </div>
                                     </div>
                                 </t>

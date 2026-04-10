@@ -2495,6 +2495,8 @@ class ShareDriveLinkDialog extends Component {
 
     async onToggleWritersCanShare(ev) {
         const newVal = ev.target.checked;
+        this.state.loaderMessage = 'Updating sharing permissions...';
+        this.state.showActionLoader = true;
         try {
             const result = await this.orm.call(
                 "google.drive.file",
@@ -2507,31 +2509,39 @@ class ShareDriveLinkDialog extends Component {
                 ev.target.checked = !newVal; // revert
             } else {
                 this.state.writersCanShare = newVal;
+                this.notificationService.add("Sharing settings updated", { type: "success" });
             }
         } catch (e) {
             this.notificationService.add("Failed to update setting.", { type: "danger" });
             ev.target.checked = !newVal;
+        } finally {
+            this.state.showActionLoader = false;
         }
     }
 
     async onToggleCopyRequiresWriter(ev) {
         const newVal = ev.target.checked;
+        this.state.loaderMessage = 'Updating download permissions...';
+        this.state.showActionLoader = true;
         try {
             const result = await this.orm.call(
                 "google.drive.file",
                 "action_update_sharing_settings",
                 [[this.file.id]],
-                { copy_requires_writer: newVal }
+                { copy_requires_writer: !newVal }
             );
             if (result.error) {
                 this.notificationService.add(result.error, { type: "danger" });
                 ev.target.checked = !newVal;
             } else {
-                this.state.copyRequiresWriterPermission = newVal;
+                this.state.copyRequiresWriterPermission = !newVal;
+                this.notificationService.add("Download settings updated", { type: "success" });
             }
         } catch (e) {
             this.notificationService.add("Failed to update setting.", { type: "danger" });
             ev.target.checked = !newVal;
+        } finally {
+            this.state.showActionLoader = false;
         }
     }
 
