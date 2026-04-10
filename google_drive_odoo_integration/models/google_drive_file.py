@@ -29,9 +29,11 @@ class GoogleDriveFile(models.Model):
     sync_state = fields.Selection([
         ('synced', 'Synced'),
         ('pending', 'Pending'),
+        ('uploading', 'Uploading'),
         ('error', 'Error'),
         ('pending_delete', 'Pending Delete'),
     ], string='Sync Status', default='pending')
+    upload_progress = fields.Float('Upload Progress', default=0.0, help='Upload progress as percentage (0-100)')
     active = fields.Boolean('Active', default=True)
     display_path = fields.Char('Location', compute='_compute_display_path')
     attachment_id = fields.Many2one('ir.attachment', string='Related Attachment', compute='_compute_attachment_id')
@@ -359,6 +361,7 @@ class GoogleDriveFile(models.Model):
             'owner_name': self.env.user.name,
             'last_modified': fields.Datetime.now(),
             'sync_state': 'pending',
+            'upload_progress': 0.0,
         })
 
         # Link attachment to file explorer record properly
@@ -429,16 +432,29 @@ class GoogleDriveFile(models.Model):
                 return False
 
             try:
+                # Set uploading state and initial progress
+                record.write({
+                    'sync_state': 'uploading',
+                    'upload_progress': 10.0
+                })
+                self.env.cr.commit()  # Force commit to show progress immediately
+
                 result = sync.upload_file_to_drive(
                     record.name, attachment.raw,
                     record.mime_type or 'application/octet-stream',
                     record.drive_config_id, parent_gdrive_id=parent_gdrive_id
                 )
+
                 if result:
+                    # Update progress to 90% before finalizing
+                    record.write({'upload_progress': 90.0})
+                    self.env.cr.commit()
+
                     record.write({
                         'google_file_id': result['google_file_id'],
                         'google_url': result['google_url'],
                         'sync_state': 'synced',
+                        'upload_progress': 100.0,
                         'last_synced': fields.Datetime.now(),
                     })
                     attachment.with_context(skip_gdrive_sync=True).write({
@@ -446,9 +462,9 @@ class GoogleDriveFile(models.Model):
                     })
                     return True
                 else:
-                    record.write({'sync_state': 'error'})
+                    record.write({'sync_state': 'error', 'upload_progress': 0.0})
             except Exception:
-                record.write({'sync_state': 'error'})
+                record.write({'sync_state': 'error', 'upload_progress': 0.0})
             return False
 
         # 3. Rename / Existing

@@ -17,6 +17,7 @@
                 <field name="sync_state" widget="badge"
                        decoration-success="sync_state == 'synced'"
                        decoration-warning="sync_state == 'pending'"
+                       decoration-info="sync_state == 'uploading'"
                        decoration-danger="sync_state == 'error'"/>
                 <field name="last_synced"/>
             </tree>
@@ -33,6 +34,7 @@
                 <field name="mime_type"/>
                 <field name="file_size"/>
                 <field name="sync_state"/>
+                <field name="upload_progress"/>
                 <field name="drive_config_id"/>
                 <field name="google_url"/>
                 <templates>
@@ -184,6 +186,7 @@
                 <separator/>
                 <filter string="Synced" name="synced" domain="[('sync_state', '=', 'synced')]"/>
                 <filter string="Pending" name="pending" domain="[('sync_state', '=', 'pending')]"/>
+                <filter string="Uploading" name="uploading" domain="[('sync_state', '=', 'uploading')]"/>
                 <filter string="Error" name="error" domain="[('sync_state', '=', 'error')]"/>
                 <group expand="0" string="Group By">
                     <filter string="Drive" name="group_drive" context="{'group_by': 'drive_config_id'}"/>

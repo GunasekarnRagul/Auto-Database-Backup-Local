@@ -639,9 +639,19 @@
                                             </td>
                                             <td class="gd_cell_sync">
                                                 <div t-att-class="'gd_sync_badge gd_sync_' + (file.sync_state || 'pending')">
-                                                    <i t-att-class="'fa ' + getSyncIcon(file.sync_state)"/>
-                                                    <t t-if="hasSyncBadgeLabel(file)">
-                                                        <span class="gd_sync_label" t-esc="getSyncBadgeText(file)"/>
+                                                    <t t-if="file.sync_state === 'uploading' or file.sync_state === 'pending'">
+                                                        <div class="gd_progress_container">
+                                                            <div class="gd_progress_bar">
+                                                                <div class="gd_progress_fill" t-att-style="'width: ' + (file.upload_progress || 0) + '%'"/>
+                                                            </div>
+                                                            <span class="gd_progress_text" t-esc="getSyncProgressText(file)"/>
+                                                        </div>
+                                                    </t>
+                                                    <t t-else="">
+                                                        <i t-att-class="'fa ' + getSyncIcon(file.sync_state)"/>
+                                                        <t t-if="hasSyncBadgeLabel(file)">
+                                                            <span class="gd_sync_label" t-esc="getSyncBadgeText(file)"/>
+                                                        </t>
                                                     </t>
                                                 </div>
                                             </td>

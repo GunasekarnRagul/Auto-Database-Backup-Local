@@ -1439,6 +1439,46 @@ img.gd_drive_icon {
     color: #c5221f;
 }
 
+.gd_sync_uploading {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.gd_sync_uploading .fa {
+    color: #1565c0;
+}
+
+/* Progress bar styles */
+.gd_progress_container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.gd_progress_bar {
+    flex: 1;
+    height: 6px;
+    background: #e0e0e0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.gd_progress_fill {
+    height: 100%;
+    background: linear-gradient(90deg, #1565c0, #42a5f5);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.gd_progress_text {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #1565c0;
+    min-width: 30px;
+    text-align: right;
+}
+
 @keyframes gd_spin_slow {
     from {
         transform: rotate(0deg);

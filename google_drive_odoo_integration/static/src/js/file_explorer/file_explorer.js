@@ -110,6 +110,8 @@ export class FileExplorer extends Component {
             loaderMessage: 'Loading...',
         });
 
+        this.uploadProgressTimers = {};
+
         const onWindowClick = (ev) => this.onWindowClick(ev);
         onMounted(() => {
             window.addEventListener("click", onWindowClick);
@@ -317,7 +319,7 @@ export class FileExplorer extends Component {
         let files = [];
         const commonFields = [
             "name", "file_type", "mime_type", "google_url", "file_size",
-            "owner_name", "last_modified", "sync_state", "starred",
+            "owner_name", "last_modified", "sync_state", "upload_progress", "starred",
             "drive_config_id", "google_file_id", "attachment_id", "display_path",
             "parent_folder_id"
         ];
@@ -590,7 +592,7 @@ export class FileExplorer extends Component {
         try {
             const files = await this.orm.searchRead("google.drive.file", domain, [
                 "name", "file_type", "mime_type", "google_url", "file_size",
-                "owner_name", "last_modified", "sync_state", "starred",
+                "owner_name", "last_modified", "sync_state", "upload_progress", "starred",
                 "drive_config_id", "google_file_id", "attachment_id", "display_path",
                 "parent_folder_id"
             ]);
@@ -799,13 +801,28 @@ export class FileExplorer extends Component {
     async onBreadcrumbClick(index) {
         const bc = this.state.breadcrumbs[index];
         if (bc.id === 'section') {
+            // Update activeSection based on breadcrumb name
+            if (bc.name === 'Trash') {
+                this.state.activeSection = 'trash';
+            } else if (this.state.rootFolders.some(r => r.name === bc.name)) {
+                this.state.activeSection = 'my_drive';
+            } else {
+                // Fallback to my_drive for drive names
+                this.state.activeSection = 'my_drive';
+            }
+
             this.state.activeRootId = null;
             this.state.isDriveOverview = true;
             await this._updateNavigationState(null, bc.name);
             await this.loadFiles(null);
         } else {
             const folderId = (bc.id === false) ? null : bc.id;
+            const currentSection = this.state.activeSection;
             await this._updateNavigationState(folderId, bc.name);
+            // Preserve trash section when navigating within trash
+            if (currentSection === 'trash') {
+                this.state.activeSection = 'trash';
+            }
             await this.loadFiles(folderId);
         }
     }
@@ -1055,6 +1072,37 @@ export class FileExplorer extends Component {
         this.notificationService.add("Cut operation cancelled.", { type: "info" });
     }
 
+    startFileSyncProgressAnimation(fileId) {
+        this.stopFileSyncProgressAnimation(fileId);
+        const timer = setInterval(() => {
+            const idx = this.state.files.findIndex(f => f.id === fileId);
+            if (idx === -1) {
+                this.stopFileSyncProgressAnimation(fileId);
+                return;
+            }
+            const file = this.state.files[idx];
+            if (file.sync_state !== 'uploading' && file.sync_state !== 'pending') {
+                this.stopFileSyncProgressAnimation(fileId);
+                return;
+            }
+            const current = file.upload_progress || 0;
+            if (current >= 90) {
+                return;
+            }
+            const step = current < 50 ? 8 : current < 75 ? 5 : 2;
+            file.upload_progress = Math.min(90, current + step);
+        }, 700);
+        this.uploadProgressTimers[fileId] = timer;
+    }
+
+    stopFileSyncProgressAnimation(fileId) {
+        const timer = this.uploadProgressTimers[fileId];
+        if (timer) {
+            clearInterval(timer);
+            delete this.uploadProgressTimers[fileId];
+        }
+    }
+
     // ─── Sidebar Tree Logic ───
 
     getTreeRootChildren() {
@@ -1215,6 +1263,15 @@ export class FileExplorer extends Component {
             const breadcrumbs = await this.orm.call("google.drive.file", "get_folder_breadcrumbs", [folderId]);
             if (breadcrumbs && breadcrumbs.length > 0) {
                 this.state.breadcrumbs = breadcrumbs;
+
+                // Update activeSection based on breadcrumb section
+                if (breadcrumbs.length > 0 && breadcrumbs[0].id === 'section') {
+                    if (breadcrumbs[0].name === 'Trash') {
+                        this.state.activeSection = 'trash';
+                    } else if (this.state.rootFolders.some(r => r.name === breadcrumbs[0].name)) {
+                        this.state.activeSection = 'my_drive';
+                    }
+                }
 
                 // Ensure activeRootId is set based on breadcrumbs
                 // breadcrumbs structure is [ {id: 'section', name: ...}, {id: null, name: RootName}, {id: FolderID, name: ...}, ... ]
@@ -1711,20 +1768,24 @@ export class FileExplorer extends Component {
     getSyncIcon(state) {
         if (state === 'synced') return 'fa-check';
         if (state === 'pending') return 'fa-refresh';
+        if (state === 'uploading') return 'fa-upload';
         if (state === 'error') return 'fa-exclamation-triangle';
         if (state === 'pending_delete') return 'fa-trash-o';
         return 'fa-circle-o';
     }
 
     hasSyncBadgeLabel(file) {
-        return ['error', 'pending', 'pending_delete'].includes(file.sync_state);
+        return ['error', 'pending_delete'].includes(file.sync_state);
     }
 
     getSyncBadgeText(file) {
         if (file.sync_state === 'error') return 'ERROR';
-        if (file.sync_state === 'pending') return 'PUSHING';
         if (file.sync_state === 'pending_delete') return 'REMOVING';
         return '';
+    }
+
+    getSyncProgressText(file) {
+        return `${Math.round(file.upload_progress || 0)}%`;
     }
 
     // ─── + New menu toggle ───
@@ -2093,27 +2154,34 @@ export class FileExplorer extends Component {
             if (pendingIds && pendingIds.length > 0) {
                 for (const id of pendingIds) {
                     try {
+                        const idx = this.state.files.findIndex(f => f.id === id);
+                        if (idx !== -1) {
+                            this.state.files[idx].sync_state = 'uploading';
+                            this.state.files[idx].upload_progress = Math.max(5, this.state.files[idx].upload_progress || 10);
+                            this.startFileSyncProgressAnimation(id);
+                        }
+
                         await this.orm.call(
                             "google.drive.file",
                             "action_sync_single_record",
                             [[id]]
                         );
 
-                        // If the user is still on this drive/view, update the specific file record in real-time
                         if (this.state.activeDriveId === targetDriveId) {
                             const updated = await this.orm.read("google.drive.file", [id], [
-                                "sync_state", "google_file_id", "google_url", "last_synced"
+                                "sync_state", "google_file_id", "google_url", "last_synced", "upload_progress"
                             ]);
                             if (updated && updated.length > 0) {
-                                const idx = this.state.files.findIndex(f => f.id === id);
-                                if (idx !== -1) {
-                                    // Update the record in place to trigger Owl reactivity
-                                    Object.assign(this.state.files[idx], updated[0]);
+                                const idx2 = this.state.files.findIndex(f => f.id === id);
+                                if (idx2 !== -1) {
+                                    Object.assign(this.state.files[idx2], updated[0]);
                                 }
                             }
                         }
                     } catch (err) {
                         console.error("Single file sync failed", id, err);
+                    } finally {
+                        this.stopFileSyncProgressAnimation(id);
                     }
                 }
             }
