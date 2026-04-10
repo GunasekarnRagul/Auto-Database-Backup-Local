@@ -104,6 +104,7 @@ export class FileExplorer extends Component {
             showShareLoader: false,
             showDownloadLoader: false,
             showPasteLoader: false,
+            showDeleteLoader: false,
             loaderMessage: 'Loading...',
         });
 
@@ -1367,7 +1368,8 @@ export class FileExplorer extends Component {
 
         const ids = files.map(f => f.id);
         this.state.showDeleteConfirm = false;
-        this.state.loading = true;
+        this.state.loaderMessage = 'Deleting items...';
+        this.state.showDeleteLoader = true;
 
         try {
             await this.orm.call("google.drive.file", "delete_on_drive_and_unlink", [ids]);
@@ -1384,7 +1386,7 @@ export class FileExplorer extends Component {
         } catch (e) {
             this.notificationService.add("Failed to delete items.", { type: "danger" });
         } finally {
-            this.state.loading = false;
+            this.state.showDeleteLoader = false;
         }
     }
 
