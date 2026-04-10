@@ -2,6 +2,11 @@
    Google Drive File Explorer — Premium Styles
    ============================================= */
 
+/* ─── Utility Classes ─── */
+.gd_hidden {
+    display: none !important;
+}
+
 /* ─── Reset & Base ─── */
 .gd_explorer {
     display: flex;

@@ -976,11 +976,9 @@
                                 <div class="gd_share_person_row">
                                     <div class="gd_share_person_avatar">
                                         <t t-if="perm.photoLink">
-                                            <img t-att-src="perm.photoLink" alt="avatar" class="gd_share_person_img"/>
+                                            <img t-att-src="perm.photoLink" alt="avatar" class="gd_share_person_img" t-on-error="onImageError"/>
                                         </t>
-                                        <t t-else="">
-                                            <span class="gd_share_person_initial" t-esc="getPermInitial(perm)"/>
-                                        </t>
+                                        <span class="gd_share_person_initial" t-esc="getPermInitial(perm)" t-att-class="{ 'gd_hidden': perm.photoLink }"/>
                                     </div>
                                     <div class="gd_share_person_info">
                                         <span class="gd_share_person_name" t-esc="perm.displayName || perm.emailAddress"/>

@@ -2308,7 +2308,8 @@ class ShareDriveLinkDialog extends Component {
             if (result.error) {
                 this.notificationService.add(result.error, { type: "danger" });
             } else if (result.success) {
-                this.state.permissions.push(result.permission);
+                // Reload share info to get complete permission data including photoLinks
+                await this.loadShareInfo();
                 this.state.addEmail = '';
                 this.notificationService.add(`Shared with ${email}`, { type: "success" });
             }
@@ -2394,6 +2395,19 @@ class ShareDriveLinkDialog extends Component {
         if (perm.displayName) return perm.displayName.charAt(0).toUpperCase();
         if (perm.emailAddress) return perm.emailAddress.charAt(0).toUpperCase();
         return '?';
+    }
+
+    onImageError(ev, perm) {
+        // Hide the broken image and show initials instead
+        ev.target.style.display = 'none';
+        // Find the parent avatar div and ensure initials are shown
+        const avatarDiv = ev.target.parentElement;
+        if (avatarDiv) {
+            const initialsSpan = avatarDiv.querySelector('.gd_share_person_initial');
+            if (initialsSpan) {
+                initialsSpan.classList.remove('gd_hidden');
+            }
+        }
     }
 
     // ─── General Access ───
