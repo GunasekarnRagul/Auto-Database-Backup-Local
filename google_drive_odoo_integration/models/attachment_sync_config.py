@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
+from datetime import datetime
 
 class AttachmentSyncConfig(models.Model):
     _name = 'attachment.sync.config'
@@ -46,7 +47,7 @@ class AttachmentSyncConfig(models.Model):
         help='Turn on to configure auto-sync; turn off to sync manually.')
 
     # Configuration metadata
-    last_synced = fields.Datetime('Last Synced')
+    last_synced = fields.Char('Last Synced', default='Never')
     sync_count = fields.Integer('Files Synced', default=0, readonly=True)
     state = fields.Selection([
         ('draft', 'Draft'),
@@ -149,6 +150,12 @@ class AttachmentSyncConfig(models.Model):
             except Exception as e:
                 self.env.cr.rollback()
                 continue
+
+        # Update sync metadata
+        self.write({
+            'sync_count': self.sync_count + sync_count,
+            'last_synced': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        })
 
         return {
             'type': 'ir.actions.client',

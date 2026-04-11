@@ -5,20 +5,18 @@
         <field name="name">Attachment Sync Configuration - Kanban</field>
         <field name="model">attachment.sync.config</field>
         <field name="arch" type="xml">
-            <kanban class="o_cloud_kanban" sample="1" quick_create="false">
+            <kanban class="o_cloud_kanban" sample="1" quick_create="false" default_group_by=''>
                 <field name="name"/>
                 <field name="model_name"/>
                 <field name="google_drive_id"/>
                 <field name="file_type"/>
                 <field name="auto_sync_mode"/>
-                <field name="state"/>
-                <field name="last_synced"/>
                 <field name="sync_count"/>
                 <templates>
                     <t t-name="kanban-box">
                         <div class="oe_kanban_global_click oe_kanban_card o_cloud_card">
                             <!-- Left accent stripe -->
-                            <div t-attf-class="o_cloud_card_accent #{record.state.raw_value == 'active' ? 'accent-success' : (record.state.raw_value == 'paused' ? 'accent-warning' : 'accent-info')}"/>
+                            <div class="o_cloud_card_accent accent-success"/>
 
                             <!-- Header: Icon + Title + 3-dot menu -->
                             <div class="o_cloud_card_header">
@@ -75,19 +73,8 @@
                             </div>
 
 
-                            <!-- Footer: Status badge + Sync Mode -->
-                            <div class="o_cloud_card_footer d-flex justify-content-between align-items-center" style="gap: 8px;">
-                                <div>
-                                    <span t-if="record.state.raw_value == 'active'" class="o_cloud_status_badge badge-connected">
-                                        <i class="fa fa-check-circle"/>Active
-                                    </span>
-                                    <span t-if="record.state.raw_value == 'draft'" class="o_cloud_status_badge badge-draft">
-                                        <i class="fa fa-clock-o"/>Draft
-                                    </span>
-                                    <span t-if="record.state.raw_value == 'paused'" class="o_cloud_status_badge badge-error">
-                                        <i class="fa fa-pause-circle"/>Paused
-                                    </span>
-                                </div>
+                            <!-- Footer: Sync Mode Badge -->
+                            <div class="o_cloud_card_footer d-flex justify-content-end">
                                 <div>
                                     <span t-if="record.auto_sync_mode.raw_value" class="badge rounded-pill" style="background-color: #1f77d0; color: white; padding: 6px 12px; font-size: 11px; font-weight: 600;">
                                         <i class="fa fa-sync me-1" style="font-size: 12px;"/> Auto Sync
@@ -116,7 +103,6 @@
                 <field name="file_type"/>
                 <field name="auto_sync_mode" string="Type"/>
                 <field name="sync_count"/>
-                <field name="last_synced"/>
             </tree>
         </field>
     </record>
@@ -128,10 +114,6 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="action_apply_sync" type="object" 
-                            string="Run Sync" 
-                            class="btn btn-success" 
-                            icon="fa-play"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,active,paused"/>
                 </header>
                 <sheet>
@@ -187,7 +169,7 @@
                     <group name="sync_options" string="Sync Options" col="2">
                         <field name="auto_sync_mode" widget="boolean_toggle" options="{'terminology': 'on_off'}"/>
                         <div colspan="2" class="alert alert-secondary">
-                            <i class="fa fa-info-circle me-2"/> Toggle to <strong>Auto Sync</strong> or <strong>Manual Mode</strong>. Save the configuration, then use the 'Run Sync' button in the header to execute.
+                            <i class="fa fa-info-circle me-2"/> Toggle to <strong>Auto Sync</strong> or <strong>Manual Mode</strong>. Save the configuration to apply.
                         </div>
                     </group>
 
@@ -217,9 +199,6 @@
                 <separator/>
                 <filter name="filter_auto_sync" string="Auto Sync" domain="[('auto_sync_mode', '=', True)]"/>
                 <filter name="filter_manual" string="Manual" domain="[('auto_sync_mode', '=', False)]"/>
-                <separator/>
-                <filter name="filter_active" string="Active" domain="[('state', '=', 'active')]"/>
-                <filter name="filter_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
             </search>
         </field>
     </record>
@@ -230,7 +209,7 @@
         <field name="res_model">attachment.sync.config</field>
         <field name="view_mode">kanban,tree,form</field>
         <field name="search_view_id" ref="view_attachment_sync_config_search"/>
-        <field name="context">{'default_state': 'active'}</field>
+        <field name="context">{'default_state': 'active', 'group_by': ''}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create your first Attachment Sync Configuration!
