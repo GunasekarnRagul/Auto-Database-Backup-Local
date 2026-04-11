@@ -109,6 +109,7 @@ export class FileExplorer extends Component {
             showDeleteLoader: false,
             showUploadLoader: false,
             showRenameLoader: false,
+            showManualSyncLoader: false,
             loaderMessage: 'Loading...',
         });
 
@@ -2138,6 +2139,10 @@ export class FileExplorer extends Component {
         this.state.manualSyncingDrives[driveId] = true;
         this.state.manualSyncCompleted[driveId] = false;
         
+        // Show full screen loader for manual sync
+        this.state.showManualSyncLoader = true;
+        this.state.loaderMessage = `Syncing ${this.activeDriveName}...`;
+        
         this.notificationService.add(`Sync started for ${this.activeDriveName}...`, { type: "info" });
 
         try {
@@ -2163,6 +2168,7 @@ export class FileExplorer extends Component {
             this.notificationService.add(`Sync failed for ${this.activeDriveName}: ` + (e.message || "Unknown error"), { type: "danger" });
         } finally {
             this.state.manualSyncingDrives[driveId] = false;
+            this.state.showManualSyncLoader = false;
         }
     }
 

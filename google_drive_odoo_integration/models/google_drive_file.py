@@ -435,9 +435,8 @@ class GoogleDriveFile(models.Model):
                 # Set uploading state and initial progress
                 record.write({
                     'sync_state': 'uploading',
-                    'upload_progress': 10.0
+                    'upload_progress': 0.0
                 })
-                self.env.cr.commit()  # Force commit to show progress immediately
 
                 result = sync.upload_file_to_drive(
                     record.name, attachment.raw,
@@ -446,10 +445,6 @@ class GoogleDriveFile(models.Model):
                 )
 
                 if result:
-                    # Update progress to 90% before finalizing
-                    record.write({'upload_progress': 90.0})
-                    self.env.cr.commit()
-
                     record.write({
                         'google_file_id': result['google_file_id'],
                         'google_url': result['google_url'],

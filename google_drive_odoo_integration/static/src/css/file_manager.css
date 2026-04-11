@@ -1492,17 +1492,21 @@ img.gd_drive_icon {
 /* ─── EMPTY STATE ─── */
 .gd_empty {
     text-align: center;
+    padding: 0;
+    min-height: 600px;
+    display: table-cell;
+    vertical-align: middle;
 }
 
 .gd_empty_content {
-    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 60px 0;
+    padding: 60px 20px;
     color: #9aa0a6;
     gap: 12px;
+    width: 100%;
 }
 
 .gd_empty_content .fa-folder-open-o {
@@ -1528,6 +1532,8 @@ img.gd_drive_icon {
     display: flex;
     flex-direction: column;
     gap: 24px;
+    justify-content: center;
+    align-items: center;
 }
 
 .gd_grid_section_title {

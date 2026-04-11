@@ -410,6 +410,9 @@ class GoogleDriveSync(models.AbstractModel):
         # Work stack stores: (odoo_parent_id, google_parent_id)
         # We start with the root configuration
         work_stack = [(False, gdrive_parent_id)]
+        
+        # Track total files processed for logging
+        total_files_processed = 0
 
         while work_stack:
             parent_folder_id, current_google_parent = work_stack.pop()
@@ -417,6 +420,7 @@ class GoogleDriveSync(models.AbstractModel):
             # Step 1: Fetch all remote children for the current Google folder
             query = f"'{current_google_parent}' in parents and trashed = false"
             synced_google_ids = []
+            files_batch_count = 0
 
             page_token = None
             while True:
@@ -440,6 +444,7 @@ class GoogleDriveSync(models.AbstractModel):
 
                 result = response.json()
                 files_batch = result.get('files', [])
+                files_batch_count += len(files_batch)
 
                 for file_data in files_batch:
                     g_id = file_data.get('id')
@@ -450,6 +455,8 @@ class GoogleDriveSync(models.AbstractModel):
                     explorer_record = self._process_drive_file(
                         file_data, config, root_folder_id, parent_folder_id, headers
                     )
+                    
+                    total_files_processed += 1
 
                     # If it's a folder, push it onto the stack to process its children later
                     if is_folder and explorer_record:
@@ -478,7 +485,8 @@ class GoogleDriveSync(models.AbstractModel):
             # Step 3: Incremental Commit
             # This ensures progress is persistent even if a timeout occurs afterwards
             self.env.cr.commit()
-            _logger.info("Sync: Completed Folder %s (%s). Progress Saved.", current_google_parent, parent_folder_id)
+            _logger.info("Sync: Completed Folder %s (%s). Processed %d files. Total: %d. Progress Saved.", 
+                        current_google_parent, parent_folder_id, files_batch_count, total_files_processed)
 
             # Step 4: Notify the frontend about the updated folder
             # This allows real-time UI refresh per folder
@@ -546,29 +554,9 @@ class GoogleDriveSync(models.AbstractModel):
         else:
             explorer_record = self.env['google.drive.file'].sudo().create(vals)
 
-        # Download file content to Odoo (backward sync)
-        if not is_folder:
-            attachment = self.env['ir.attachment'].sudo().search([
-                ('google_file_id', '=', g_id),
-            ], limit=1)
-
-            if not attachment and 'vnd.google-apps' not in mimetype:
-                try:
-                    file_response = http_requests.get(
-                        f"https://www.googleapis.com/drive/v3/files/{g_id}?alt=media",
-                        headers=headers,
-                    )
-                    if file_response.status_code == 200:
-                        self.env['ir.attachment'].with_context(
-                            skip_gdrive_sync=True
-                        ).sudo().create({
-                            'name': name,
-                            'raw': file_response.content,
-                            'mimetype': mimetype,
-                            'google_file_id': g_id,
-                        })
-                except Exception as e:
-                    _logger.warning("Failed to download %s: %s", name, str(e))
+        # NOTE: File downloads during sync have been removed for performance.
+        # Files are downloaded on-demand when explicitly accessed/viewed by the user.
+        # This keeps sync fast, especially for large folders with many files.
 
         return explorer_record
 
