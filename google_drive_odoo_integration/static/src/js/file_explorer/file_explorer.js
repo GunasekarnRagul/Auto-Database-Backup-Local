@@ -2175,6 +2175,9 @@ export class FileExplorer extends Component {
     // ─── Sync Mode ───
 
     toggleSyncModeMenu() {
+        if (this.isAutoSyncingCurrentDrive) {
+            return;
+        }
         const target = !this.state.showSyncModeMenu;
         this.closeAllMenus();
         this.state.showSyncModeMenu = target;

@@ -373,7 +373,7 @@ class GoogleDriveFile(models.Model):
     @api.model
     def get_pending_sync_ids(self, drive_config_id=None):
         """Returns a list of IDs for records that need syncing (push) for a drive."""
-        domain = [('sync_state', '=', 'pending'), ('active', '=', True)]
+        domain = [('sync_state', 'in', ['pending', 'error']), ('active', '=', True)]
         if drive_config_id:
             domain.append(('drive_config_id', '=', drive_config_id))
         # Important: Order folders first so they exist on Drive before files are uploaded to them

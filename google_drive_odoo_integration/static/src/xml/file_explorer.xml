@@ -108,7 +108,7 @@
                             <i class="fa fa-caret-down" style="margin-left: 4px; font-size: 0.7rem;"/>
                             <div t-if="state.hasPendingChanges and state.syncMode === 'manual'" class="gd_sync_dot" title="Changes need sync"/>
                         </div>
-                        <div t-if="state.showSyncModeMenu" class="gd_sync_mode_dropdown">
+                        <div t-if="state.showSyncModeMenu and !isAutoSyncingCurrentDrive" class="gd_sync_mode_dropdown">
                             <a class="gd_sync_mode_item" t-att-class="{ 'gd_sync_mode_active': state.syncMode === 'auto' }"
                                t-on-click="() => this.setSyncMode('auto')">
                                 <i class="fa fa-bolt"/>
@@ -392,7 +392,7 @@
                                     <i class="fa fa-folder-open"/>
                                     <span>Upload Folder</span>
                                 </button>
-                                <t t-if="state.syncMode === 'manual'">
+                                <t t-if="state.syncMode === 'manual' and !isAutoSyncingCurrentDrive">
                                     <button class="gd_action_btn gd_btn_sync" 
                                             t-att-class="{ 'gd_btn_syncing': isManualSyncingCurrentDrive, 'gd_btn_sync_completed': isManualSyncCompletedCurrentDrive, 'gd_btn_sync_needed': state.hasPendingChanges }"
                                             t-on-click="onManualSync" t-att-title="state.hasPendingChanges ? 'Push changes to Google Drive' : 'Sync with Google Drive'">
