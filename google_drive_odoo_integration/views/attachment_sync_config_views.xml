@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Kanban View for Multiple Configurations -->
+    <record id="view_attachment_sync_config_kanban" model="ir.ui.view">
+        <field name="name">Attachment Sync Configuration - Kanban</field>
+        <field name="model">attachment.sync.config</field>
+        <field name="arch" type="xml">
+            <kanban class="o_cloud_kanban" sample="1" quick_create="false">
+                <field name="name"/>
+                <field name="model_name"/>
+                <field name="google_drive_id"/>
+                <field name="file_type"/>
+                <field name="auto_sync_mode"/>
+                <field name="state"/>
+                <field name="last_synced"/>
+                <field name="sync_count"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_global_click oe_kanban_card o_cloud_card">
+                            <!-- Left accent stripe -->
+                            <div t-attf-class="o_cloud_card_accent #{record.state.raw_value == 'active' ? 'accent-success' : (record.state.raw_value == 'paused' ? 'accent-warning' : 'accent-info')}"/>
+
+                            <!-- Header: Icon + Title + 3-dot menu -->
+                            <div class="o_cloud_card_header">
+                                <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
+                                    <div class="o_cloud_card_icon">
+                                        <i class="fa fa-cog"/>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="o_cloud_card_title text-truncate">
+                                            <field name="name"/>
+                                        </div>
+                                        <div class="o_cloud_card_subtitle">
+                                            <i class="fa fa-gear me-1"/> Sync Configuration
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 3-dot dropdown menu -->
+                                <div class="o_cloud_card_menu o_dropdown_kanban dropdown">
+                                    <a class="dropdown-toggle o-no-caret" role="button" data-bs-toggle="dropdown" href="#">
+                                        <i class="fa fa-ellipsis-v" title="Actions"/>
+                                    </a>
+                                    <div class="dropdown-menu dropdown-menu-end" role="menu">
+                                        <a role="menuitem" type="edit" class="dropdown-item">
+                                            <i class="fa fa-pencil me-2 text-primary"/>Edit
+                                        </a>
+                                        <a role="menuitem" type="delete" class="dropdown-item text-danger">
+                                            <i class="fa fa-trash-o me-2"/>Delete
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Configuration details tag -->
+                            <div style="padding: 6px 16px 0 20px;">
+                                <span class="o_cloud_drive_tag" style="white-space: nowrap;">
+                                    <i class="fa fa-cube me-1"/><field name="model_name"/>
+                                </span>
+                            </div>
+
+                            <!-- Details section: Model, Drive, Folder -->
+                            <div class="o_cloud_card_details pt-2 border-top mx-3" style="font-size: 11px; color: #666;">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span><i class="fa fa-cloud me-1"/> Drive:</span>
+                                    <span class="fw-bold text-dark text-truncate"><field name="google_drive_id"/></span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span><i class="fa fa-file me-1"/> File Type:</span>
+                                    <span class="fw-bold text-dark text-truncate"><field name="file_type"/></span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span><i class="fa fa-check-circle me-1"/> Synced:</span>
+                                    <span class="fw-bold text-dark"><field name="sync_count"/></span>
+                                </div>
+                            </div>
+
+
+                            <!-- Footer: Status badge + Sync Mode -->
+                            <div class="o_cloud_card_footer d-flex justify-content-between align-items-center" style="gap: 8px;">
+                                <div>
+                                    <span t-if="record.state.raw_value == 'active'" class="o_cloud_status_badge badge-connected">
+                                        <i class="fa fa-check-circle"/>Active
+                                    </span>
+                                    <span t-if="record.state.raw_value == 'draft'" class="o_cloud_status_badge badge-draft">
+                                        <i class="fa fa-clock-o"/>Draft
+                                    </span>
+                                    <span t-if="record.state.raw_value == 'paused'" class="o_cloud_status_badge badge-error">
+                                        <i class="fa fa-pause-circle"/>Paused
+                                    </span>
+                                </div>
+                                <div>
+                                    <span t-if="record.auto_sync_mode.raw_value" class="badge rounded-pill" style="background-color: #1f77d0; color: white; padding: 6px 12px; font-size: 11px; font-weight: 600;">
+                                        <i class="fa fa-sync me-1" style="font-size: 12px;"/> Auto Sync
+                                    </span>
+                                    <span t-else="" class="badge rounded-pill" style="background-color: #6c757d; color: white; padding: 6px 12px; font-size: 11px; font-weight: 600;">
+                                        <i class="fa fa-hand-o-up me-1" style="font-size: 12px;"/> Manual
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Tree View for List Display -->
+    <record id="view_attachment_sync_config_tree" model="ir.ui.view">
+        <field name="name">Attachment Sync Configuration - Tree</field>
+        <field name="model">attachment.sync.config</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="model_name"/>
+                <field name="google_drive_id"/>
+                <field name="file_type"/>
+                <field name="auto_sync_mode" string="Type"/>
+                <field name="sync_count"/>
+                <field name="last_synced"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Form View for Creating/Editing Configurations -->
+    <record id="view_attachment_sync_wizard_form" model="ir.ui.view">
+        <field name="name">Attachment Sync Configuration - Form</field>
+        <field name="model">attachment.sync.config</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_apply_sync" type="object" 
+                            string="Run Sync" 
+                            class="btn btn-success" 
+                            icon="fa-play"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,active,paused"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <i class="fa fa-cloud-upload"/> Attachment Sync Configuration
+                        </h1>
+                        <p class="text-muted">Configure automatic synchronization of attachments from Odoo models to Google Drive</p>
+                    </div>
+
+                    <!-- Configuration Name -->
+                    <group name="config_name" string="Configuration Details" col="2">
+                        <field name="name" placeholder="e.g., CRM Leads to Drive"/>
+                        <div colspan="2" class="alert alert-info" role="alert">
+                            <i class="fa fa-info-circle me-2"/> Give this configuration a descriptive name to identify it later
+                        </div>
+                    </group>
+
+                    <!-- Step 1: Model Selection -->
+                    <group name="step1" string="Step 1: Select Model" col="2">
+                        <field name="model_name" widget="selection" required="1" placeholder="Select model..." />
+                        <div colspan="2" class="alert alert-info" role="alert">
+                            <i class="fa fa-info-circle me-2"/> Choose which Odoo model contains the attachments you want to sync
+                        </div>
+                    </group>
+
+                    <!-- Step 2: Google Drive Selection -->
+                    <group name="step2" string="Step 2: Select Google Drive" col="2">
+                        <field name="google_drive_id" widget="selection" required="1" placeholder="Select driver..." />
+                        <div colspan="2" class="alert alert-info" role="alert">
+                            <i class="fa fa-cloud me-2"/> Select the Google Drive account where files will be stored
+                        </div>
+                    </group>
+
+                    <!-- Step 3: Folder Selection -->
+                    <group name="step3" string="Step 3: Select Folder" col="2">
+                        <field name="google_folder_id" widget="selection" required="1" placeholder="Select folder..." />
+                        <field name="folder_path" string="Selected Path" readonly="1" class="text-primary font-weight-bold" />
+                        <div colspan="2" class="alert alert-info" role="alert">
+                            <i class="fa fa-folder-open me-2"/> Choose the destination folder in Google Drive where attachments will be uploaded
+                        </div>
+                    </group>
+
+                    <!-- Step 4: File Type Selection -->
+                    <group name="step4" string="Step 4: Select File Type" col="2">
+                        <field name="file_type" widget="selection" required="1" placeholder="Select file type..." />
+                        <div colspan="2" class="alert alert-info" role="alert">
+                            <i class="fa fa-filter me-2"/> Specify which file types to sync. Select 'All File Types' to sync everything
+                        </div>
+                    </group>
+
+                    <!-- Sync Options -->
+                    <group name="sync_options" string="Sync Options" col="2">
+                        <field name="auto_sync_mode" widget="boolean_toggle" options="{'terminology': 'on_off'}"/>
+                        <div colspan="2" class="alert alert-secondary">
+                            <i class="fa fa-info-circle me-2"/> Toggle to <strong>Auto Sync</strong> or <strong>Manual Mode</strong>. Save the configuration, then use the 'Run Sync' button in the header to execute.
+                        </div>
+                    </group>
+
+                    <!-- Sync Statistics -->
+                    <group name="sync_stats" string="Sync Statistics" col="2">
+                        <field name="sync_count" readonly="1"/>
+                        <field name="last_synced" readonly="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Save" type="object" name="action_save_and_return" class="btn btn-primary"/>
+                    <button string="Discard" class="btn btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View for Filtering -->
+    <record id="view_attachment_sync_config_search" model="ir.ui.view">
+        <field name="name">Attachment Sync Configuration - Search</field>
+        <field name="model">attachment.sync.config</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="model_name"/>
+                <field name="google_drive_id"/>
+                <separator/>
+                <filter name="filter_auto_sync" string="Auto Sync" domain="[('auto_sync_mode', '=', True)]"/>
+                <filter name="filter_manual" string="Manual" domain="[('auto_sync_mode', '=', False)]"/>
+                <separator/>
+                <filter name="filter_active" string="Active" domain="[('state', '=', 'active')]"/>
+                <filter name="filter_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action for Attachment Sync Configuration -->
+    <record id="action_attachment_sync_config" model="ir.actions.act_window">
+        <field name="name">Attachment Sync Configuration</field>
+        <field name="res_model">attachment.sync.config</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="search_view_id" ref="view_attachment_sync_config_search"/>
+        <field name="context">{'default_state': 'active'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Attachment Sync Configuration!
+            </p>
+            <p>
+                Set up rules to automatically or manually synchronize attachments from Odoo to Google Drive.
+            </p>
+        </field>
+    </record>
+</odoo>

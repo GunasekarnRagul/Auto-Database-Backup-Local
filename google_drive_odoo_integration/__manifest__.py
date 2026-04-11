@@ -15,9 +15,13 @@
     'data': [
         'security/ir.model.access.csv',
         'data/cron_sync.xml',
+        'data/gdrive_model_config.xml',
         'wizard/google_drive_folder_wizard_views.xml',
+        'views/attachment_sync_config_views.xml',
         'views/google_drive_config_views.xml',
         'views/google_drive_file_views.xml',
+        'views/gdrive_model_config_views.xml',
+        'views/ir_attachment_views.xml',
         'views/client_action_views.xml',
         'views/menu.xml',
     ],
