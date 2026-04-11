@@ -40,6 +40,8 @@ export class FileExplorer extends Component {
             searchQuery: '',
             activeSection: 'my_drive',
             breadcrumbs: [],
+            trashBreadcrumbs: [],
+            trashCurrentFolderId: null,
             drives: [],
             activeDriveId: null,
             activeRootId: null,
@@ -189,6 +191,22 @@ export class FileExplorer extends Component {
     get activeDriveName() {
         const drive = this.state.drives.find(d => d.id === this.state.activeDriveId);
         return drive ? drive.name : 'No Drive';
+    }
+
+    // Helper to get the correct breadcrumbs based on current section
+    _getActiveBreadcrumbs() {
+        return this.state.activeSection === 'trash' ? this.state.trashBreadcrumbs : this.state.breadcrumbs;
+    }
+
+    // Build independent trash breadcrumbs
+    _buildTrashBreadcrumbs(folderId, folderName) {
+        const breadcrumbs = [{ id: 'section', name: 'Trash' }];
+        
+        if (folderId && folderId !== 'trash_root') {
+            breadcrumbs.push({ id: folderId, name: folderName || 'Trash Folder' });
+        }
+        
+        return breadcrumbs;
     }
 
     toggleSort(field) {
@@ -755,16 +773,20 @@ export class FileExplorer extends Component {
             this.state.isDriveOverview = false;
         }
 
-        await this._updateNavigationState(null, this._sectionLabel(section));
-
-        if (section === 'my_drive') {
-            this.state.isRootTreeExpanded = !this.state.isRootTreeExpanded;
-            await this.loadFiles(null);
+        // Handle trash section separately to maintain independent breadcrumbs
+        if (section === 'trash') {
+            this.state.trashBreadcrumbs = [{ id: 'section', name: 'Trash' }];
+            this.state.trashCurrentFolderId = null;
+            this.state.currentFolderName = 'Trash';
+            await this.loadFiles('trash_root');
         } else {
-            this.state.isRootTreeExpanded = false;
-            if (section === 'trash') {
-                await this.loadFiles('trash_root');
+            await this._updateNavigationState(null, this._sectionLabel(section));
+
+            if (section === 'my_drive') {
+                this.state.isRootTreeExpanded = !this.state.isRootTreeExpanded;
+                await this.loadFiles(null);
             } else {
+                this.state.isRootTreeExpanded = false;
                 await this.loadFiles(null);
             }
         }
@@ -790,55 +812,99 @@ export class FileExplorer extends Component {
 
     async onFolderClick(file) {
         if (file.file_type === 'folder') {
-            if (this.state.activeSection !== 'trash') {
+            if (this.state.activeSection === 'trash') {
+                // In trash section: handle independently
+                this.state.currentFolderName = file.name;
+                this.state.trashCurrentFolderId = file.id;
+                
+                // Build trash-specific breadcrumbs
+                this.state.trashBreadcrumbs = [
+                    { id: 'section', name: 'Trash' },
+                    { id: file.id, name: file.name }
+                ];
+            } else {
+                // In drive section: use normal navigation
                 this.state.activeSection = 'my_drive';
+                await this._updateNavigationState(file.id, file.name);
             }
-            await this._updateNavigationState(file.id, file.name);
             await this.loadFiles(file.id);
         }
     }
 
     async onBreadcrumbClick(index) {
-        const bc = this.state.breadcrumbs[index];
+        // Use the appropriate breadcrumbs based on current section
+        const breadcrumbs = this.state.activeSection === 'trash' ? this.state.trashBreadcrumbs : this.state.breadcrumbs;
+        const bc = breadcrumbs[index];
+        
         if (bc.id === 'section') {
-            // Update activeSection based on breadcrumb name
+            // Section header clicked
             if (bc.name === 'Trash') {
                 this.state.activeSection = 'trash';
-            } else if (this.state.rootFolders.some(r => r.name === bc.name)) {
-                this.state.activeSection = 'my_drive';
+                this.state.trashBreadcrumbs = [{ id: 'section', name: 'Trash' }];
+                this.state.trashCurrentFolderId = null;
+                this.state.currentFolderName = 'Trash';
+                await this.loadFiles('trash_root');
             } else {
-                // Fallback to my_drive for drive names
+                // Drive section clicked
                 this.state.activeSection = 'my_drive';
+                this.state.activeRootId = null;
+                this.state.isDriveOverview = true;
+                await this._updateNavigationState(null, bc.name);
+                await this.loadFiles(null);
             }
-
-            this.state.activeRootId = null;
-            this.state.isDriveOverview = true;
-            await this._updateNavigationState(null, bc.name);
-            await this.loadFiles(null);
         } else {
-            const folderId = (bc.id === false) ? null : bc.id;
-            const currentSection = this.state.activeSection;
-            await this._updateNavigationState(folderId, bc.name);
-            // Preserve trash section when navigating within trash
-            if (currentSection === 'trash') {
-                this.state.activeSection = 'trash';
+            // Folder in the breadcrumb trail clicked
+            if (this.state.activeSection === 'trash') {
+                // Trash folder navigation - rebuild breadcrumbs up to clicked level
+                const folderId = (bc.id === false) ? null : bc.id;
+                this.state.currentFolderName = bc.name;
+                this.state.trashCurrentFolderId = folderId;
+                
+                // Rebuild breadcrumbs: keep all items up to (and including) the clicked one
+                this.state.trashBreadcrumbs = breadcrumbs.slice(0, index + 1);
+                await this.loadFiles(folderId);
+            } else {
+                // Drive folder navigation
+                const folderId = (bc.id === false) ? null : bc.id;
+                await this._updateNavigationState(folderId, bc.name);
+                await this.loadFiles(folderId);
             }
-            await this.loadFiles(folderId);
         }
     }
 
     async onBackClick() {
-        if (this.state.breadcrumbs.length > 1) {
-            const last = this.state.breadcrumbs[this.state.breadcrumbs.length - 2];
-            if (last.id === 'section') {
-                this.state.activeRootId = null;
-                this.state.isDriveOverview = true;
-                await this._updateNavigationState(null, last.name);
-                await this.loadFiles(null);
-            } else {
-                const folderId = (last.id === false) ? null : last.id;
-                await this._updateNavigationState(folderId, last.name);
-                await this.loadFiles(folderId);
+        if (this.state.activeSection === 'trash') {
+            // Handle trash back button
+            if (this.state.trashBreadcrumbs.length > 1) {
+                this.state.trashBreadcrumbs.pop();
+                const last = this.state.trashBreadcrumbs[this.state.trashBreadcrumbs.length - 1];
+                
+                if (last.id === 'section') {
+                    // Going back to trash root
+                    this.state.trashCurrentFolderId = null;
+                    this.state.currentFolderName = 'Trash';
+                    await this.loadFiles('trash_root');
+                } else {
+                    // Going back to a parent trash folder
+                    this.state.trashCurrentFolderId = last.id;
+                    this.state.currentFolderName = last.name;
+                    await this.loadFiles(last.id);
+                }
+            }
+        } else {
+            // Handle drive back button
+            if (this.state.breadcrumbs.length > 1) {
+                const last = this.state.breadcrumbs[this.state.breadcrumbs.length - 2];
+                if (last.id === 'section') {
+                    this.state.activeRootId = null;
+                    this.state.isDriveOverview = true;
+                    await this._updateNavigationState(null, last.name);
+                    await this.loadFiles(null);
+                } else {
+                    const folderId = (last.id === false) ? null : last.id;
+                    await this._updateNavigationState(folderId, last.name);
+                    await this.loadFiles(folderId);
+                }
             }
         }
     }

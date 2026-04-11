@@ -342,12 +342,13 @@
                     <!-- Content Header -->
                     <div class="gd_content_header">
                         <div class="gd_content_title" t-if="!state.searchMode">
-                            <t t-foreach="state.breadcrumbs" t-as="bc" t-key="bc_index">
+                            <t t-set="activeBreadcrumbs" t-value="state.activeSection === 'trash' ? state.trashBreadcrumbs : state.breadcrumbs"/>
+                            <t t-foreach="activeBreadcrumbs" t-as="bc" t-key="bc_index">
                                 <span t-if="bc_index > 0" class="gd_breadcrumb_sep">
                                     <i class="fa fa-angle-right"/>
                                 </span>
                                 <span class="gd_breadcrumb_item"
-                                      t-att-class="{ 'gd_breadcrumb_active': bc_index === state.breadcrumbs.length - 1 }"
+                                      t-att-class="{ 'gd_breadcrumb_active': bc_index === activeBreadcrumbs.length - 1 }"
                                       t-on-click="() => this.onBreadcrumbClick(bc_index)">
                                     <t t-esc="bc.name"/>
                                 </span>
