@@ -119,13 +119,18 @@
                     </div>
 
                     <!-- Status Badge -->
-                    <div class="alert" t-attf-class="#{record.state == 'active' ? 'alert-success' : 'alert-warning'}">
+                    <div class="alert alert-success" invisible="state != 'active'">
                         <div class="d-flex align-items-center gap-2">
-                            <i t-attf-class="fa #{record.state == 'active' ? 'fa-check-circle' : 'fa-info-circle'}" style="font-size: 16px;"/>
-                            <strong t-if="record.state == 'active'">
+                            <i class="fa fa-check-circle" style="font-size: 16px;"/>
+                            <strong>
                                 ✅ ACTIVE - Attachment categorization enabled
                             </strong>
-                            <strong t-else="">
+                        </div>
+                    </div>
+                    <div class="alert alert-warning" invisible="state == 'active'">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa fa-info-circle" style="font-size: 16px;"/>
+                            <strong>
                                 ⚠️ INACTIVE - Waiting activation
                             </strong>
                         </div>
@@ -146,16 +151,15 @@
                              <i class="fa fa-info-circle me-1"/> Choose which Odoo model contains the attachments you want to sync
                         </div>
                         <!-- Enhanced real-time counter -->
-                        <div colspan="2" class="d-flex align-items-center gap-2 mt-1 mb-3 px-3 py-2 rounded" style="background-color: #f1f7ff; border: 1px solid #d1e3ff; color: #004085;" invisible="not model_name">
-                            <i class="fa fa-paperclip me-1" style="font-size: 1.1em;"/>
-                            <span class="flex-grow-1">Total Odoo attachments found for synchronization:</span>
-                           <span class="badge rounded-pill d-inline-flex align-items-center"
-      style="background-color: #004085; color: white; padding: 5px 10px; font-weight: 600; gap: 4px;">
-    
-    <field name="model_attachment_count" class="p-0 m-0"/>
-    <span class="p-0 m-0">Files Found</span>
-
-</span>
+                        <div colspan="2" class="d-flex justify-content-between align-items-center mt-1 mb-3 px-3 py-2 rounded" style="background-color: #f1f7ff; border: 1px solid #d1e3ff; color: #004085;" invisible="not model_name">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fa fa-paperclip" style="font-size: 1.1em;"/>
+                                <span>Total Odoo attachments found for synchronization:</span>
+                            </div>
+                            <span class="badge rounded-pill d-inline-flex align-items-center" style="background-color: #004085; color: white; padding: 5px 12px; font-weight: 600; gap: 4px;">
+                                <field name="model_attachment_count" class="p-0 m-0"/>
+                                <span class="p-0 m-0">Files Found</span>
+                            </span>
                         </div>
                     </group>
 

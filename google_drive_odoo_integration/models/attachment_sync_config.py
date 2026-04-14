@@ -58,12 +58,9 @@ class AttachmentSyncConfig(models.Model):
     # Computed field for folder path display
     folder_path = fields.Char('Folder Path', compute='_compute_folder_path')
 
-<<<<<<< HEAD
-=======
     # Count of attachments for the selected model
     model_attachment_count = fields.Integer('Total Attachments', compute='_compute_model_attachment_count')
 
->>>>>>> 43b5ca9 (add the one logic ')
     @api.model_create_multi
     def create(self, vals_list):
         """Override create to set default state to active for new configurations."""
@@ -100,8 +97,6 @@ class AttachmentSyncConfig(models.Model):
                     path_parts.extend(inner_parts)
             wizard.folder_path = ' / '.join(path_parts) if path_parts else ''
 
-<<<<<<< HEAD
-=======
     @api.depends('model_name')
     def _compute_model_attachment_count(self):
         """Count total attachments in Odoo for the selected model."""
@@ -113,7 +108,6 @@ class AttachmentSyncConfig(models.Model):
             else:
                 record.model_attachment_count = 0
 
->>>>>>> 43b5ca9 (add the one logic ')
     def _create_attachment_categories(self):
         """Create folder structure for attachment categorization in Google Drive."""
         self.ensure_one()
