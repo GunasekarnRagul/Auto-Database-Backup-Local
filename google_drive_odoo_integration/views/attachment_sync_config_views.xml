@@ -119,6 +119,7 @@
                     </div>
 
                     <!-- Status Badge -->
+<<<<<<< HEAD
                     <div class="alert" t-attf-class="#{record.state == 'active' ? 'alert-success' : 'alert-warning'}">
                         <div class="d-flex align-items-center gap-2">
                             <i t-attf-class="fa #{record.state == 'active' ? 'fa-check-circle' : 'fa-info-circle'}" style="font-size: 16px;"/>
@@ -126,6 +127,20 @@
                                 ✅ ACTIVE - Attachment categorization enabled
                             </strong>
                             <strong t-else="">
+=======
+                    <div class="alert alert-success" invisible="state != 'active'">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa fa-check-circle" style="font-size: 16px;"/>
+                            <strong>
+                                ✅ ACTIVE - Attachment categorization enabled
+                            </strong>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning" invisible="state == 'active'">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa fa-info-circle" style="font-size: 16px;"/>
+                            <strong>
+>>>>>>> 43b5ca9 (add the one logic ')
                                 ⚠️ INACTIVE - Waiting activation
                             </strong>
                         </div>
@@ -142,8 +157,20 @@
                     <!-- Step 1: Model Selection -->
                     <group name="step1" string="Step 1: Select Model" col="2">
                         <field name="model_name" widget="selection" required="1" placeholder="Select model..." />
-                        <div colspan="2" class="alert alert-info" role="alert">
-                            <i class="fa fa-info-circle me-2"/> Choose which Odoo model contains the attachments you want to sync
+                        <div colspan="2" class="alert alert-info py-2" role="alert">
+                             <i class="fa fa-info-circle me-1"/> Choose which Odoo model contains the attachments you want to sync
+                        </div>
+                        <!-- Enhanced real-time counter -->
+                        <div colspan="2" class="d-flex align-items-center gap-2 mt-1 mb-3 px-3 py-2 rounded" style="background-color: #f1f7ff; border: 1px solid #d1e3ff; color: #004085;" invisible="not model_name">
+                            <i class="fa fa-paperclip me-1" style="font-size: 1.1em;"/>
+                            <span class="flex-grow-1">Total Odoo attachments found for synchronization:</span>
+                           <span class="badge rounded-pill d-inline-flex align-items-center"
+      style="background-color: #004085; color: white; padding: 5px 10px; font-weight: 600; gap: 4px;">
+    
+    <field name="model_attachment_count" class="p-0 m-0"/>
+    <span class="p-0 m-0">Files Found</span>
+
+</span>
                         </div>
                     </group>
 
@@ -179,7 +206,11 @@
                     </group>
 
                     <!-- Active Configuration Info -->
+<<<<<<< HEAD
                     <div class="alert alert-success" t-if="record.state == 'active'">
+=======
+                    <div class="alert alert-success" invisible="state != 'active'">
+>>>>>>> 43b5ca9 (add the one logic ')
                         <strong>✅ Active Configuration - Folder Structure:</strong>
                         <div style="margin-top: 10px; font-family: monospace; font-size: 12px; white-space: pre-wrap;">
 📂 <field name="google_folder_id"/>
@@ -193,7 +224,11 @@
                     </div>
 
                     <!-- Inactive Configuration Info -->
+<<<<<<< HEAD
                     <div class="alert alert-info" t-if="record.state != 'active'">
+=======
+                    <div class="alert alert-info" invisible="state == 'active'">
+>>>>>>> 43b5ca9 (add the one logic ')
                         <strong>ℹ️ To activate attachment categorization:</strong><br/>
                         <ul style="margin-top: 10px; padding-left: 20px;">
                             <li>Complete all configuration steps</li>
