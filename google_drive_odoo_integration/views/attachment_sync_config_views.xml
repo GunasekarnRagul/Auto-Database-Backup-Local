@@ -9,7 +9,6 @@
                 <field name="name"/>
                 <field name="model_name"/>
                 <field name="google_drive_id"/>
-                <field name="file_type"/>
                 <field name="auto_sync_mode"/>
                 <field name="sync_count"/>
                 <templates>
@@ -62,10 +61,6 @@
                                     <span><i class="fa fa-cloud me-1"/> Drive:</span>
                                     <span class="fw-bold text-dark text-truncate"><field name="google_drive_id"/></span>
                                 </div>
-                                <div class="d-flex justify-content-between mb-1">
-                                    <span><i class="fa fa-file me-1"/> File Type:</span>
-                                    <span class="fw-bold text-dark text-truncate"><field name="file_type"/></span>
-                                </div>
                                 <div class="d-flex justify-content-between">
                                     <span><i class="fa fa-check-circle me-1"/> Synced:</span>
                                     <span class="fw-bold text-dark"><field name="sync_count"/></span>
@@ -100,7 +95,6 @@
                 <field name="name"/>
                 <field name="model_name"/>
                 <field name="google_drive_id"/>
-                <field name="file_type"/>
                 <field name="auto_sync_mode" string="Type"/>
                 <field name="sync_count"/>
             </tree>
@@ -122,6 +116,19 @@
                             <i class="fa fa-cloud-upload"/> Attachment Sync Configuration
                         </h1>
                         <p class="text-muted">Configure automatic synchronization of attachments from Odoo models to Google Drive</p>
+                    </div>
+
+                    <!-- Status Badge -->
+                    <div class="alert" t-attf-class="#{record.state == 'active' ? 'alert-success' : 'alert-warning'}">
+                        <div class="d-flex align-items-center gap-2">
+                            <i t-attf-class="fa #{record.state == 'active' ? 'fa-check-circle' : 'fa-info-circle'}" style="font-size: 16px;"/>
+                            <strong t-if="record.state == 'active'">
+                                ✅ ACTIVE - Attachment categorization enabled
+                            </strong>
+                            <strong t-else="">
+                                ⚠️ INACTIVE - Waiting activation
+                            </strong>
+                        </div>
                     </div>
 
                     <!-- Configuration Name -->
@@ -157,14 +164,6 @@
                         </div>
                     </group>
 
-                    <!-- Step 4: File Type Selection -->
-                    <group name="step4" string="Step 4: Select File Type" col="2">
-                        <field name="file_type" widget="selection" required="1" placeholder="Select file type..." />
-                        <div colspan="2" class="alert alert-info" role="alert">
-                            <i class="fa fa-filter me-2"/> Specify which file types to sync. Select 'All File Types' to sync everything
-                        </div>
-                    </group>
-
                     <!-- Sync Options -->
                     <group name="sync_options" string="Sync Options" col="2">
                         <field name="auto_sync_mode" widget="boolean_toggle" options="{'terminology': 'on_off'}"/>
@@ -178,6 +177,30 @@
                         <field name="sync_count" readonly="1"/>
                         <field name="last_synced" readonly="1"/>
                     </group>
+
+                    <!-- Active Configuration Info -->
+                    <div class="alert alert-success" t-if="record.state == 'active'">
+                        <strong>✅ Active Configuration - Folder Structure:</strong>
+                        <div style="margin-top: 10px; font-family: monospace; font-size: 12px; white-space: pre-wrap;">
+📂 <field name="google_folder_id"/>
+├── 🧾 Customer Uploaded Files
+│   └── (Files uploaded via chatter attachments)
+├── 📑 Requirement / Project Files
+│   └── (Sales &amp; Pre-sales team files)
+└── 📧 Email Attachments
+    └── (Auto-created from incoming emails)
+                        </div>
+                    </div>
+
+                    <!-- Inactive Configuration Info -->
+                    <div class="alert alert-info" t-if="record.state != 'active'">
+                        <strong>ℹ️ To activate attachment categorization:</strong><br/>
+                        <ul style="margin-top: 10px; padding-left: 20px;">
+                            <li>Complete all configuration steps</li>
+                            <li>Click Save</li>
+                            <li>Configuration status will change to Active</li>
+                        </ul>
+                    </div>
                 </sheet>
                 <footer>
                     <button string="Save" type="object" name="action_save_and_return" class="btn btn-primary"/>

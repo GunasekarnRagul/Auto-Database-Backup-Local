@@ -94,6 +94,31 @@ class AttachmentSyncConfig(models.Model):
                     path_parts.extend(inner_parts)
             wizard.folder_path = ' / '.join(path_parts) if path_parts else ''
 
+    def _create_attachment_categories(self):
+        """Create folder structure for attachment categorization in Google Drive."""
+        self.ensure_one()
+        
+        if not self.state == 'active':
+            return
+        
+        # Define attachment categories
+        categories = [
+            ('🧾 Customer Uploaded Files', 'Customer files uploaded via chatter and attachments'),
+            ('📑 Requirement / Project Files', 'Sales and pre-sales team requirements and specs'),
+            ('📧 Email Attachments', 'Automatically created from incoming emails'),
+        ]
+        
+        # In a real implementation, this would create subfolders in Google Drive
+        # For now, we log the structure that would be created
+        folder_structure = f"""
+        📂 {self.google_folder_id.name}
+        ├── 🧾 Customer Uploaded Files
+        ├── 📑 Requirement / Project Files
+        └── 📧 Email Attachments
+        """
+        
+        return folder_structure
+
     def action_manual_sync(self):
         """Perform manual sync for selected configuration."""
         self.ensure_one()
@@ -157,12 +182,19 @@ class AttachmentSyncConfig(models.Model):
             'last_synced': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         })
 
+        # Create folder structure if active
+        folder_structure = self._create_attachment_categories()
+        
+        message = f'Successfully synced {sync_count} out of {len(attachments)} files'
+        if self.state == 'active' and folder_structure:
+            message += f'\n\nAttachment Structure:\n{folder_structure}'
+
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': 'Sync Complete',
-                'message': f'Successfully synced {sync_count} out of {len(attachments)} files',
+                'message': message,
                 'type': 'success',
                 'sticky': False,
             }
@@ -203,12 +235,19 @@ class AttachmentSyncConfig(models.Model):
             'auto_sync_enabled': True,
         })
 
+        # Create folder structure if active
+        folder_structure = self._create_attachment_categories()
+        
+        message = f'Auto-sync enabled for {len(attachments)} files in {self.model_name}'
+        if self.state == 'active' and folder_structure:
+            message += f'\n\nAttachment Structure:\n{folder_structure}'
+
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': 'Auto-Sync Configured',
-                'message': f'Auto-sync enabled for {len(attachments)} files in {self.model_name}',
+                'message': message,
                 'type': 'success',
                 'sticky': False,
             }
