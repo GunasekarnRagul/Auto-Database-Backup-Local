@@ -57,6 +57,7 @@ class GoogleDriveSyncLog(models.Model):
     file_size = fields.Float('File Size (bytes)')
     duration = fields.Float('Duration (s)', digits=(10, 3), help='Time taken for the operation in seconds')
     user_id = fields.Many2one('res.users', string='User', default=lambda self: self.env.user, index=True)
+    user_name = fields.Char('User Name', help='Name of the user who performed the action')
 
     # Computed color field for terminal-style display
     state_color = fields.Char(compute='_compute_state_color')
@@ -99,13 +100,18 @@ class GoogleDriveSyncLog(models.Model):
     def log_operation(self, config, file_name, operation, state='success',
                       error_message=False, sync_type=False, file_type='file',
                       root_folder_name=False, folder_path=False,
-                      google_file_id=False, file_size=0, duration=0):
+                      google_file_id=False, file_size=0, duration=0,
+                      user_id=False):
         """High-level helper to log a sync operation.
 
         Determines sync_type from context if not explicitly supplied.
         """
         if not sync_type:
             sync_type = self.env.context.get('sync_type', 'manual')
+
+        active_uid = user_id or self.env.context.get('active_uid') or self.env.user.id
+        active_user = self.env['res.users'].sudo().browse(active_uid)
+        u_name = active_user.name if active_user.exists() else 'System'
 
         vals = {
             'drive_config_id': config.id if config else False,
@@ -120,6 +126,7 @@ class GoogleDriveSyncLog(models.Model):
             'google_file_id': google_file_id,
             'file_size': file_size,
             'duration': duration,
-            'user_id': self.env.user.id,
+            'user_id': active_uid,
+            'user_name': u_name,
         }
         return self.create_log(vals)

@@ -9,6 +9,11 @@ class GoogleDriveFile(models.Model):
     _description = 'Google Drive File'
     _order = 'file_type desc, name asc'
 
+    _sql_constraints = [
+        ('google_file_id_drive_config_unique', 'unique(google_file_id, drive_config_id)',
+         'A file with this Google ID already exists for this drive configuration.')
+    ]
+
     name = fields.Char('File Name', required=True)
     drive_config_id = fields.Many2one('google.drive.config', string='Drive', required=True, ondelete='cascade')
     root_folder_id = fields.Many2one('google.drive.root.folder', string='Root Folder', ondelete='cascade')
@@ -233,7 +238,9 @@ class GoogleDriveFile(models.Model):
             
             # Sync to Drive
             success = sync_service.move_file(
-                item, old_parent_gdrive_id, new_parent_gdrive_id
+                item, old_parent_gdrive_id, new_parent_gdrive_id,
+                target_parent_id=target_parent_id,
+                target_root_id=target_root_id
             )
             
             if success:
@@ -396,11 +403,23 @@ class GoogleDriveFile(models.Model):
         log_model = self.env['google.drive.sync.log']
         sync_type = self.env.context.get('sync_type', 'manual')
         
-        # Resolve root folder name for logging
+        # Resolve root folder name and folder path for logging
         root_name = False
+        folder_path = False
         if record.root_folder_id:
             root_rec = self.env['google.drive.root.folder'].sudo().browse(record.root_folder_id.id)
             root_name = root_rec.name if root_rec.exists() else False
+        # Build folder path by walking the parent chain
+        try:
+            parts = []
+            parent = record.parent_folder_id
+            while parent:
+                parts.append(parent.name or '')
+                parent = parent.parent_folder_id
+            if parts:
+                folder_path = ' / '.join(reversed(parts))
+        except Exception:
+            pass
 
         # 1. New Folder
         if record.file_type == 'folder' and not record.google_file_id:
@@ -411,7 +430,7 @@ class GoogleDriveFile(models.Model):
             t0 = time.time()
             try:
                 result = sync.with_context(sync_type=sync_type).create_folder_in_drive(
-                    record.name, record.drive_config_id, parent_gdrive_id=parent_gdrive_id)
+                    record.name, record.drive_config_id, parent_gdrive_id=parent_gdrive_id, file_record=record)
                 if result:
                     record.write({
                         'google_file_id': result['google_file_id'],
@@ -433,6 +452,7 @@ class GoogleDriveFile(models.Model):
                     sync_type=sync_type,
                     file_type='folder',
                     root_folder_name=root_name,
+                    folder_path=folder_path,
                     duration=time.time() - t0,
                 )
             return False
@@ -464,6 +484,7 @@ class GoogleDriveFile(models.Model):
                     sync_type=sync_type,
                     file_type='file',
                     root_folder_name=root_name,
+                    folder_path=folder_path,
                 )
                 return False
 
@@ -500,6 +521,7 @@ class GoogleDriveFile(models.Model):
                         sync_type=sync_type,
                         file_type='file',
                         root_folder_name=root_name,
+                        folder_path=folder_path,
                         google_file_id=result['google_file_id'],
                         file_size=len(attachment.raw) if attachment.raw else 0,
                         duration=time.time() - t0,
@@ -516,6 +538,7 @@ class GoogleDriveFile(models.Model):
                         sync_type=sync_type,
                         file_type='file',
                         root_folder_name=root_name,
+                        folder_path=folder_path,
                         duration=time.time() - t0,
                     )
             except Exception as e:
@@ -529,6 +552,7 @@ class GoogleDriveFile(models.Model):
                     sync_type=sync_type,
                     file_type='file',
                     root_folder_name=root_name,
+                    folder_path=folder_path,
                     duration=time.time() - t0,
                 )
             return False

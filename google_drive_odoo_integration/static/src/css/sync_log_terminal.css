@@ -97,8 +97,64 @@
 
 .term-btn:hover {
     background: var(--term-bg-hover);
-    color: var(--term-text);
-    border-color: var(--term-text-dim);
+    color: var(--term-text-bright);
+}
+
+.term-filter-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.term-btn-filter {
+    position: relative;
+}
+
+.term-btn-filter.active {
+    color: var(--term-green);
+}
+
+.term-filter-dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 6px;
+    height: 6px;
+    background: var(--term-green);
+    border-radius: 50%;
+    box-shadow: 0 0 5px var(--term-green);
+}
+
+.term-filter-menu {
+    position: absolute;
+    top: 40px;
+    right: 0;
+    width: 160px;
+    background: var(--term-bg-alt);
+    border: 1px solid var(--term-border);
+    border-radius: 6px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    z-index: 1000;
+    padding: 6px 0;
+    overflow: hidden;
+}
+
+.term-filter-item {
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--term-text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.term-filter-item:hover {
+    background: var(--term-bg-hover);
+    color: var(--term-text-bright);
+}
+
+.term-filter-item.active {
+    color: var(--term-green);
+    background: rgba(16, 185, 129, 0.1);
 }
 
 .term-btn-danger:hover {
@@ -178,11 +234,13 @@
 .term-search {
     display: flex;
     align-items: center;
-    flex: 1;
     background: var(--term-bg);
     border: 1px solid var(--term-border);
-    border-radius: 6px;
+    border-radius: 4px;
     padding: 0 10px;
+    height: 32px;
+    flex: 1;
+    min-width: 140px;
     transition: border-color 0.2s;
 }
 
@@ -193,8 +251,23 @@
 
 .term-search-icon {
     color: var(--term-text-dim);
-    font-size: 12px;
-    margin-right: 8px;
+    margin-right: 10px;
+    font-size: 14px;
+}
+
+.term-search .term-select {
+    background: transparent;
+    border: none;
+    color: var(--term-text-bright);
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.term-search .term-select:focus {
+    outline: none;
 }
 
 .term-search-input {
@@ -351,6 +424,13 @@
     letter-spacing: 0.3px;
 }
 
+.term-user {
+    color: var(--term-green);
+    margin: 0 8px;
+    font-size: 11px;
+    opacity: 0.85;
+}
+
 /* Path: drive → folder → file */
 .term-path {
     display: inline-flex;
@@ -386,6 +466,13 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.term-move-arrow {
+    color: var(--term-purple);
+    font-weight: bold;
+    margin: 0 6px;
+    filter: drop-shadow(0 0 2px rgba(188, 140, 255, 0.4));
 }
 
 /* Duration */

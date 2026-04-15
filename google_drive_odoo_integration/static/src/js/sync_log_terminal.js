@@ -18,6 +18,10 @@ export class SyncLogTerminal extends Component {
             typeFilter: 'all',   // all | manual | auto | cron | upload
             operationFilter: 'all',
             searchQuery: '',
+            userFilter: 'all',
+            users: [],
+            dateFilter: 'all',    // all | today | 3days | week | 2weeks | month
+            showDateMenu: false,
             limit: 200,
             totalCount: 0,
             autoScroll: true,
@@ -25,6 +29,14 @@ export class SyncLogTerminal extends Component {
         });
 
         onWillStart(async () => {
+            // Fetch internal users for the dropdown
+            const users = await this.orm.searchRead(
+                "res.users",
+                [["share", "=", false], ["active", "=", true]],
+                ["id", "name"],
+                { order: "name asc" }
+            );
+            this.state.users = users;
             await this.loadLogs();
         });
 
@@ -45,7 +57,7 @@ export class SyncLogTerminal extends Component {
                 [
                     "create_date", "drive_name", "root_folder_name",
                     "file_name", "file_type", "operation", "sync_type",
-                    "state", "error_message", "duration", "user_id",
+                    "state", "error_message", "duration", "user_id", "user_name",
                     "google_file_id", "file_size", "display_name", "folder_path"
                 ],
                 { limit: this.state.limit, order: "create_date asc, id asc" }
@@ -53,12 +65,25 @@ export class SyncLogTerminal extends Component {
 
             this.state.logs = logs;
 
-            // Load stats
-            const allLogs = await this.orm.searchCount("google.drive.sync.log", []);
-            const successLogs = await this.orm.searchCount("google.drive.sync.log", [["state", "=", "success"]]);
-            const failLogs = await this.orm.searchCount("google.drive.sync.log", [["state", "=", "fail"]]);
-            this.state.stats = { total: allLogs, success: successLogs, fail: failLogs };
-            this.state.totalCount = allLogs;
+            // Load DYNAMIC stats based on CURRENT filters
+            const statsDomain = this._buildDomain();
+            
+            // 1. Success Count for current filters
+            const sDomain = statsDomain.filter(d => d[0] !== 'state');
+            sDomain.push(['state', '=', 'success']);
+            const successCount = await this.orm.searchCount("google.drive.sync.log", sDomain);
+
+            // 2. Fail Count for current filters
+            const fDomain = statsDomain.filter(d => d[0] !== 'state');
+            fDomain.push(['state', '=', 'fail']);
+            const failCount = await this.orm.searchCount("google.drive.sync.log", fDomain);
+
+            this.state.stats = { 
+                total: successCount + failCount, 
+                success: successCount, 
+                fail: failCount 
+            };
+            this.state.totalCount = successCount + failCount;
         } catch (e) {
             console.error("Failed to load logs", e);
         } finally {
@@ -85,7 +110,39 @@ export class SyncLogTerminal extends Component {
         if (this.state.searchQuery.trim()) {
             domain.push(["file_name", "ilike", this.state.searchQuery.trim()]);
         }
+        if (this.state.userFilter !== 'all') {
+            const uid = parseInt(this.state.userFilter);
+            if (!isNaN(uid)) {
+                domain.push(["user_id", "=", uid]);
+            }
+        }
+        if (this.state.dateFilter !== 'all') {
+            const dateLimit = this._getDateLimit(this.state.dateFilter);
+            if (dateLimit) {
+                domain.push(["create_date", ">=", dateLimit]);
+            }
+        }
         return domain;
+    }
+
+    _getDateLimit(filter) {
+        const d = new Date();
+        if (filter === 'today') {
+            d.setHours(0, 0, 0, 0);
+        } else if (filter === '3days') {
+            d.setDate(d.getDate() - 3);
+        } else if (filter === 'week') {
+            d.setDate(d.getDate() - 7);
+        } else if (filter === '2weeks') {
+            d.setDate(d.getDate() - 14);
+        } else if (filter === 'month') {
+            d.setMonth(d.getMonth() - 1);
+        } else {
+            return null;
+        }
+        // Format to Odoo datetime string YYYY-MM-DD HH:MM:SS
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
     }
 
     scrollToBottom() {
@@ -107,7 +164,7 @@ export class SyncLogTerminal extends Component {
     getOperationLabel(op) {
         const labels = {
             'upload': 'UPLOAD',
-            'download': 'PULL',
+            'download': 'DOWNLOAD',
             'rename': 'RENAME',
             'delete': 'DELETE',
             'trash': 'TRASH',
@@ -154,6 +211,44 @@ export class SyncLogTerminal extends Component {
         return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
     }
 
+    /**
+     * Parse the move transition string into styled segments.
+     * Format: Drive/Root/Folder/File ➜ MOVE TO ➜ Drive/Root/Folder/File
+     */
+    getStyledMoveSegments(fileName) {
+        if (!fileName || !fileName.includes(" ➜ MOVE TO ➜ ")) {
+            return [{ text: fileName || '', class: 'term-file' }];
+        }
+
+        const parts = fileName.split(" ➜ MOVE TO ➜ ");
+        const result = [];
+
+        const parsePath = (pathStr) => {
+            // Split by '/' but keep the delimiters to maintain exact UI spacing if needed
+            // However, the user shown Drive/Root / Path / File
+            const segments = pathStr.split('/');
+            segments.forEach((seg, idx) => {
+                const trimmed = seg.trim();
+                let cls = "term-folder-path";
+                if (idx === 0) cls = "term-drive";
+                else if (idx === 1) cls = "term-folder";
+                else if (idx === segments.length - 1) cls = "term-file";
+                
+                // Keep the leading/trailing spaces in the text to match original string
+                result.push({ text: seg, class: cls });
+                if (idx < segments.length - 1) {
+                    result.push({ text: "/", class: "term-sep" });
+                }
+            });
+        };
+
+        parsePath(parts[0]);
+        result.push({ text: " ➜ MOVE TO ➜ ", class: "term-move-arrow" });
+        parsePath(parts[1]);
+
+        return result;
+    }
+
     // ─── Filters ───
 
     setFilter(filter) {
@@ -175,6 +270,21 @@ export class SyncLogTerminal extends Component {
         this.state.searchQuery = ev.target.value;
         clearTimeout(this._searchTimeout);
         this._searchTimeout = setTimeout(() => this.loadLogs(), 400);
+    }
+
+    onUserFilterChange(ev) {
+        this.state.userFilter = ev.target.value;
+        this.loadLogs();
+    }
+
+    toggleDateMenu() {
+        this.state.showDateMenu = !this.state.showDateMenu;
+    }
+
+    setDateFilter(filter) {
+        this.state.dateFilter = filter;
+        this.state.showDateMenu = false;
+        this.loadLogs();
     }
 
     onSearchKeydown(ev) {
@@ -205,7 +315,8 @@ export class SyncLogTerminal extends Component {
         return [
             { value: 'all', label: 'All Operations' },
             { value: 'upload', label: 'Upload' },
-            { value: 'sync', label: 'Sync / Pull' },
+            { value: 'download', label: 'Download' },
+            { value: 'sync', label: 'Sync' },
             { value: 'rename', label: 'Rename' },
             { value: 'delete', label: 'Delete' },
             { value: 'trash', label: 'Trash' },

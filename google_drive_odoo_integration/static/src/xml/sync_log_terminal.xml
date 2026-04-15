@@ -39,6 +39,15 @@
 
         <!-- Toolbar -->
         <div class="term-toolbar">
+            <div class="term-search term-user-select">
+                <i class="fa fa-user term-search-icon"/>
+                <select class="term-select" t-on-change="onUserFilterChange" t-att-value="state.userFilter">
+                    <option value="all">All Users</option>
+                    <t t-foreach="state.users" t-as="user" t-key="user.id">
+                        <option t-att-value="user.id"><t t-esc="user.name"/></option>
+                    </t>
+                </select>
+            </div>
             <div class="term-search">
                 <i class="fa fa-search term-search-icon"/>
                 <input type="text" class="term-search-input"
@@ -60,6 +69,26 @@
                         <option t-att-value="opt.value"><t t-esc="opt.label"/></option>
                     </t>
                 </select>
+            </div>
+            <div class="term-actions">
+                <div class="term-filter-container">
+                    <button class="term-btn term-btn-filter" 
+                            t-on-click="toggleDateMenu" 
+                            t-att-class="{ 'active': state.dateFilter !== 'all' }"
+                            title="Filter by Date">
+                        <i class="fa fa-filter"/>
+                        <span t-if="state.dateFilter !== 'all'" class="term-filter-dot"/>
+                    </button>
+                    <!-- Date Dropdown Menu -->
+                    <div class="term-filter-menu" t-if="state.showDateMenu">
+                        <div class="term-filter-item" t-on-click="() => this.setDateFilter('all')" t-att-class="{ 'active': state.dateFilter === 'all' }">All Time</div>
+                        <div class="term-filter-item" t-on-click="() => this.setDateFilter('today')" t-att-class="{ 'active': state.dateFilter === 'today' }">Today</div>
+                        <div class="term-filter-item" t-on-click="() => this.setDateFilter('3days')" t-att-class="{ 'active': state.dateFilter === '3days' }">Last 3 Days</div>
+                        <div class="term-filter-item" t-on-click="() => this.setDateFilter('week')" t-att-class="{ 'active': state.dateFilter === 'week' }">Last Week</div>
+                        <div class="term-filter-item" t-on-click="() => this.setDateFilter('2weeks')" t-att-class="{ 'active': state.dateFilter === '2weeks' }">Last 2 Weeks</div>
+                        <div class="term-filter-item" t-on-click="() => this.setDateFilter('month')" t-att-class="{ 'active': state.dateFilter === 'month' }">Last Month</div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -104,26 +133,42 @@
                         <t t-esc="getOperationLabel(log.operation)"/>
                     </span>
 
-                    <!-- Sync Type -->
                     <span class="term-type">
                         [<t t-esc="getSyncTypeLabel(log.sync_type)"/>]
+                    </span>
+                    
+                    <!-- User -->
+                    <span class="term-user">
+                        <t t-if="log.user_name">
+                            <t t-esc="'@' + log.user_name"/>
+                        </t>
+                        <t t-else="">
+                            @System
+                        </t>
                     </span>
 
                     <!-- Drive / Root / Path / File -->
                     <span class="term-path">
-                        <t t-if="log.drive_name">
-                            <span class="term-drive"><t t-esc="log.drive_name"/></span>
-                            <span class="term-sep">/</span>
+                        <t t-if="log.operation === 'move'">
+                            <t t-foreach="getStyledMoveSegments(log.file_name)" t-as="seg" t-key="seg_index">
+                                <span t-att-class="seg.class"><t t-esc="seg.text"/></span>
+                            </t>
                         </t>
-                        <t t-if="log.root_folder_name">
-                            <span class="term-folder"><t t-esc="log.root_folder_name"/></span>
-                            <span class="term-sep">/</span>
+                        <t t-else="">
+                            <t t-if="log.drive_name">
+                                <span class="term-drive"><t t-esc="log.drive_name"/></span>
+                                <span class="term-sep">/</span>
+                            </t>
+                            <t t-if="log.root_folder_name">
+                                <span class="term-folder"><t t-esc="log.root_folder_name"/></span>
+                                <span class="term-sep">/</span>
+                            </t>
+                            <t t-if="log.folder_path">
+                                <span class="term-folder-path"><t t-esc="log.folder_path"/></span>
+                                <span class="term-sep">/</span>
+                            </t>
+                            <span class="term-file"><t t-esc="log.file_name or '—'"/></span>
                         </t>
-                        <t t-if="log.folder_path">
-                            <span class="term-folder-path"><t t-esc="log.folder_path"/></span>
-                            <span class="term-sep">/</span>
-                        </t>
-                        <span class="term-file"><t t-esc="log.file_name or '—'"/></span>
                     </span>
 
                     <!-- Duration -->

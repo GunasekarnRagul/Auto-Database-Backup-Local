@@ -83,7 +83,16 @@ class GoogleDriveController(http.Controller):
         try:
             response = requests.get(url, headers=headers)
             if response.status_code != 200:
+                request.env['google.drive.sync'].sudo()._log_file(
+                    config, file_record, file_record.name, 'download', 
+                    state='fail', error_message=f"HTTP {response.status_code}: {response.text}"
+                )
                 return f"Error downloading from Google Drive: {response.text}"
+
+            # Log successful download
+            request.env['google.drive.sync'].sudo()._log_file(
+                config, file_record, file_record.name, 'download'
+            )
 
             headers = [
                 ('Content-Type', target_mime),
@@ -91,6 +100,10 @@ class GoogleDriveController(http.Controller):
             ]
             return request.make_response(response.content, headers=headers)
         except Exception as e:
+            request.env['google.drive.sync'].sudo()._log_file(
+                config, file_record, file_record.name, 'download',
+                state='fail', error_message=str(e)
+            )
             return f"Download error: {str(e)}"
     @http.route('/google_drive/download_zip', type='http', auth='user')
     def google_drive_download_zip(self, file_ids, **kw):
@@ -153,9 +166,15 @@ class GoogleDriveController(http.Controller):
             
             zip_buffer.seek(0)
             zip_filename = "google_drive_export.zip"
+            log_name = "Bulk Download (ZIP)"
             if len(ids) == 1:
-                zip_filename = f"{file_model.sudo().browse(ids[0]).name}.zip"
-                
+                rec = file_model.sudo().browse(ids[0])
+                zip_filename = f"{rec.name}.zip"
+                log_name = f"Download ZIP: {rec.name}"
+            
+            # Log successful ZIP download
+            sync_service._log(config, log_name, 'download')
+
             return request.make_response(
                 zip_buffer.getvalue(),
                 headers=[

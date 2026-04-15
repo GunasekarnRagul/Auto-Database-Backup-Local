@@ -49,8 +49,12 @@ class GoogleDriveSync(models.AbstractModel):
 
     def _log(self, config, file_name, operation, state='success',
              error_message=False, file_type='file', root_folder_name=False,
-             folder_path=False, google_file_id=False, file_size=0, duration=0):
-        """Create a sync log entry. Sync type is read from context."""
+             folder_path=False, google_file_id=False, file_size=0, duration=0,
+             **kwargs):
+        """Create a sync log entry. Captures real UID to persist through sudo."""
+        # Capture the UID of the current environment (the person who triggered this)
+        real_uid = self.env.uid
+        
         self.env['google.drive.sync.log'].log_operation(
             config=config,
             file_name=file_name,
@@ -64,6 +68,7 @@ class GoogleDriveSync(models.AbstractModel):
             google_file_id=google_file_id,
             file_size=file_size,
             duration=duration,
+            user_id=kwargs.get('user_id') or real_uid
         )
 
     def _log_file(self, config, file_record, file_name, operation, **kwargs):
@@ -287,6 +292,8 @@ class GoogleDriveSync(models.AbstractModel):
             if response.status_code == 200:
                 action = "Trashed" if trashed else "Restored from trash"
                 _logger.info("%s file %s on Drive", action, file_record.google_file_id)
+                # Archive the Odoo record if trashed, restore it if untrashed
+                file_record.sudo().write({'active': not trashed})
                 self._log_file(config, file_record, file_record.name, 'trash',
                                duration=elapsed)
                 return True
@@ -338,7 +345,7 @@ class GoogleDriveSync(models.AbstractModel):
                            error_message=str(e), duration=time.time() - t0)
             return False
 
-    def move_file(self, file_record, old_parent_id, new_parent_id):
+    def move_file(self, file_record, old_parent_id, new_parent_id, target_parent_id=None, target_root_id=None):
         """Move a file or folder on Google Drive."""
         if not file_record.google_file_id or not new_parent_id:
             return False
@@ -349,6 +356,37 @@ class GoogleDriveSync(models.AbstractModel):
             self._log_file(config, file_record, file_record.name, 'move', state='fail',
                            error_message='Could not obtain access token')
             return False
+
+        # Capture old path info before moving
+        old_root, old_path = self._get_file_info(file_record)
+        old_full_path = f"{config.name}"
+        if old_root:
+            old_full_path += f"/{old_root}"
+        if old_path:
+            old_full_path += f"/{old_path}"
+        old_full_path += f"/{file_record.name}"
+        
+        # Calculate new path info
+        new_full_path = f"{config.name}"
+        if target_parent_id:
+            parent_rec = self.env['google.drive.file'].sudo().browse(target_parent_id)
+            if parent_rec.exists():
+                p_root, p_path = self._get_file_info(parent_rec)
+                if p_root:
+                    new_full_path += f"/{p_root}"
+                if p_path:
+                    new_full_path += f"/{p_path}"
+                new_full_path += f"/{parent_rec.name}"
+        elif target_root_id:
+            root_rec = self.env['google.drive.root.folder'].sudo().browse(target_root_id)
+            if root_rec.exists():
+                new_full_path += f"/{root_rec.name}"
+        else:
+            new_full_path = "Unknown Location"
+            
+        new_full_path += f"/{file_record.name}"
+        
+        combined_transition = f"{old_full_path} ➜ MOVE TO ➜ {new_full_path}"
 
         headers = {"Authorization": f"Bearer {access_token}"}
         url = f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}"
@@ -367,30 +405,54 @@ class GoogleDriveSync(models.AbstractModel):
             elapsed = time.time() - t0
             if response.status_code == 200:
                 _logger.info("Successfully moved file %s on Drive", file_record.google_file_id)
-                self._log_file(config, file_record, file_record.name, 'move',
-                               duration=elapsed)
+                # Log using the combined transition as the filename, suppressing other fields for clarity
+                self.env['google.drive.sync.log'].log_operation(
+                    config=False, # Suppress related drive_name column
+                    file_name=combined_transition,
+                    operation='move',
+                    state='success',
+                    duration=elapsed,
+                    file_type=file_record.file_type or 'file'
+                )
                 return True
             else:
                 _logger.warning("Failed to move file on Drive: %s", response.text)
-                self._log_file(config, file_record, file_record.name, 'move', state='fail',
-                               error_message=f'HTTP {response.status_code}: {response.text}',
-                               duration=elapsed)
+                self.env['google.drive.sync.log'].log_operation(
+                    config=False,
+                    file_name=combined_transition,
+                    operation='move',
+                    state='fail',
+                    error_message=f'HTTP {response.status_code}: {response.text}',
+                    duration=elapsed,
+                    file_type=file_record.file_type or 'file'
+                )
                 return False
         except Exception as e:
             _logger.error("Error moving file on Drive: %s", str(e))
-            self._log_file(config, file_record, file_record.name, 'move', state='fail',
-                           error_message=str(e), duration=time.time() - t0)
+            self.env['google.drive.sync.log'].log_operation(
+                config=False,
+                file_name=combined_transition,
+                operation='move',
+                state='fail',
+                error_message=str(e),
+                duration=time.time() - t0,
+                file_type=file_record.file_type or 'file'
+            )
             return False
 
     # ─── Odoo → Drive: Create folder ───
 
-    def create_folder_in_drive(self, folder_name, config, parent_gdrive_id=None):
+    def create_folder_in_drive(self, folder_name, config, parent_gdrive_id=None, file_record=None):
         """Create a folder on Google Drive."""
         access_token = self._get_access_token(config)
         if not access_token:
-            self._log(config, folder_name, 'create_folder', state='fail',
-                      error_message='Could not obtain access token',
-                      file_type='folder')
+            if file_record:
+                self._log_file(config, file_record, folder_name, 'create_folder', state='fail',
+                               error_message='Could not obtain access token')
+            else:
+                self._log(config, folder_name, 'create_folder', state='fail',
+                          error_message='Could not obtain access token',
+                          file_type='folder')
             return False
 
         headers = {
@@ -412,19 +474,29 @@ class GoogleDriveSync(models.AbstractModel):
         elapsed = time.time() - t0
         if response.status_code == 200:
             data = response.json()
-            self._log(config, folder_name, 'create_folder',
-                      file_type='folder',
-                      google_file_id=data.get('id'),
-                      duration=elapsed)
+            if file_record:
+                self._log_file(config, file_record, folder_name, 'create_folder',
+                               google_file_id=data.get('id'),
+                               duration=elapsed)
+            else:
+                self._log(config, folder_name, 'create_folder',
+                          file_type='folder',
+                          google_file_id=data.get('id'),
+                          duration=elapsed)
             return {
                 'google_file_id': data.get('id'),
                 'google_url': data.get('webViewLink', ''),
             }
         _logger.warning("Failed to create folder: %s", response.text)
-        self._log(config, folder_name, 'create_folder', state='fail',
-                  error_message=f'HTTP {response.status_code}: {response.text}',
-                  file_type='folder',
-                  duration=elapsed)
+        if file_record:
+            self._log_file(config, file_record, folder_name, 'create_folder', state='fail',
+                           error_message=f'HTTP {response.status_code}: {response.text}',
+                           duration=elapsed)
+        else:
+            self._log(config, folder_name, 'create_folder', state='fail',
+                      error_message=f'HTTP {response.status_code}: {response.text}',
+                      file_type='folder',
+                      duration=elapsed)
         return False
 
     def upload_file_to_drive(self, file_name, file_content, mime_type, config, parent_gdrive_id=None):
@@ -660,10 +732,13 @@ class GoogleDriveSync(models.AbstractModel):
 
         is_starred = file_data.get('starred', False)
 
+        # Search for an existing record — use google_file_id + drive_config_id
+        # as the unique key. Do NOT include root_folder_id in the primary search
+        # because forward-sync and backward-sync may assign different root IDs,
+        # leading to duplicate records.
         explorer_record = self.env['google.drive.file'].sudo().search([
             ('google_file_id', '=', g_id),
             ('drive_config_id', '=', config.id),
-            ('root_folder_id', '=', root_folder_id),
         ], limit=1)
 
         vals = {

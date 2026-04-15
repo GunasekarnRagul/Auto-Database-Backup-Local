@@ -2240,7 +2240,8 @@ export class FileExplorer extends Component {
                         await this.orm.call(
                             "google.drive.file",
                             "action_sync_single_record",
-                            [[id]]
+                            [[id]],
+                            { context: { sync_type: 'auto' } }
                         );
 
                         if (this.state.activeDriveId === targetDriveId) {
