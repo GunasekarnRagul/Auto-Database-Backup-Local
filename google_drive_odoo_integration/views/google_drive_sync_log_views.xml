@@ -105,24 +105,4 @@
         </field>
     </record>
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!--  Window Action                                              -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <record id="action_google_drive_sync_log" model="ir.actions.act_window">
-        <field name="name">Sync Logs</field>
-        <field name="res_model">google.drive.sync.log</field>
-        <field name="view_mode">tree,form</field>
-        <field name="search_view_id" ref="view_google_drive_sync_log_search"/>
-        <field name="context">{'search_default_filter_today': 1}</field>
-        <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">
-                No sync logs yet
-            </p>
-            <p>
-                Sync logs will appear here automatically when files are synchronized
-                between Odoo and Google Drive — both manual and automatic syncs.
-            </p>
-        </field>
-    </record>
-
 </odoo>

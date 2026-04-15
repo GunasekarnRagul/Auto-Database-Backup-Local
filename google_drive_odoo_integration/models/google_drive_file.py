@@ -276,15 +276,19 @@ class GoogleDriveFile(models.Model):
         return result
 
     @api.model
-    def rename_on_drive_by_id(self, record_id, new_name):
+    def rename_on_drive_by_id(self, record_id, new_name, old_name=None):
         """Rename a file/folder on Google Drive. 
         Called asynchronously from JS after Odoo UI updates instantly.
         """
         record = self.browse(record_id)
         if not record.exists() or not record.google_file_id:
             return False
-            
-        success = self.env['google.drive.sync'].sudo().rename_file(record, new_name)
+
+        # Use old_name from JS (captured before the write), fall back to record.name
+        rename_old = old_name or record.name
+        success = self.env['google.drive.sync'].sudo().with_context(
+            rename_old_name=rename_old
+        ).rename_file(record, new_name)
         if success:
             super(GoogleDriveFile, record).write({
                 'sync_state': 'synced',

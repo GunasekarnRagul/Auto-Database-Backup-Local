@@ -28,6 +28,25 @@ class GoogleDriveSync(models.AbstractModel):
 
     # ─── Logging Helper ───
 
+    def _get_file_info(self, file_record):
+        """Extract root folder name and full folder path from a file record."""
+        root_name = ''
+        folder_path = ''
+        try:
+            if file_record.root_folder_id:
+                root_name = file_record.root_folder_id.name or ''
+            # Build folder path by walking the parent chain
+            parts = []
+            parent = file_record.parent_folder_id
+            while parent:
+                parts.append(parent.name or '')
+                parent = parent.parent_folder_id
+            if parts:
+                folder_path = ' / '.join(reversed(parts))
+        except Exception:
+            pass
+        return root_name, folder_path
+
     def _log(self, config, file_name, operation, state='success',
              error_message=False, file_type='file', root_folder_name=False,
              folder_path=False, google_file_id=False, file_size=0, duration=0):
@@ -46,6 +65,15 @@ class GoogleDriveSync(models.AbstractModel):
             file_size=file_size,
             duration=duration,
         )
+
+    def _log_file(self, config, file_record, file_name, operation, **kwargs):
+        """Log with auto-extracted path info from file_record."""
+        root_name, fpath = self._get_file_info(file_record)
+        kwargs.setdefault('file_type', file_record.file_type or 'file')
+        kwargs.setdefault('google_file_id', file_record.google_file_id or '')
+        kwargs.setdefault('root_folder_name', root_name)
+        kwargs.setdefault('folder_path', fpath)
+        self._log(config, file_name, operation, **kwargs)
 
     # ─── Authentication ───
 
@@ -195,13 +223,13 @@ class GoogleDriveSync(models.AbstractModel):
 
     def rename_file(self, file_record, new_name):
         """Rename a file or folder on Google Drive."""
+        # Get old name from context (set by the caller before record was updated)
+        old_name = self.env.context.get('rename_old_name') or file_record.name
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
-            self._log(config, file_record.name, 'rename', state='fail',
-                      error_message='Could not obtain access token',
-                      file_type=file_record.file_type,
-                      google_file_id=file_record.google_file_id)
+            self._log_file(config, file_record, f'{old_name} → {new_name}', 'rename',
+                           state='fail', error_message='Could not obtain access token')
             return False
 
         headers = {
@@ -217,26 +245,20 @@ class GoogleDriveSync(models.AbstractModel):
             elapsed = time.time() - t0
             if response.status_code == 200:
                 _logger.info("Successfully renamed file %s to %s on Drive", file_record.google_file_id, new_name)
-                self._log(config, f'{file_record.name} → {new_name}', 'rename',
-                          file_type=file_record.file_type,
-                          google_file_id=file_record.google_file_id,
-                          duration=elapsed)
+                self._log_file(config, file_record, f'{old_name} → {new_name}', 'rename',
+                               duration=elapsed)
                 return True
             else:
                 _logger.warning("Failed to rename file on Drive: %s", response.text)
-                self._log(config, file_record.name, 'rename', state='fail',
-                          error_message=f'HTTP {response.status_code}: {response.text}',
-                          file_type=file_record.file_type,
-                          google_file_id=file_record.google_file_id,
-                          duration=elapsed)
+                self._log_file(config, file_record, f'{old_name} → {new_name}', 'rename',
+                               state='fail', error_message=f'HTTP {response.status_code}: {response.text}',
+                               duration=elapsed)
                 return False
         except Exception as e:
             _logger.error("Error renaming file on Drive: %s", str(e))
-            self._log(config, file_record.name, 'rename', state='fail',
-                      error_message=str(e),
-                      file_type=file_record.file_type,
-                      google_file_id=file_record.google_file_id,
-                      duration=time.time() - t0)
+            self._log_file(config, file_record, f'{old_name} → {new_name}', 'rename',
+                           state='fail', error_message=str(e),
+                           duration=time.time() - t0)
             return False
 
     def trash_file(self, file_record, trashed=True):
@@ -247,10 +269,8 @@ class GoogleDriveSync(models.AbstractModel):
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
-            self._log(config, file_record.name, 'trash', state='fail',
-                      error_message='Could not obtain access token',
-                      file_type=file_record.file_type,
-                      google_file_id=file_record.google_file_id)
+            self._log_file(config, file_record, file_record.name, 'trash', state='fail',
+                           error_message='Could not obtain access token')
             return False
 
         headers = {
@@ -267,26 +287,19 @@ class GoogleDriveSync(models.AbstractModel):
             if response.status_code == 200:
                 action = "Trashed" if trashed else "Restored from trash"
                 _logger.info("%s file %s on Drive", action, file_record.google_file_id)
-                self._log(config, file_record.name, 'trash',
-                          file_type=file_record.file_type,
-                          google_file_id=file_record.google_file_id,
-                          duration=elapsed)
+                self._log_file(config, file_record, file_record.name, 'trash',
+                               duration=elapsed)
                 return True
             else:
                 _logger.warning("Failed to trash/untrash file on Drive: %s", response.text)
-                self._log(config, file_record.name, 'trash', state='fail',
-                          error_message=f'HTTP {response.status_code}: {response.text}',
-                          file_type=file_record.file_type,
-                          google_file_id=file_record.google_file_id,
-                          duration=elapsed)
+                self._log_file(config, file_record, file_record.name, 'trash', state='fail',
+                               error_message=f'HTTP {response.status_code}: {response.text}',
+                               duration=elapsed)
                 return False
         except Exception as e:
             _logger.error("Error trashing/untrashing file on Drive: %s", str(e))
-            self._log(config, file_record.name, 'trash', state='fail',
-                      error_message=str(e),
-                      file_type=file_record.file_type,
-                      google_file_id=file_record.google_file_id,
-                      duration=time.time() - t0)
+            self._log_file(config, file_record, file_record.name, 'trash', state='fail',
+                           error_message=str(e), duration=time.time() - t0)
             return False
 
     def delete_file_from_drive(self, file_record):
@@ -297,10 +310,8 @@ class GoogleDriveSync(models.AbstractModel):
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
-            self._log(config, file_record.name, 'delete', state='fail',
-                      error_message='Could not obtain access token',
-                      file_type=file_record.file_type,
-                      google_file_id=file_record.google_file_id)
+            self._log_file(config, file_record, file_record.name, 'delete', state='fail',
+                           error_message='Could not obtain access token')
             return False
 
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -312,26 +323,19 @@ class GoogleDriveSync(models.AbstractModel):
             elapsed = time.time() - t0
             if response.status_code in (200, 204, 404):
                 _logger.info("Permanently deleted file %s from Drive", file_record.google_file_id)
-                self._log(config, file_record.name, 'delete',
-                          file_type=file_record.file_type,
-                          google_file_id=file_record.google_file_id,
-                          duration=elapsed)
+                self._log_file(config, file_record, file_record.name, 'delete',
+                               duration=elapsed)
                 return True
             else:
                 _logger.warning("Failed to permanently delete file from Drive: %s", response.text)
-                self._log(config, file_record.name, 'delete', state='fail',
-                          error_message=f'HTTP {response.status_code}: {response.text}',
-                          file_type=file_record.file_type,
-                          google_file_id=file_record.google_file_id,
-                          duration=elapsed)
+                self._log_file(config, file_record, file_record.name, 'delete', state='fail',
+                               error_message=f'HTTP {response.status_code}: {response.text}',
+                               duration=elapsed)
                 return False
         except Exception as e:
             _logger.error("Error permanently deleting file from Drive: %s", str(e))
-            self._log(config, file_record.name, 'delete', state='fail',
-                      error_message=str(e),
-                      file_type=file_record.file_type,
-                      google_file_id=file_record.google_file_id,
-                      duration=time.time() - t0)
+            self._log_file(config, file_record, file_record.name, 'delete', state='fail',
+                           error_message=str(e), duration=time.time() - t0)
             return False
 
     def move_file(self, file_record, old_parent_id, new_parent_id):
@@ -342,10 +346,8 @@ class GoogleDriveSync(models.AbstractModel):
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
-            self._log(config, file_record.name, 'move', state='fail',
-                      error_message='Could not obtain access token',
-                      file_type=file_record.file_type,
-                      google_file_id=file_record.google_file_id)
+            self._log_file(config, file_record, file_record.name, 'move', state='fail',
+                           error_message='Could not obtain access token')
             return False
 
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -365,26 +367,19 @@ class GoogleDriveSync(models.AbstractModel):
             elapsed = time.time() - t0
             if response.status_code == 200:
                 _logger.info("Successfully moved file %s on Drive", file_record.google_file_id)
-                self._log(config, file_record.name, 'move',
-                          file_type=file_record.file_type,
-                          google_file_id=file_record.google_file_id,
-                          duration=elapsed)
+                self._log_file(config, file_record, file_record.name, 'move',
+                               duration=elapsed)
                 return True
             else:
                 _logger.warning("Failed to move file on Drive: %s", response.text)
-                self._log(config, file_record.name, 'move', state='fail',
-                          error_message=f'HTTP {response.status_code}: {response.text}',
-                          file_type=file_record.file_type,
-                          google_file_id=file_record.google_file_id,
-                          duration=elapsed)
+                self._log_file(config, file_record, file_record.name, 'move', state='fail',
+                               error_message=f'HTTP {response.status_code}: {response.text}',
+                               duration=elapsed)
                 return False
         except Exception as e:
             _logger.error("Error moving file on Drive: %s", str(e))
-            self._log(config, file_record.name, 'move', state='fail',
-                      error_message=str(e),
-                      file_type=file_record.file_type,
-                      google_file_id=file_record.google_file_id,
-                      duration=time.time() - t0)
+            self._log_file(config, file_record, file_record.name, 'move', state='fail',
+                           error_message=str(e), duration=time.time() - t0)
             return False
 
     # ─── Odoo → Drive: Create folder ───

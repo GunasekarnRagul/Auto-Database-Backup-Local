@@ -1789,7 +1789,8 @@ export class FileExplorer extends Component {
                 try {
                     await this.orm.call("google.drive.file", "rename_on_drive_by_id", [], {
                         record_id: fileId,
-                        new_name: newName
+                        new_name: newName,
+                        old_name: file.name,
                     });
                     this.loadFiles(this.state.currentFolderId); // Refresh to clear 'pending'
                     this.notificationService.add(`Renamed to "${newName}" on Google Drive`, { type: "success" });

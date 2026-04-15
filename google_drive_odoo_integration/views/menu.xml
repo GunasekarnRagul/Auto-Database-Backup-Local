@@ -18,5 +18,5 @@
     <menuitem id="google_drive_menu_config_attachments" name="Attachments" parent="google_drive_menu_configuration" action="action_attachment_sync_config" sequence="2"/>
 
     <!-- 3.3 Logs -->
-    <menuitem id="google_drive_menu_config_logs" name="Activity Log" parent="google_drive_menu_configuration" action="action_google_drive_sync_log" sequence="3"/>
+    <menuitem id="google_drive_menu_config_logs" name="Activity Log" parent="google_drive_menu_configuration" action="action_google_drive_sync_log_terminal" sequence="3"/>
 </odoo>
