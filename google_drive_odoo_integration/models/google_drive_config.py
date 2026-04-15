@@ -144,7 +144,7 @@ class GoogleDriveConfig(models.Model):
     def action_sync_all(self):
         self.ensure_one()
         for root in self.root_ids.filtered(lambda r: r.active):
-            self.env['google.drive.sync'].sudo()._sync_config_files(
+            self.env['google.drive.sync'].sudo().with_context(sync_type='manual')._sync_config_files(
                 self, root_folder_id=root.id, gdrive_parent_id=root.root_id
             )
         return True
@@ -184,13 +184,13 @@ class GoogleDriveConfig(models.Model):
         """
         # Step 1: Push any pending folders/files to Google Drive first
         # Scope push to drive if provided
-        self.env['google.drive.file'].sudo().sync_pending_to_drive(drive_config_id=drive_config_id)
+        self.env['google.drive.file'].sudo().with_context(sync_type='manual').sync_pending_to_drive(drive_config_id=drive_config_id)
 
         # Step 2: Pull from Drive (backward sync)
         if root_folder_id:
             root = self.env['google.drive.root.folder'].sudo().browse(root_folder_id)
             if root.exists() and root.active and root.config_id.active:
-                self.env['google.drive.sync'].sudo()._sync_config_files(
+                self.env['google.drive.sync'].sudo().with_context(sync_type='manual')._sync_config_files(
                     root.config_id, root_folder_id=root.id, gdrive_parent_id=root.root_id
                 )
             return True
@@ -203,7 +203,7 @@ class GoogleDriveConfig(models.Model):
         configs = self.search(domain)
         for config in configs:
             for root in config.root_ids.filtered(lambda r: r.active):
-                self.env['google.drive.sync'].sudo()._sync_config_files(
+                self.env['google.drive.sync'].sudo().with_context(sync_type='manual')._sync_config_files(
                     config, root_folder_id=root.id, gdrive_parent_id=root.root_id
                 )
         return True
@@ -226,7 +226,7 @@ class GoogleDriveConfig(models.Model):
         Returns:
             dict: {'success': int, 'error': int} — counts from sync_pending_to_drive.
         """
-        return self.env['google.drive.file'].sudo().sync_pending_to_drive(
+        return self.env['google.drive.file'].sudo().with_context(sync_type='auto').sync_pending_to_drive(
             drive_config_id=drive_config_id
         )
 

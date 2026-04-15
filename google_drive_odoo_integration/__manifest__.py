@@ -23,6 +23,7 @@
         'views/gdrive_model_config_views.xml',
         'views/ir_attachment_views.xml',
         'views/client_action_views.xml',
+        'views/google_drive_sync_log_views.xml',
         'views/menu.xml',
     ],
     'installable': True,

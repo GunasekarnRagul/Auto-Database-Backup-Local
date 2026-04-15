@@ -4,3 +4,4 @@ access_google_drive_file,google.drive.file,model_google_drive_file,base.group_sy
 access_google_drive_root_folder,google.drive.root.folder,model_google_drive_root_folder,base.group_system,1,1,1,1
 access_gdrive_model_config,gdrive.model.config,model_gdrive_model_config,base.group_system,1,1,1,1
 access_attachment_sync_config,attachment.sync.config,model_attachment_sync_config,base.group_system,1,1,1,1
+access_google_drive_sync_log,google.drive.sync.log,model_google_drive_sync_log,base.group_system,1,1,1,1

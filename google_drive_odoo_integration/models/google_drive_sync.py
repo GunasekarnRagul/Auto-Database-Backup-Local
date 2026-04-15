@@ -3,6 +3,7 @@ import base64
 import io
 import json
 import logging
+import time
 
 import requests as http_requests
 
@@ -24,6 +25,27 @@ except ImportError:
 class GoogleDriveSync(models.AbstractModel):
     _name = 'google.drive.sync'
     _description = 'Google Drive Synchronization Logic'
+
+    # ─── Logging Helper ───
+
+    def _log(self, config, file_name, operation, state='success',
+             error_message=False, file_type='file', root_folder_name=False,
+             folder_path=False, google_file_id=False, file_size=0, duration=0):
+        """Create a sync log entry. Sync type is read from context."""
+        self.env['google.drive.sync.log'].log_operation(
+            config=config,
+            file_name=file_name,
+            operation=operation,
+            state=state,
+            error_message=error_message,
+            sync_type=self.env.context.get('sync_type', 'manual'),
+            file_type=file_type,
+            root_folder_name=root_folder_name,
+            folder_path=folder_path,
+            google_file_id=google_file_id,
+            file_size=file_size,
+            duration=duration,
+        )
 
     # ─── Authentication ───
 
@@ -91,6 +113,7 @@ class GoogleDriveSync(models.AbstractModel):
             mimetype=attachment.mimetype,
             resumable=True,
         )
+        t0 = time.time()
         try:
             result = service.files().create(
                 body=file_metadata, media_body=media, fields='id',
@@ -98,13 +121,24 @@ class GoogleDriveSync(models.AbstractModel):
             file_id = result.get('id')
             if file_id:
                 self._register_uploaded_file(attachment, config, file_id)
+                self._log(config, attachment.name, 'upload',
+                          google_file_id=file_id,
+                          file_size=len(file_content),
+                          root_folder_name=first_root.name if first_root else False,
+                          duration=time.time() - t0)
         except Exception as e:
             _logger.error("Client upload failed for %s: %s", attachment.name, str(e))
+            self._log(config, attachment.name, 'upload', state='fail',
+                      error_message=str(e),
+                      root_folder_name=first_root.name if first_root else False,
+                      duration=time.time() - t0)
 
     def _upload_via_requests(self, attachment, config):
         """Upload using raw HTTP requests (fallback)."""
         access_token = self._get_access_token(config)
         if not access_token:
+            self._log(config, attachment.name, 'upload', state='fail',
+                      error_message='Could not obtain access token')
             return
 
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -121,14 +155,26 @@ class GoogleDriveSync(models.AbstractModel):
             'data': ('metadata', json.dumps(metadata), 'application/json; charset=UTF-8'),
             'file': (attachment.name, attachment.raw, attachment.mimetype)
         }
+        t0 = time.time()
         response = http_requests.post(
             "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",
             headers=headers, files=files,
         )
+        elapsed = time.time() - t0
         if response.status_code == 200:
             file_id = response.json().get('id')
             if file_id:
                 self._register_uploaded_file(attachment, config, file_id)
+                self._log(config, attachment.name, 'upload',
+                          google_file_id=file_id,
+                          file_size=len(attachment.raw) if attachment.raw else 0,
+                          root_folder_name=first_root.name if first_root else False,
+                          duration=elapsed)
+        else:
+            self._log(config, attachment.name, 'upload', state='fail',
+                      error_message=f'HTTP {response.status_code}: {response.text}',
+                      root_folder_name=first_root.name if first_root else False,
+                      duration=elapsed)
 
     def _register_uploaded_file(self, attachment, config, file_id):
         """Save the uploaded file info in both ir.attachment and google.drive.file."""
@@ -152,6 +198,10 @@ class GoogleDriveSync(models.AbstractModel):
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
+            self._log(config, file_record.name, 'rename', state='fail',
+                      error_message='Could not obtain access token',
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id)
             return False
 
         headers = {
@@ -161,16 +211,32 @@ class GoogleDriveSync(models.AbstractModel):
         data = {"name": new_name}
         url = f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}"
 
+        t0 = time.time()
         try:
             response = http_requests.patch(url, headers=headers, data=json.dumps(data))
+            elapsed = time.time() - t0
             if response.status_code == 200:
                 _logger.info("Successfully renamed file %s to %s on Drive", file_record.google_file_id, new_name)
+                self._log(config, f'{file_record.name} → {new_name}', 'rename',
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return True
             else:
                 _logger.warning("Failed to rename file on Drive: %s", response.text)
+                self._log(config, file_record.name, 'rename', state='fail',
+                          error_message=f'HTTP {response.status_code}: {response.text}',
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return False
         except Exception as e:
             _logger.error("Error renaming file on Drive: %s", str(e))
+            self._log(config, file_record.name, 'rename', state='fail',
+                      error_message=str(e),
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id,
+                      duration=time.time() - t0)
             return False
 
     def trash_file(self, file_record, trashed=True):
@@ -181,6 +247,10 @@ class GoogleDriveSync(models.AbstractModel):
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
+            self._log(config, file_record.name, 'trash', state='fail',
+                      error_message='Could not obtain access token',
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id)
             return False
 
         headers = {
@@ -190,17 +260,33 @@ class GoogleDriveSync(models.AbstractModel):
         url = f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}"
         data = {"trashed": trashed}
 
+        t0 = time.time()
         try:
             response = http_requests.patch(url, headers=headers, data=json.dumps(data))
+            elapsed = time.time() - t0
             if response.status_code == 200:
                 action = "Trashed" if trashed else "Restored from trash"
                 _logger.info("%s file %s on Drive", action, file_record.google_file_id)
+                self._log(config, file_record.name, 'trash',
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return True
             else:
                 _logger.warning("Failed to trash/untrash file on Drive: %s", response.text)
+                self._log(config, file_record.name, 'trash', state='fail',
+                          error_message=f'HTTP {response.status_code}: {response.text}',
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return False
         except Exception as e:
             _logger.error("Error trashing/untrashing file on Drive: %s", str(e))
+            self._log(config, file_record.name, 'trash', state='fail',
+                      error_message=str(e),
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id,
+                      duration=time.time() - t0)
             return False
 
     def delete_file_from_drive(self, file_record):
@@ -211,21 +297,41 @@ class GoogleDriveSync(models.AbstractModel):
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
+            self._log(config, file_record.name, 'delete', state='fail',
+                      error_message='Could not obtain access token',
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id)
             return False
 
         headers = {"Authorization": f"Bearer {access_token}"}
         url = f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}"
 
+        t0 = time.time()
         try:
             response = http_requests.delete(url, headers=headers)
+            elapsed = time.time() - t0
             if response.status_code in (200, 204, 404):
                 _logger.info("Permanently deleted file %s from Drive", file_record.google_file_id)
+                self._log(config, file_record.name, 'delete',
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return True
             else:
                 _logger.warning("Failed to permanently delete file from Drive: %s", response.text)
+                self._log(config, file_record.name, 'delete', state='fail',
+                          error_message=f'HTTP {response.status_code}: {response.text}',
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return False
         except Exception as e:
             _logger.error("Error permanently deleting file from Drive: %s", str(e))
+            self._log(config, file_record.name, 'delete', state='fail',
+                      error_message=str(e),
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id,
+                      duration=time.time() - t0)
             return False
 
     def move_file(self, file_record, old_parent_id, new_parent_id):
@@ -236,6 +342,10 @@ class GoogleDriveSync(models.AbstractModel):
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
+            self._log(config, file_record.name, 'move', state='fail',
+                      error_message='Could not obtain access token',
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id)
             return False
 
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -249,16 +359,32 @@ class GoogleDriveSync(models.AbstractModel):
         if old_parent_id:
             params['removeParents'] = old_parent_id
         
+        t0 = time.time()
         try:
             response = http_requests.patch(url, headers=headers, params=params)
+            elapsed = time.time() - t0
             if response.status_code == 200:
                 _logger.info("Successfully moved file %s on Drive", file_record.google_file_id)
+                self._log(config, file_record.name, 'move',
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return True
             else:
                 _logger.warning("Failed to move file on Drive: %s", response.text)
+                self._log(config, file_record.name, 'move', state='fail',
+                          error_message=f'HTTP {response.status_code}: {response.text}',
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return False
         except Exception as e:
             _logger.error("Error moving file on Drive: %s", str(e))
+            self._log(config, file_record.name, 'move', state='fail',
+                      error_message=str(e),
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id,
+                      duration=time.time() - t0)
             return False
 
     # ─── Odoo → Drive: Create folder ───
@@ -267,6 +393,9 @@ class GoogleDriveSync(models.AbstractModel):
         """Create a folder on Google Drive."""
         access_token = self._get_access_token(config)
         if not access_token:
+            self._log(config, folder_name, 'create_folder', state='fail',
+                      error_message='Could not obtain access token',
+                      file_type='folder')
             return False
 
         headers = {
@@ -280,17 +409,27 @@ class GoogleDriveSync(models.AbstractModel):
         if parent_gdrive_id:
             metadata["parents"] = [parent_gdrive_id]
 
+        t0 = time.time()
         response = http_requests.post(
             "https://www.googleapis.com/drive/v3/files?fields=id,webViewLink",
             headers=headers, data=json.dumps(metadata),
         )
+        elapsed = time.time() - t0
         if response.status_code == 200:
             data = response.json()
+            self._log(config, folder_name, 'create_folder',
+                      file_type='folder',
+                      google_file_id=data.get('id'),
+                      duration=elapsed)
             return {
                 'google_file_id': data.get('id'),
                 'google_url': data.get('webViewLink', ''),
             }
         _logger.warning("Failed to create folder: %s", response.text)
+        self._log(config, folder_name, 'create_folder', state='fail',
+                  error_message=f'HTTP {response.status_code}: {response.text}',
+                  file_type='folder',
+                  duration=elapsed)
         return False
 
     def upload_file_to_drive(self, file_name, file_content, mime_type, config, parent_gdrive_id=None):
@@ -549,10 +688,23 @@ class GoogleDriveSync(models.AbstractModel):
             'sync_state': 'synced',
         }
 
+        is_new = not explorer_record
         if explorer_record:
             explorer_record.write(vals)
         else:
             explorer_record = self.env['google.drive.file'].sudo().create(vals)
+
+        # Log the sync operation (only for new files to avoid flooding logs)
+        if is_new:
+            root_name = False
+            if root_folder_id:
+                root_rec = self.env['google.drive.root.folder'].sudo().browse(root_folder_id)
+                root_name = root_rec.name if root_rec.exists() else False
+            self._log(config, name, 'sync',
+                      file_type='folder' if is_folder else 'file',
+                      root_folder_name=root_name,
+                      google_file_id=g_id,
+                      file_size=size)
 
         # NOTE: File downloads during sync have been removed for performance.
         # Files are downloaded on-demand when explicitly accessed/viewed by the user.
@@ -644,6 +796,10 @@ class GoogleDriveSync(models.AbstractModel):
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
+            self._log(config, file_record.name, 'share_add', state='fail',
+                      error_message='Could not get access token',
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id)
             return {'error': 'Could not get access token'}
 
         headers = {
@@ -662,10 +818,17 @@ class GoogleDriveSync(models.AbstractModel):
             'emailAddress': email,
         }
 
+        t0 = time.time()
         try:
             response = http_requests.post(url, headers=headers, data=json.dumps(body), timeout=15)
+            elapsed = time.time() - t0
             if response.status_code == 200:
                 perm = response.json()
+                self._log(config, f'{file_record.name} → shared with {email} ({role})',
+                          'share_add',
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return {
                     'success': True,
                     'permission': {
@@ -681,9 +844,21 @@ class GoogleDriveSync(models.AbstractModel):
                 error_data = response.json() if response.content else {}
                 error_msg = error_data.get('error', {}).get('message', response.text)
                 _logger.warning("Failed to create permission: %s", error_msg)
+                self._log(config, f'{file_record.name} → share with {email}',
+                          'share_add', state='fail',
+                          error_message=error_msg,
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return {'error': error_msg}
         except Exception as e:
             _logger.error("Error creating permission: %s", str(e))
+            self._log(config, f'{file_record.name} → share with {email}',
+                      'share_add', state='fail',
+                      error_message=str(e),
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id,
+                      duration=time.time() - t0)
             return {'error': str(e)}
 
     def update_permission(self, file_record, permission_id, role):
@@ -694,6 +869,10 @@ class GoogleDriveSync(models.AbstractModel):
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
+            self._log(config, file_record.name, 'share_update', state='fail',
+                      error_message='Could not get access token',
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id)
             return {'error': 'Could not get access token'}
 
         headers = {
@@ -707,16 +886,37 @@ class GoogleDriveSync(models.AbstractModel):
         )
         body = {'role': role}
 
+        t0 = time.time()
         try:
             response = http_requests.patch(url, headers=headers, data=json.dumps(body), timeout=15)
+            elapsed = time.time() - t0
             if response.status_code == 200:
-                return {'success': True, 'permission': response.json()}
+                perm_data = response.json()
+                email = perm_data.get('emailAddress', '')
+                self._log(config, f'{file_record.name} → {email} role changed to {role}',
+                          'share_update',
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
+                return {'success': True, 'permission': perm_data}
             else:
                 error_data = response.json() if response.content else {}
                 error_msg = error_data.get('error', {}).get('message', response.text)
+                self._log(config, f'{file_record.name} → update role to {role}',
+                          'share_update', state='fail',
+                          error_message=error_msg,
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return {'error': error_msg}
         except Exception as e:
             _logger.error("Error updating permission: %s", str(e))
+            self._log(config, f'{file_record.name} → update role to {role}',
+                      'share_update', state='fail',
+                      error_message=str(e),
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id,
+                      duration=time.time() - t0)
             return {'error': str(e)}
 
     def delete_permission(self, file_record, permission_id):
@@ -727,6 +927,10 @@ class GoogleDriveSync(models.AbstractModel):
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
+            self._log(config, file_record.name, 'share_remove', state='fail',
+                      error_message='Could not get access token',
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id)
             return {'error': 'Could not get access token'}
 
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -735,16 +939,35 @@ class GoogleDriveSync(models.AbstractModel):
             f"/permissions/{permission_id}"
         )
 
+        t0 = time.time()
         try:
             response = http_requests.delete(url, headers=headers, timeout=15)
+            elapsed = time.time() - t0
             if response.status_code in (200, 204):
+                self._log(config, f'{file_record.name} → removed access (perm: {permission_id})',
+                          'share_remove',
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return {'success': True}
             else:
                 error_data = response.json() if response.content else {}
                 error_msg = error_data.get('error', {}).get('message', response.text)
+                self._log(config, f'{file_record.name} → remove access',
+                          'share_remove', state='fail',
+                          error_message=error_msg,
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return {'error': error_msg}
         except Exception as e:
             _logger.error("Error deleting permission: %s", str(e))
+            self._log(config, f'{file_record.name} → remove access',
+                      'share_remove', state='fail',
+                      error_message=str(e),
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id,
+                      duration=time.time() - t0)
             return {'error': str(e)}
 
     def set_general_access(self, file_record, access_type, role='reader'):
@@ -759,6 +982,10 @@ class GoogleDriveSync(models.AbstractModel):
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
+            self._log(config, file_record.name, 'share_general', state='fail',
+                      error_message='Could not get access token',
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id)
             return {'error': 'Could not get access token'}
 
         headers = {
@@ -776,13 +1003,20 @@ class GoogleDriveSync(models.AbstractModel):
                 'type': 'anyone',
                 'role': role,
             }
+            t0 = time.time()
             try:
                 response = http_requests.post(url, headers=headers, data=json.dumps(body), timeout=15)
+                elapsed = time.time() - t0
                 if response.status_code == 200:
                     perm = response.json()
                     link = f"https://drive.google.com/file/d/{file_record.google_file_id}/view?usp=sharing"
                     if file_record.file_type == 'folder':
                         link = f"https://drive.google.com/drive/folders/{file_record.google_file_id}?usp=sharing"
+                    self._log(config, f'{file_record.name} → general access: anyone ({role})',
+                              'share_general',
+                              file_type=file_record.file_type,
+                              google_file_id=file_record.google_file_id,
+                              duration=elapsed)
                     return {
                         'success': True,
                         'link': link,
@@ -791,8 +1025,20 @@ class GoogleDriveSync(models.AbstractModel):
                 else:
                     error_data = response.json() if response.content else {}
                     error_msg = error_data.get('error', {}).get('message', response.text)
+                    self._log(config, f'{file_record.name} → general access: anyone',
+                              'share_general', state='fail',
+                              error_message=error_msg,
+                              file_type=file_record.file_type,
+                              google_file_id=file_record.google_file_id,
+                              duration=elapsed)
                     return {'error': error_msg}
             except Exception as e:
+                self._log(config, f'{file_record.name} → general access: anyone',
+                          'share_general', state='fail',
+                          error_message=str(e),
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=time.time() - t0)
                 return {'error': str(e)}
 
         elif access_type == 'restricted':
@@ -801,9 +1047,16 @@ class GoogleDriveSync(models.AbstractModel):
                 f"https://www.googleapis.com/drive/v3/files/{file_record.google_file_id}"
                 f"?fields=permissions(id,type)"
             )
+            t0 = time.time()
             try:
                 get_resp = http_requests.get(get_url, headers=headers, timeout=15)
                 if get_resp.status_code != 200:
+                    self._log(config, f'{file_record.name} → general access: restricted',
+                              'share_general', state='fail',
+                              error_message='Could not fetch permissions',
+                              file_type=file_record.file_type,
+                              google_file_id=file_record.google_file_id,
+                              duration=time.time() - t0)
                     return {'error': 'Could not fetch permissions'}
 
                 permissions = get_resp.json().get('permissions', [])
@@ -816,8 +1069,19 @@ class GoogleDriveSync(models.AbstractModel):
                     )
                     http_requests.delete(del_url, headers=headers, timeout=15)
 
+                self._log(config, f'{file_record.name} → general access: restricted',
+                          'share_general',
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=time.time() - t0)
                 return {'success': True}
             except Exception as e:
+                self._log(config, f'{file_record.name} → general access: restricted',
+                          'share_general', state='fail',
+                          error_message=str(e),
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=time.time() - t0)
                 return {'error': str(e)}
 
         return {'error': 'Invalid access type'}
@@ -834,6 +1098,10 @@ class GoogleDriveSync(models.AbstractModel):
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
+            self._log(config, file_record.name, 'share_settings', state='fail',
+                      error_message='Could not get access token',
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id)
             return {'error': 'Could not get access token'}
 
         headers = {
@@ -851,14 +1119,41 @@ class GoogleDriveSync(models.AbstractModel):
         if not body:
             return {'success': True}
 
+        # Build description of what changed
+        changes = []
+        if writers_can_share is not None:
+            changes.append(f"editors can share: {'yes' if writers_can_share else 'no'}")
+        if copy_requires_writer is not None:
+            changes.append(f"restrict download: {'yes' if copy_requires_writer else 'no'}")
+        change_desc = ', '.join(changes)
+
+        t0 = time.time()
         try:
             response = http_requests.patch(url, headers=headers, data=json.dumps(body), timeout=15)
+            elapsed = time.time() - t0
             if response.status_code == 200:
+                self._log(config, f'{file_record.name} → {change_desc}',
+                          'share_settings',
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return {'success': True}
             else:
                 error_data = response.json() if response.content else {}
                 error_msg = error_data.get('error', {}).get('message', response.text)
+                self._log(config, f'{file_record.name} → {change_desc}',
+                          'share_settings', state='fail',
+                          error_message=error_msg,
+                          file_type=file_record.file_type,
+                          google_file_id=file_record.google_file_id,
+                          duration=elapsed)
                 return {'error': error_msg}
         except Exception as e:
             _logger.error("Error updating sharing settings: %s", str(e))
+            self._log(config, f'{file_record.name} → {change_desc}',
+                      'share_settings', state='fail',
+                      error_message=str(e),
+                      file_type=file_record.file_type,
+                      google_file_id=file_record.google_file_id,
+                      duration=time.time() - t0)
             return {'error': str(e)}

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import time
 from odoo import models, fields, api
 import base64
 
@@ -388,15 +389,25 @@ class GoogleDriveFile(models.Model):
     def _sync_single_record(self, record):
         """Internal helper to sync one record. Logic extracted from sync_pending_to_drive."""
         sync = self.env['google.drive.sync'].sudo()
+        log_model = self.env['google.drive.sync.log']
+        sync_type = self.env.context.get('sync_type', 'manual')
         
+        # Resolve root folder name for logging
+        root_name = False
+        if record.root_folder_id:
+            root_rec = self.env['google.drive.root.folder'].sudo().browse(record.root_folder_id.id)
+            root_name = root_rec.name if root_rec.exists() else False
+
         # 1. New Folder
         if record.file_type == 'folder' and not record.google_file_id:
             parent_gdrive_id = record._resolve_parent_gdrive_id(
                 record.parent_folder_id.id if record.parent_folder_id else False,
                 record.root_folder_id.id if record.root_folder_id else False,
             )
+            t0 = time.time()
             try:
-                result = sync.create_folder_in_drive(record.name, record.drive_config_id, parent_gdrive_id=parent_gdrive_id)
+                result = sync.with_context(sync_type=sync_type).create_folder_in_drive(
+                    record.name, record.drive_config_id, parent_gdrive_id=parent_gdrive_id)
                 if result:
                     record.write({
                         'google_file_id': result['google_file_id'],
@@ -407,8 +418,19 @@ class GoogleDriveFile(models.Model):
                     return True
                 else:
                     record.write({'sync_state': 'error'})
-            except Exception:
+            except Exception as e:
                 record.write({'sync_state': 'error'})
+                log_model.log_operation(
+                    config=record.drive_config_id,
+                    file_name=record.name,
+                    operation='create_folder',
+                    state='fail',
+                    error_message=str(e),
+                    sync_type=sync_type,
+                    file_type='folder',
+                    root_folder_name=root_name,
+                    duration=time.time() - t0,
+                )
             return False
 
         # 2. New File
@@ -429,8 +451,19 @@ class GoogleDriveFile(models.Model):
                 ], limit=1)
 
             if not attachment or not attachment.raw:
+                log_model.log_operation(
+                    config=record.drive_config_id,
+                    file_name=record.name,
+                    operation='upload',
+                    state='fail',
+                    error_message='No attachment data found for upload',
+                    sync_type=sync_type,
+                    file_type='file',
+                    root_folder_name=root_name,
+                )
                 return False
 
+            t0 = time.time()
             try:
                 # Set uploading state and initial progress
                 record.write({
@@ -438,7 +471,7 @@ class GoogleDriveFile(models.Model):
                     'upload_progress': 0.0
                 })
 
-                result = sync.upload_file_to_drive(
+                result = sync.with_context(sync_type=sync_type).upload_file_to_drive(
                     record.name, attachment.raw,
                     record.mime_type or 'application/octet-stream',
                     record.drive_config_id, parent_gdrive_id=parent_gdrive_id
@@ -455,11 +488,45 @@ class GoogleDriveFile(models.Model):
                     attachment.with_context(skip_gdrive_sync=True).write({
                         'google_file_id': result['google_file_id'],
                     })
+                    log_model.log_operation(
+                        config=record.drive_config_id,
+                        file_name=record.name,
+                        operation='upload',
+                        state='success',
+                        sync_type=sync_type,
+                        file_type='file',
+                        root_folder_name=root_name,
+                        google_file_id=result['google_file_id'],
+                        file_size=len(attachment.raw) if attachment.raw else 0,
+                        duration=time.time() - t0,
+                    )
                     return True
                 else:
                     record.write({'sync_state': 'error', 'upload_progress': 0.0})
-            except Exception:
+                    log_model.log_operation(
+                        config=record.drive_config_id,
+                        file_name=record.name,
+                        operation='upload',
+                        state='fail',
+                        error_message='Upload returned no result',
+                        sync_type=sync_type,
+                        file_type='file',
+                        root_folder_name=root_name,
+                        duration=time.time() - t0,
+                    )
+            except Exception as e:
                 record.write({'sync_state': 'error', 'upload_progress': 0.0})
+                log_model.log_operation(
+                    config=record.drive_config_id,
+                    file_name=record.name,
+                    operation='upload',
+                    state='fail',
+                    error_message=str(e),
+                    sync_type=sync_type,
+                    file_type='file',
+                    root_folder_name=root_name,
+                    duration=time.time() - t0,
+                )
             return False
 
         # 3. Rename / Existing
