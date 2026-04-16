@@ -7,7 +7,9 @@
         <field name="arch" type="xml">
             <kanban class="o_cloud_kanban" sample="1" quick_create="false" default_group_by=''>
                 <field name="name"/>
+                <field name="module_config_id"/>
                 <field name="model_name"/>
+                <field name="storage_mode"/>
                 <field name="google_drive_id"/>
                 <field name="auto_sync_mode"/>
                 <field name="sync_count"/>
@@ -51,7 +53,10 @@
                             <!-- Configuration details tag -->
                             <div style="padding: 6px 16px 0 20px;">
                                 <span class="o_cloud_drive_tag" style="white-space: nowrap;">
-                                    <i class="fa fa-cube me-1"/><field name="model_name"/>
+                                    <i class="fa fa-cube me-1"/><field name="module_config_id"/>
+                                </span>
+                                <span class="o_cloud_drive_tag ms-1" style="white-space: nowrap; color: #6c757d; border-color: #dee2e6;">
+                                    <i class="fa fa-database me-1"/><field name="storage_mode"/>
                                 </span>
                             </div>
 
@@ -93,7 +98,8 @@
         <field name="arch" type="xml">
             <tree>
                 <field name="name"/>
-                <field name="model_name"/>
+                <field name="module_config_id" string="Module"/>
+                <field name="model_name" string="Internal Model" groups="base.group_no_one"/>
                 <field name="google_drive_id"/>
                 <field name="auto_sync_mode" string="Type"/>
                 <field name="sync_count"/>
@@ -144,11 +150,13 @@
                         </div>
                     </group>
 
-                    <!-- Step 1: Model Selection -->
-                    <group name="step1" string="Step 1: Select Model" col="2">
-                        <field name="model_name" widget="selection" required="1" placeholder="Select model..." />
+                    <!-- Step 1: Module/Model Selection -->
+                    <group name="step1" string="Step 1: Select Module" col="2">
+                        <field name="existing_module_ids" widget="many2many_tags" invisible="1"/>
+                        <field name="module_config_id" options="{'no_create': True, 'no_open': True}" placeholder="Select module..." />
+                        <field name="model_name" string="Technical Model" readonly="1" force_save="1" invisible="not module_config_id" />
                         <div colspan="2" class="alert alert-info py-2" role="alert">
-                             <i class="fa fa-info-circle me-1"/> Choose which Odoo model contains the attachments you want to sync
+                             <i class="fa fa-info-circle me-1"/> Choose the Odoo module for which you want to sync attachments.
                         </div>
                         <!-- Enhanced real-time counter -->
                         <div colspan="2" class="d-flex justify-content-between align-items-center mt-1 mb-3 px-3 py-2 rounded" style="background-color: #f1f7ff; border: 1px solid #d1e3ff; color: #004085;" invisible="not model_name">
@@ -180,7 +188,17 @@
                         </div>
                     </group>
 
-                    <!-- Sync Options -->
+                    <!-- Step 4: Storage Mode -->
+                    <group name="step4" string="Step 4: Select Storage Mode" col="2">
+                        <field name="storage_mode" widget="radio" options="{'horizontal': true}"/>
+                        <div colspan="2" class="alert alert-info" role="alert">
+                            <i class="fa fa-database me-2"/> 
+                            <strong>Drive only:</strong> Files stored only on Google Drive. 
+                            <strong>Dual:</strong> Both Odoo and Drive. 
+                            <strong>Odoo only:</strong> Local storage only.
+                        </div>
+                    </group>
+
                     <group name="sync_options" string="Sync Options" col="2">
                         <field name="auto_sync_mode" widget="boolean_toggle" options="{'terminology': 'on_off'}"/>
                         <div colspan="2" class="alert alert-secondary">

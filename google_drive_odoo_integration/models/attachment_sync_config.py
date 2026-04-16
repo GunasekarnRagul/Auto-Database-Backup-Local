@@ -10,18 +10,13 @@ class AttachmentSyncConfig(models.Model):
     # Configuration Name
     name = fields.Char('Configuration Name', required=True)
 
-    # Step 1: Model Selection
-    model_name = fields.Selection([
-        ('crm.lead', 'CRM - Leads'),
-        ('sale.order', 'Sales - Orders'),
-        ('account.move', 'Accounting - Invoices'),
-        ('purchase.order', 'Purchase - Orders'),
-        ('hr.employee', 'HR - Employees'),
-        ('project.task', 'Project - Tasks'),
-        ('stock.picking', 'Inventory - Transfers'),
-        ('documents.document', 'Documents - Managed Files'),
-        ('helpdesk.ticket', 'Helpdesk - Tickets'),
-    ], string='Model', required=True)
+    # Step 1: Module/Model Selection
+    module_config_id = fields.Many2one('gdrive.model.config', string='Module', required=True,
+        domain="[('id', 'not in', existing_module_ids)]",
+        help="Select the module for which you want to configure attachment synchronization.")
+    
+    model_name = fields.Selection(selection='_get_model_selection', string='Model', 
+        compute='_compute_model_name', store=True, readonly=False, required=True, index=True)
 
     # Step 2: Driver Selection
     google_drive_id = fields.Many2one('google.drive.config', string='Google Drive', required=True)
@@ -46,6 +41,14 @@ class AttachmentSyncConfig(models.Model):
     auto_sync_mode = fields.Boolean('Auto Sync Mode', default=False,
         help='Turn on to configure auto-sync; turn off to sync manually.')
 
+    # Storage Mode
+    storage_mode = fields.Selection([
+        ('drive', 'Drive only'),
+        ('dual', 'Dual (Drive + Odoo)'),
+        ('odoo', 'Odoo only'),
+    ], string='Storage Mode', default='dual', required=True,
+    help='Choose where the attachments should be stored.')
+
     # Configuration metadata
     last_synced = fields.Char('Last Synced', default='Never')
     sync_count = fields.Integer('Files Synced', default=0, readonly=True)
@@ -54,6 +57,49 @@ class AttachmentSyncConfig(models.Model):
         ('active', 'Active'),
         ('paused', 'Paused'),
     ], string='State', default='draft')
+
+    @api.model
+    def _get_model_selection(self):
+        """Dynamic selection of models from gdrive.model.config."""
+        configs = self.env['gdrive.model.config'].sudo().search([])
+        return [(c.res_model, c.model_label) for c in configs]
+
+    # Computed field to filter available modules in the UI
+    existing_module_ids = fields.Many2many('gdrive.model.config', 
+        compute='_compute_existing_module_ids', 
+        string="Existing Modules")
+
+    _sql_constraints = [
+        ('model_name_unique', 'unique(model_name)', 'This module is already configured. You cannot create multiple configurations for the same module.')
+    ]
+
+    @api.depends('module_config_id')
+    def _compute_model_name(self):
+        """Automatically set the technical model name from the module configuration."""
+        for record in self:
+            if record.module_config_id:
+                record.model_name = record.module_config_id.res_model
+            else:
+                record.model_name = False
+
+    def _compute_existing_module_ids(self):
+        """Get list of module configurations already used."""
+        all_configs = self.search([])
+        configured_module_ids = all_configs.mapped('module_config_id').ids
+        for record in self:
+            # When editing, don't hide the current module from its own record
+            if record.id and record.module_config_id:
+                record.existing_module_ids = [(6, 0, [mid for mid in configured_module_ids if mid != record.module_config_id.id])]
+            else:
+                record.existing_module_ids = [(6, 0, configured_module_ids)]
+
+    @api.onchange('module_config_id')
+    def _onchange_module_config_id(self):
+        """Auto-fill model name and default configuration title when module is selected."""
+        if self.module_config_id:
+            self.model_name = self.module_config_id.res_model
+            if not self.name or self.name == 'New Configuration':
+                self.name = f"{self.module_config_id.model_label} Sync"
 
     # Computed field for folder path display
     folder_path = fields.Char('Folder Path', compute='_compute_folder_path')

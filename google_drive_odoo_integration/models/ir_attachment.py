@@ -7,17 +7,7 @@ class IrAttachment(models.Model):
     google_file_id = fields.Char('Google File ID', index=True)
     google_drive_id = fields.Many2one('google.drive.config', string='Drive')
     google_folder_id = fields.Many2one('google.drive.file', string='Folder', domain="[('file_type', '=', 'folder')]" )
-    model_name = fields.Selection([
-        ('crm.lead', 'CRM - Leads'),
-        ('sale.order', 'Sales - Orders'),
-        ('account.move', 'Accounting - Invoices'),
-        ('purchase.order', 'Purchase - Orders'),
-        ('hr.employee', 'HR - Employees'),
-        ('project.task', 'Project - Tasks'),
-        ('stock.picking', 'Inventory - Pickings'),
-        ('documents.document', 'Documents - Managed Files'),
-        ('google.drive.file', 'Google Drive - Files'),
-    ], string='Model')
+    model_name = fields.Selection(selection='_get_model_selection', string='Model Name', index=True, help="Technical name of the Odoo model")
     model_display = fields.Char('Model', compute='_compute_model_display', store=True)
     sync_type = fields.Selection([
         ('internal', 'Internal'),
@@ -41,23 +31,25 @@ class IrAttachment(models.Model):
             else:
                 attachment.google_drive_id = False
 
+    @api.model
+    def _get_model_selection(self):
+        """Dynamic selection of models from gdrive.model.config."""
+        configs = self.env['gdrive.model.config'].sudo().search([])
+        return [(c.res_model, c.model_label) for c in configs]
+
     @api.depends('model_name', 'res_model')
     def _compute_model_display(self):
-        """Get friendly display name for the selected model."""
-        model_mapping = {
-            'crm.lead': 'CRM - Leads',
-            'sale.order': 'Sales - Orders',
-            'account.move': 'Accounting - Invoices',
-            'purchase.order': 'Purchase - Orders',
-            'hr.employee': 'HR - Employees',
-            'project.task': 'Project - Tasks',
-            'stock.picking': 'Inventory - Pickings',
-            'documents.document': 'Documents - Managed Files',
-            'google.drive.file': 'Google Drive - Files',
-        }
+        """Get friendly display name for the model using gdrive.model.config."""
         for attachment in self:
-            key = attachment.model_name or attachment.res_model
-            attachment.model_display = model_mapping.get(key, key)
+            res_model = attachment.model_name or attachment.res_model
+            if not res_model:
+                attachment.model_display = False
+                continue
+            
+            config = self.env['gdrive.model.config'].sudo().search([
+                ('res_model', '=', res_model)
+            ], limit=1)
+            attachment.model_display = config.model_label if config else res_model
 
     @api.depends('google_drive_id', 'google_folder_id')
     def _compute_google_folder_path(self):
