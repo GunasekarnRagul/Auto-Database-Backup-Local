@@ -15,8 +15,7 @@ class AttachmentSyncConfig(models.Model):
         domain="[('id', 'not in', existing_module_ids)]",
         help="Select the module for which you want to configure attachment synchronization.")
     
-    model_name = fields.Selection(selection='_get_model_selection', string='Model', 
-        compute='_compute_model_name', store=True, readonly=False, required=True, index=True)
+    model_name = fields.Char('Model', compute='_compute_model_name', store=True, readonly=True, index=True)
 
     # Step 2: Driver Selection
     google_drive_id = fields.Many2one('google.drive.config', string='Google Drive', required=True, ondelete='cascade')
@@ -162,11 +161,12 @@ class AttachmentSyncConfig(models.Model):
 
     @api.depends('model_name')
     def _compute_model_attachment_count(self):
-        """Count total attachments in Odoo for the selected model."""
+        """Count total attachments in Odoo for the selected model. 
+        Uses ilike to be robust against padding/collation issues."""
         for record in self:
             if record.model_name:
                 record.model_attachment_count = self.env['ir.attachment'].sudo().search_count([
-                    ('res_model', '=', record.model_name)
+                    ('res_model', 'ilike', record.model_name.strip())
                 ])
             else:
                 record.model_attachment_count = 0
@@ -177,7 +177,8 @@ class AttachmentSyncConfig(models.Model):
         Attachment = self.env['ir.attachment'].sudo()
         for record in self:
             if record.model_name:
-                base_domain = [('res_model', '=', record.model_name)]
+                m_name = record.model_name.strip()
+                base_domain = [('res_model', 'ilike', m_name)]
                 
                 synced_count = Attachment.search_count(base_domain + [('google_file_id', '!=', False)])
                 unsynced_count = Attachment.search_count(base_domain + [('google_file_id', '=', False)])
@@ -214,7 +215,7 @@ class AttachmentSyncConfig(models.Model):
             'res_model': 'ir.attachment',
             'view_mode': 'tree,form',
             'domain': [
-                ('res_model', '=', self.model_name),
+                ('res_model', 'ilike', self.model_name.strip()),
                 ('google_file_id', '!=', False),
             ],
             'context': {'create': False},
@@ -230,7 +231,7 @@ class AttachmentSyncConfig(models.Model):
             'res_model': 'ir.attachment',
             'view_mode': 'tree,form',
             'domain': [
-                ('res_model', '=', self.model_name),
+                ('res_model', 'ilike', self.model_name.strip()),
                 ('google_file_id', '=', False),
             ],
             'context': {'create': False},
@@ -246,26 +247,26 @@ class AttachmentSyncConfig(models.Model):
             'res_model': 'ir.attachment',
             'view_mode': 'tree,form',
             'domain': [
-                ('res_model', '=', self.model_name),
+                ('res_model', 'ilike', self.model_name.strip()),
                 ('google_file_id', '!=', False),
-                ('type', '!=', 'url'),
+                ('type', '!=', 'url')
             ],
             'context': {'create': False},
             'target': 'current',
         }
 
     def action_view_drive_only_files(self):
-        """Open list of drive only attachments for this model."""
+        """Open list of drive-only attachments for this model."""
         self.ensure_one()
         return {
-            'name': f'Drive Only Files (External URL) — {self.name}',
+            'name': f'Drive-Only Files (Cloud Links) — {self.name}',
             'type': 'ir.actions.act_window',
             'res_model': 'ir.attachment',
             'view_mode': 'tree,form',
             'domain': [
-                ('res_model', '=', self.model_name),
+                ('res_model', 'ilike', self.model_name.strip()),
                 ('google_file_id', '!=', False),
-                ('type', '=', 'url'),
+                ('type', '=', 'url')
             ],
             'context': {'create': False},
             'target': 'current',
@@ -316,7 +317,7 @@ class AttachmentSyncConfig(models.Model):
         self.ensure_one()
         
         # 1. First check: Select Storage Mode validation
-        if not self.storage_mode or self.storage_mode == 'odoo':
+        if not self.storage_mode:
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
@@ -330,7 +331,7 @@ class AttachmentSyncConfig(models.Model):
 
         # 2. Search for all attachments for this model that haven't been synced yet
         domain = [
-            ('res_model', '=', self.model_name),
+            ('res_model', 'ilike', self.model_name.strip()),
             ('google_file_id', '=', False),
         ]
         

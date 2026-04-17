@@ -274,22 +274,31 @@ class IrAttachment(models.Model):
                     root_res['google_file_id'], root_res.get('google_url')
                 )
                 
-                # 2. Find or create Record Folder (e.g. order_idS00009)
-                record_res = sync_service.find_or_create_folder(record_folder, root_res['google_file_id'], config.google_drive_id)
-                if record_res:
-                    current_local_parent_id = get_or_create_local_folder(
-                        record_folder, current_local_parent_id, config.google_drive_id.id, 
-                        record_res['google_file_id'], record_res.get('google_url')
-                    )
-                    
-                    # 3. Find or create Category Subfolder (e.g. quotations)
-                    sub_res = sync_service.find_or_create_folder(model_sub, record_res['google_file_id'], config.google_drive_id)
-                    if sub_res:
+                # 2. Find or create Record Hierarchy (Recursive/Loop)
+                # record_folder can now be a list of paths for deep nested structures
+                path_parts = record_folder if isinstance(record_folder, list) else [record_folder]
+                
+                for part in path_parts:
+                    if not part: continue
+                    record_res = sync_service.find_or_create_folder(part, root_res['google_file_id'], config.google_drive_id)
+                    if record_res:
                         current_local_parent_id = get_or_create_local_folder(
-                            model_sub, current_local_parent_id, config.google_drive_id.id, 
-                            sub_res['google_file_id'], sub_res.get('google_url')
+                            part, current_local_parent_id, config.google_drive_id.id, 
+                            record_res['google_file_id'], record_res.get('google_url')
                         )
-                        parent_id = sub_res['google_file_id']
+                        # Update root_res for next iteration
+                        root_res = record_res
+                    else:
+                        break # Stop if folder creation fails
+                
+                # 3. Find or create Category Subfolder (e.g. invoices)
+                sub_res = sync_service.find_or_create_folder(model_sub, root_res['google_file_id'], config.google_drive_id)
+                if sub_res:
+                    current_local_parent_id = get_or_create_local_folder(
+                        model_sub, current_local_parent_id, config.google_drive_id.id, 
+                        sub_res['google_file_id'], sub_res.get('google_url')
+                    )
+                    parent_id = sub_res['google_file_id']
 
         # Attempt Upload
         try:
@@ -343,7 +352,9 @@ class IrAttachment(models.Model):
                 
                 # Detailed success logging for both auto and manual syncs
                 current_sync_type = self.env.context.get('sync_type', 'auto')
-                full_drive_path = f"{model_root}/{record_folder}/{model_sub}"
+                record_path_str = "/".join(record_folder) if isinstance(record_folder, list) else str(record_folder)
+                full_drive_path = f"{str(model_root)}/{record_path_str}/{str(model_sub)}"
+                
                 if config.storage_mode == 'drive':
                     details = f"Storage Mode: Drive Only\nSaved to Drive folder path: {full_drive_path}\nDrive URL: {result['google_url']}"
                 else:
@@ -389,97 +400,122 @@ class IrAttachment(models.Model):
 
     @api.model
     def _get_sync_subfolder_name(self, model, res_id, mimetype, name, is_email):
-        """Determine the 3-level folder structure based on model and attachment attributes.
-        Returns: (root_name, record_name, category_name)
+        """Determine the hierarchical folder structure.
+        Returns: (root_name, record_path_list, category_name)
         """
         MAP = {
-            'crm.lead':            { 'root': 'CRM',        'prefix': 'lead_id',     'sub': ['documents', 'images', 'Email_attachments'] },
-            'sale.order':          { 'root': 'Sales',      'prefix': 'order_id',    'sub': ['quotations', 'customer_files', 'Email_attachments'] },
-            'account.move':        { 'root': 'Accounting', 'prefix': 'move_id',     'sub': ['invoices', 'vendor_bills', 'tax_docs'] },
-            'purchase.order':      { 'root': 'Purchase',   'prefix': 'order_id',    'sub': ['vendor_docs', 'rfq', 'contracts'] },
-            'hr.employee':         { 'root': 'HR',         'prefix': 'employee_id', 'sub': ['certificates', 'id_docs', 'contracts'] },
-            'project.task':        { 'root': 'Project',    'prefix': 'task_id',     'sub': ['task_files', 'references', 'deliverables'] },
-            'stock.picking':       { 'root': 'Inventory',  'prefix': 'picking_id',  'sub': ['delivery_notes', 'packing_lists', 'customs_docs'] },
-            'helpdesk.ticket':     { 'root': 'Helpdesk',   'prefix': 'ticket_id',   'sub': ['screenshots', 'customer_files', 'resolution_docs'] },
+            'crm.lead':             { 'root': 'CRM',        'prefix': 'lead_id',     'sub': ['documents', 'images', 'Email_attachments'] },
+            'sale.order':           { 'root': 'Sales',      'prefix': 'order_id',    'sub': ['quotations', 'customer_files', 'Email_attachments'] },
+            'account.move':         { 'root': 'Accounting', 'prefix': 'move_id',     'sub': ['invoices', 'vendor_bills', 'tax_docs'] },
+            'account.move.send':    { 'root': 'Accounting', 'prefix': 'move_id',     'sub': ['invoices', 'vendor_bills', 'tax_docs'] },
+            'purchase.order':       { 'root': 'Purchase',   'prefix': 'order_id',    'sub': ['vendor_docs', 'rfq', 'contracts'] },
+            'hr.employee':          { 'root': 'HR',         'prefix': 'employee_id', 'sub': ['certificates', 'id_docs', 'contracts'] },
+            'project.task':         { 'root': 'Project',    'prefix': 'task_id',     'sub': ['task_files', 'references', 'deliverables'] },
+            'stock.picking':        { 'root': 'Inventory',  'prefix': 'picking_id',  'sub': ['delivery_notes', 'packing_lists', 'customs_docs'] },
+            'helpdesk.ticket':      { 'root': 'Helpdesk',   'prefix': 'ticket_id',   'sub': ['screenshots', 'customer_files', 'resolution_docs'] },
         }
 
         if model not in MAP:
-            return False, False, False
+            return "General", [model.replace('.', '_')], "others"
 
         root_name = MAP[model]['root']
         subs = MAP[model]['sub']
+        record_path = []
         
+        record = False
         if res_id:
             try:
                 record = self.env[model].sudo().browse(res_id)
-                display_name = record.display_name if record.exists() else str(res_id)
+                
+                # Special handling for Invoice Sending wizard
+                if model == 'account.move.send' and record.exists() and hasattr(record, 'move_ids') and record.move_ids:
+                     # Use the first move being sent for the path
+                     move = record.move_ids[0]
+                     display_name = move.name
+                else:
+                     display_name = record.display_name if record.exists() else str(res_id)
             except Exception:
                 display_name = str(res_id)
             
-            # Use format e.g., order_idS00009
-            record_name = f"{MAP[model]['prefix']}{display_name}"
+            # Handle Path Splitting (Hierarchy)
+            # e.g. INV/2026/0001 -> ['move_idINV', '2026', '0001']
+            if '/' in display_name:
+                parts = display_name.split('/')
+                # Prefix the FIRST part
+                parts[0] = f"{MAP[model]['prefix']}{parts[0]}"
+                record_path = [p.strip() for p in parts if p.strip()]
+            else:
+                record_path = [f"{MAP[model]['prefix']}{display_name}"]
         else:
-            record_name = f"{MAP[model]['prefix']}General"
+            record_path = [f"{MAP[model]['prefix']}General"]
+
+        category = 'others' # Default
+        lower_name = (name or '').lower()
 
         # 1. Email Attachments
         if is_email and 'Email_attachments' in subs:
-            return root_name, record_name, 'Email_attachments'
+            category = 'Email_attachments'
             
-        # 2. PDF specific categorizations
-        is_pdf = mimetype == 'application/pdf'
-        if is_pdf:
-            if model == 'sale.order' and 'quotations' in subs:
-                return root_name, record_name, 'quotations'
-            if model == 'crm.lead' and 'documents' in subs:
-                return root_name, record_name, 'documents'
-            if model == 'account.move' and ('invoices' in subs):
-                return root_name, record_name, 'invoices'
-            if model == 'purchase.order' and 'rfq' in subs:
-                return root_name, record_name, 'rfq'
-            if model == 'hr.employee' and 'contracts' in subs:
-                return root_name, record_name, 'contracts'
-                
-        # 3. Name based categorizations
-        lower_name = (name or '').lower()
-        if model == 'hr.employee':
-            if 'contract' in lower_name and 'contracts' in subs:
-                return root_name, record_name, 'contracts'
-            if ('id' in lower_name or 'passport' in lower_name) and 'id_docs' in subs:
-                return root_name, record_name, 'id_docs'
-                
-        if model == 'stock.picking':
-            if 'packing' in lower_name and 'packing_lists' in subs:
-                return root_name, record_name, 'packing_lists'
-            if 'customs' in lower_name and 'customs_docs' in subs:
-                return root_name, record_name, 'customs_docs'
-
-        # 4. Image categorizations
-        is_image = mimetype and mimetype.startswith('image/')
-        if model == 'crm.lead' and is_image and 'images' in subs:
-            return root_name, record_name, 'images'
-        if model == 'helpdesk.ticket' and is_image and 'screenshots' in subs:
-            return root_name, record_name, 'screenshots'
-
-        # 5. Default fallbacks
-        fallback = subs[1] if len(subs) > 1 else subs[0]
-        if model == 'sale.order':
-             fallback = 'customer_files'
-        elif model == 'crm.lead':
-             fallback = 'documents'
+        # 2. Intelligent Categorization for account.move
         elif model == 'account.move':
-             fallback = 'vendor_bills'
-        elif model == 'purchase.order':
-             fallback = 'vendor_docs'
-        elif model == 'project.task':
-             fallback = 'task_files'
-        elif model == 'helpdesk.ticket':
-             fallback = 'customer_files'
-        elif model == 'hr.employee':
-             fallback = 'certificates'
-        elif model == 'stock.picking':
-             fallback = 'delivery_notes'
-             
-        return root_name, record_name, fallback
+            # 1. Check for tax keywords (Deep Categorization)
+            tax_keywords = ['tax', 'gst', 'vat', 'certificate', 'tds']
+            # 2. Check for bill/receipt keywords
+            bill_keywords = ['bill', 'receipt', 'vendor', 'purchase']
+            
+            if any(k in lower_name for k in tax_keywords):
+                category = 'tax_docs'
+            elif any(k in lower_name for k in bill_keywords):
+                category = 'vendor_bills'
+            else:
+                # Check record type as fallback
+                move_type = 'unknown'
+                try:
+                    if record:
+                        move_type = record.move_type
+                except Exception:
+                    pass
+                
+                if move_type in ['in_invoice', 'in_refund']:
+                    category = 'vendor_bills'
+                elif move_type in ['out_invoice', 'out_refund']:
+                    category = 'invoices'
+                elif mimetype == 'application/pdf':
+                    # Fallback for PDFs on moves
+                    category = 'invoices' if move_type == 'out_invoice' else 'vendor_bills'
+                else:
+                    category = 'invoices' if move_type == 'out_invoice' else 'vendor_bills'
+
+        # 3. Categorization for other models (Existing logic)
+        else:
+            is_pdf = mimetype == 'application/pdf'
+            if is_pdf:
+                if model == 'sale.order' and 'quotations' in subs:
+                    category = 'quotations'
+                elif model == 'crm.lead' and 'documents' in subs:
+                    category = 'documents'
+                elif model == 'purchase.order' and 'rfq' in subs:
+                    category = 'rfq'
+                elif model == 'hr.employee' and 'contracts' in subs:
+                    category = 'contracts'
+                    
+            if model == 'hr.employee':
+                if 'contract' in lower_name and 'contracts' in subs:
+                    category = 'contracts'
+                elif ('id' in lower_name or 'passport' in lower_name) and 'id_docs' in subs:
+                    category = 'id_docs'
+                    
+            if model == 'stock.picking':
+                if ('note' in lower_name or 'delivery' in lower_name) and 'delivery_notes' in subs:
+                    category = 'delivery_notes'
+                elif 'packing' in lower_name and 'packing_lists' in subs:
+                    category = 'packing_lists'
+
+        # Ensure selected category is in allowed subs, otherwise use first available or 'others'
+        if category not in subs:
+            category = subs[0] if subs else 'others'
+
+        return root_name, record_path, category
 
     def action_sync_to_drive(self):
         """Manually sync an attachment to Google Drive."""
