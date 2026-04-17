@@ -22,7 +22,7 @@ except ImportError:
     _logger.info("Google API client not installed. Using requests fallback for Drive sync.")
 
 
-class GoogleDriveSync(models.AbstractModel):
+class GoogleDriveSync(models.Model):
     _name = 'google.drive.sync'
     _description = 'Google Drive Synchronization Logic'
 

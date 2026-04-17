@@ -5,77 +5,92 @@
         <field name="name">Attachment Sync Configuration - Kanban</field>
         <field name="model">attachment.sync.config</field>
         <field name="arch" type="xml">
-            <kanban class="o_cloud_kanban" sample="1" quick_create="false" default_group_by=''>
+            <kanban class="o_cloud_kanban" sample="1" quick_create="false">
                 <field name="name"/>
                 <field name="module_config_id"/>
                 <field name="model_name"/>
                 <field name="storage_mode"/>
                 <field name="google_drive_id"/>
-                <field name="sync_count"/>
+                <field name="synced_attachment_count"/>
+                <field name="unsynced_attachment_count"/>
+                <field name="dual_attachment_count"/>
+                <field name="sync_percentage"/>
+                <field name="auto_sync_mode"/>
+                <field name="last_synced"/>
                 <templates>
                     <t t-name="kanban-box">
                         <div class="oe_kanban_global_click oe_kanban_card o_cloud_card">
-                            <!-- Left accent stripe -->
-                            <div class="o_cloud_card_accent accent-success"/>
-
-                            <!-- Header: Icon + Title + 3-dot menu -->
+                            <!-- Header Layer -->
                             <div class="o_cloud_card_header">
-                                <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
+                                <div class="d-flex align-items-center gap-2">
                                     <div class="o_cloud_card_icon">
-                                        <i class="fa fa-cog"/>
+                                        <i class="fa fa-refresh text-primary" t-if="record.auto_sync_mode.raw_value"/>
+                                        <i class="fa fa-pause text-muted" t-if="!record.auto_sync_mode.raw_value"/>
                                     </div>
                                     <div class="min-w-0">
                                         <div class="o_cloud_card_title text-truncate">
                                             <field name="name"/>
                                         </div>
                                         <div class="o_cloud_card_subtitle">
-                                            <i class="fa fa-gear me-1"/> Sync Configuration
+                                            <field name="module_config_id"/>
                                         </div>
                                     </div>
                                 </div>
-                                <!-- 3-dot dropdown menu -->
-                                <div class="o_cloud_card_menu o_dropdown_kanban dropdown">
-                                    <a class="dropdown-toggle o-no-caret" role="button" data-bs-toggle="dropdown" href="#">
-                                        <i class="fa fa-ellipsis-v" title="Actions"/>
-                                    </a>
-                                    <div class="dropdown-menu dropdown-menu-end" role="menu">
-                                        <a role="menuitem" type="edit" class="dropdown-item">
-                                            <i class="fa fa-pencil me-2 text-primary"/>Edit
-                                        </a>
-                                        <a role="menuitem" type="delete" class="dropdown-item text-danger">
-                                            <i class="fa fa-trash-o me-2"/>Delete
-                                        </a>
+                                
+                                <!-- Toggle Button in Top Right -->
+                                <div class="ms-auto" title="Auto Sync Mode">
+                                    <field name="auto_sync_mode" widget="boolean_toggle"/>
+                                </div>
+                            </div>
+
+                            <!-- Storage Status Bar -->
+                            <div class="px-3 py-2">
+                                <div class="d-flex gap-1 flex-wrap">
+                                    <span t-attf-class="badge rounded-pill #{record.storage_mode.raw_value == 'dual' ? 'bg-success-light text-success' : 'bg-info-light text-info'}" 
+                                          style="font-size: 10px; padding: 4px 8px; border: 1px solid currentColor;">
+                                        <i class="fa fa-database me-1"/>
+                                        <t t-esc="record.storage_mode.value"/>
+                                    </span>
+                                    <span class="badge rounded-pill bg-secondary-light text-secondary" style="font-size: 10px; padding: 4px 8px; border: 1px solid currentColor;">
+                                        <i class="fa fa-cloud me-1"/>
+                                        <t t-esc="record.google_drive_id.value"/>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Detailed Stats Grid -->
+                            <div class="px-3 py-2 border-top border-bottom bg-light-subtle">
+                                <div class="row g-0 text-center">
+                                    <div class="col-4 border-end">
+                                        <div class="fw-bold text-dark" style="font-size: 1.1rem;"><field name="synced_attachment_count"/></div>
+                                        <div class="text-muted" style="font-size: 9px; text-transform: uppercase;">Synced</div>
+                                    </div>
+                                    <div class="col-4 border-end">
+                                        <div class="fw-bold text-success" style="font-size: 1.1rem;"><field name="dual_attachment_count"/></div>
+                                        <div class="text-muted" style="font-size: 9px; text-transform: uppercase;">Dual</div>
+                                    </div>
+                                    <div class="col-4 text-warning">
+                                        <div class="fw-bold" style="font-size: 1.1rem;"><field name="unsynced_attachment_count"/></div>
+                                        <div class="text-muted" style="font-size: 9px; text-transform: uppercase;">Pending</div>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Configuration details tag -->
-                            <div style="padding: 6px 16px 0 20px;">
-                                <span class="o_cloud_drive_tag" style="white-space: nowrap;">
-                                    <i class="fa fa-cube me-1"/><field name="module_config_id"/>
-                                </span>
-                                <span class="o_cloud_drive_tag ms-1" style="white-space: nowrap; color: #6c757d; border-color: #dee2e6;">
-                                    <i class="fa fa-database me-1"/><field name="storage_mode"/>
-                                </span>
-                            </div>
-
-                            <!-- Details section: Model, Drive, Folder -->
-                            <div class="o_cloud_card_details pt-2 border-top mx-3" style="font-size: 11px; color: #666;">
+                            <!-- Progress Footer -->
+                            <div class="p-3">
                                 <div class="d-flex justify-content-between mb-1">
-                                    <span><i class="fa fa-cloud me-1"/> Drive:</span>
-                                    <span class="fw-bold text-dark text-truncate"><field name="google_drive_id"/></span>
+                                    <small class="fw-bold text-muted">Integration Progress</small>
+                                    <small class="fw-bold text-primary"><field name="sync_percentage" widget="float" options="{'digits': [3, 0]}"/>%</small>
                                 </div>
-                                <div class="d-flex justify-content-between">
-                                    <span><i class="fa fa-check-circle me-1"/> Synced:</span>
-                                    <span class="fw-bold text-dark"><field name="sync_count"/></span>
+                                <div class="progress" style="height: 6px; border-radius: 3px; background-color: #e9ecef;">
+                                    <div class="progress-bar bg-primary" role="progressbar" 
+                                         t-attf-style="width: #{record.sync_percentage.raw_value}%; border-radius: 3px;"
+                                         t-att-aria-valuenow="record.sync_percentage.raw_value" 
+                                         aria-valuemin="0" aria-valuemax="100"/>
                                 </div>
-                            </div>
-
-
-                            <!-- Footer: Sync Statistics -->
-                            <div class="o_cloud_card_footer d-flex justify-content-end">
-                                <div class="text-muted" style="font-size: 10px;">
-                                    Last Check: <field name="last_synced"/>
+                                <div class="mt-2 text-muted d-flex justify-content-between" style="font-size: 9px;">
+                                    <span><i class="fa fa-history me-1"/> <field name="last_synced"/></span>
+                                    <span class="fw-bold"><i class="fa fa-check text-success" t-if="record.sync_percentage.raw_value == 100"/></span>
                                 </div>
                             </div>
                         </div>
@@ -180,8 +195,7 @@
                                     string="Manual Drive Sync Now" 
                                     type="object" 
                                     class="btn btn-primary w-100 py-2 fw-bold" 
-                                    icon="fa-cloud-upload"
-                                    invisible="storage_mode == 'odoo'"/>
+                                    icon="fa-cloud-upload"/>
                         </div>
                         <div colspan="2" class="alert alert-light border shadow-sm p-3 mt-2" role="alert" style="border-left: 4px solid #714bca !important;">
                             <div class="d-flex gap-3">
@@ -191,8 +205,7 @@
                                 <div>
                                     <h6 class="mb-2 fw-bold">Understanding Storage Modes:</h6>
                                     <div class="mb-1"><strong>🚀 Drive only:</strong> Files are stored <strong>only</strong> on Google Drive. Saves server space (Odoo storage minimized).</div>
-                                    <div class="mb-1"><strong>🔄 Dual:</strong> Files are kept in <strong>both</strong> Odoo and Google Drive. Maximum redundancy.</div>
-                                    <div class="mb-0"><strong>🏠 Odoo only:</strong> Standard local storage. Google Drive synchronization is <strong>disabled</strong>.</div>
+                                    <div class="mb-0"><strong>🔄 Dual:</strong> Files are kept in <strong>both</strong> Odoo and Google Drive. Maximum redundancy.</div>
                                 </div>
                             </div>
                         </div>
@@ -213,52 +226,67 @@
                             </button>
                         </div>
 
-                        <!-- Summary Cards Row -->
+                        <!-- Summary Cards Rows -->
                         <div class="row g-3 mb-4 px-2">
-
-                            <!-- Total Files Card -->
-                            <div class="col-3">
+                            <!-- Row 1: Primary Stats -->
+                            <div class="col-4">
                                 <button name="action_view_all_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); transition: all 0.2s;">
                                     <div class="text-muted mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Total Files</div>
                                     <div class="fw-bold" style="font-size: 2rem; color: #495057;">
                                         <field name="model_attachment_count" class="p-0 m-0"/>
                                     </div>
-                                    <small class="text-muted"><i class="fa fa-paperclip me-1"/>In Odoo</small>
+                                    <small class="text-muted"><i class="fa fa-copy me-1"/>In Odoo Total</small>
                                 </button>
                             </div>
 
-                            <!-- Synced Card -->
-                            <div class="col-3">
-                                <button name="action_view_synced_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border-color: #b1dfbb !important; transition: all 0.2s;">
-                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #155724;">Synced</div>
-                                    <div class="fw-bold" style="font-size: 2rem; color: #155724;">
+                            <div class="col-4">
+                                <button name="action_view_synced_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-color: #90caf9 !important; transition: all 0.2s;">
+                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #0d47a1;">Synced Total</div>
+                                    <div class="fw-bold" style="font-size: 2rem; color: #0d47a1;">
                                         <field name="synced_attachment_count" class="p-0 m-0"/>
                                     </div>
-                                    <small style="color: #155724;"><i class="fa fa-check-circle me-1"/>On Drive</small>
+                                    <small style="color: #0d47a1;"><i class="fa fa-cloud me-1"/>On Google Drive</small>
                                 </button>
                             </div>
 
-                            <!-- Not Synced Card -->
-                            <div class="col-3">
+                            <div class="col-4">
                                 <button name="action_view_unsynced_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%); border-color: #ffc107 !important; transition: all 0.2s;">
                                     <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #856404;">Not Synced</div>
                                     <div class="fw-bold" style="font-size: 2rem; color: #856404;">
                                         <field name="unsynced_attachment_count" class="p-0 m-0"/>
                                     </div>
-                                    <small style="color: #856404;"><i class="fa fa-clock-o me-1"/>Pending</small>
+                                    <small style="color: #856404;"><i class="fa fa-clock-o me-1"/>Pending Sync</small>
                                 </button>
                             </div>
 
-                            <!-- Last Synced Card -->
-                            <div class="col-3">
-                                <div class="border rounded-3 p-3 h-100 text-center shadow-sm" style="background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%); border-color: #9fa8da !important;">
-                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #283593;">Last Synced</div>
-                                    <div class="fw-bold" style="font-size: 1rem; color: #283593; margin-top: 8px;">
+                            <!-- Row 2: Storage Mode Details & Info -->
+                            <div class="col-4">
+                                <button name="action_view_dual_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border-color: #b1dfbb !important; transition: all 0.2s;">
+                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #155724;">Dual (Odoo + Drive)</div>
+                                    <div class="fw-bold" style="font-size: 2rem; color: #155724;">
+                                        <field name="dual_attachment_count" class="p-0 m-0"/>
+                                    </div>
+                                    <small style="color: #155724;"><i class="fa fa-check-circle me-1"/>Local Data + Cloud ID</small>
+                                </button>
+                            </div>
+
+                            <div class="col-4">
+                                <button name="action_view_drive_only_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); border-color: #ce93d8 !important; transition: all 0.2s;">
+                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #4a148c;">Drive Only (Link)</div>
+                                    <div class="fw-bold" style="font-size: 2rem; color: #4a148c;">
+                                        <field name="drive_only_attachment_count" class="p-0 m-0"/>
+                                    </div>
+                                    <small style="color: #4a148c;"><i class="fa fa-external-link me-1"/>URL Only (Minimized)</small>
+                                </button>
+                            </div>
+
+                            <div class="col-4">
+                                <div class="border rounded-3 p-3 h-100 text-center shadow-sm d-flex flex-column justify-content-center" style="background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%); border-color: #9fa8da !important;">
+                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #283593;">Last Synced Timestamp</div>
+                                    <div class="fw-bold" style="font-size: 1.1rem; color: #283593;">
                                         <field name="last_synced" class="p-0 m-0"/>
                                     </div>
-                                    <small style="color: #283593;"><i class="fa fa-history me-1"/>
-                                        <field name="storage_mode" class="p-0 m-0"/> mode
-                                    </small>
+                                    <small style="color: #283593;"><i class="fa fa-history me-1"/>Mode: <field name="storage_mode" class="p-0 m-0"/></small>
                                 </div>
                             </div>
                         </div>

@@ -211,6 +211,56 @@
     background: rgba(23, 162, 184, 0.12) !important;
 }
 
+.bg-success-light {
+    background: rgba(40, 167, 69, 0.1) !important;
+}
+
 .bg-secondary-light {
     background: rgba(108, 117, 125, 0.1) !important;
+    color: #000000 !important;
+}
+
+.bg-light-subtle {
+    background-color: #f8f9fa !important;
+}
+
+/* Detailed Stats Grid Styling */
+.o_cloud_card .border-end {
+    border-right: 1px solid #dee2e6 !important;
+}
+
+.o_cloud_card .progress {
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.075);
+}
+
+.o_cloud_card .progress-bar {
+    transition: width 0.6s ease;
+    background: linear-gradient(90deg, #714bca, #8e67ef) !important;
+}
+
+/* Hover effect for the whole card */
+.o_cloud_card {
+    cursor: pointer;
+}
+
+/* Pulse animation for active sync */
+@keyframes sync-pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.o_cloud_card_icon .fa-refresh {
+    animation: sync-pulse 2s infinite ease-in-out;
 }

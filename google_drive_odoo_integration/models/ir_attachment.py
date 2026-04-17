@@ -182,7 +182,7 @@ class IrAttachment(models.Model):
                     continue  # Already synced
 
                 config = self.env['attachment.sync.config'].sudo().get_config_for_model(attachment.res_model)
-                if not config or config.storage_mode == 'odoo' or not config.auto_sync_mode:
+                if not config or not config.auto_sync_mode:
                     continue
 
                 if not self._matches_file_type_filter(attachment, config):

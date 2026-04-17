@@ -46,7 +46,6 @@ class AttachmentSyncConfig(models.Model):
     storage_mode = fields.Selection([
         ('drive', 'Drive only'),
         ('dual', 'Dual (Drive + Odoo)'),
-        ('odoo', 'Odoo only'),
     ], string='Storage Mode', default='dual', required=True,
     help='Choose where the attachments should be stored.')
 
@@ -62,6 +61,8 @@ class AttachmentSyncConfig(models.Model):
     # Sync statistics computed fields
     synced_attachment_count = fields.Integer('Synced Files', compute='_compute_sync_statistics')
     unsynced_attachment_count = fields.Integer('Unsynced Files', compute='_compute_sync_statistics')
+    dual_attachment_count = fields.Integer('Dual Sync Files', compute='_compute_sync_statistics')
+    drive_only_attachment_count = fields.Integer('Drive Only Files', compute='_compute_sync_statistics')
     sync_percentage = fields.Float('Sync %', compute='_compute_sync_statistics')
 
     @api.model
@@ -176,21 +177,32 @@ class AttachmentSyncConfig(models.Model):
         Attachment = self.env['ir.attachment'].sudo()
         for record in self:
             if record.model_name:
-                synced_count = Attachment.search_count([
-                    ('res_model', '=', record.model_name),
+                base_domain = [('res_model', '=', record.model_name)]
+                
+                synced_count = Attachment.search_count(base_domain + [('google_file_id', '!=', False)])
+                unsynced_count = Attachment.search_count(base_domain + [('google_file_id', '=', False)])
+                
+                dual_count = Attachment.search_count(base_domain + [
                     ('google_file_id', '!=', False),
+                    ('type', '!=', 'url')
                 ])
-                unsynced_count = Attachment.search_count([
-                    ('res_model', '=', record.model_name),
-                    ('google_file_id', '=', False),
+                drive_only_count = Attachment.search_count(base_domain + [
+                    ('google_file_id', '!=', False),
+                    ('type', '=', 'url')
                 ])
+
                 record.synced_attachment_count = synced_count
                 record.unsynced_attachment_count = unsynced_count
+                record.dual_attachment_count = dual_count
+                record.drive_only_attachment_count = drive_only_count
+                
                 total = synced_count + unsynced_count
                 record.sync_percentage = (synced_count / total * 100) if total > 0 else 0
             else:
                 record.synced_attachment_count = 0
                 record.unsynced_attachment_count = 0
+                record.dual_attachment_count = 0
+                record.drive_only_attachment_count = 0
                 record.sync_percentage = 0
 
     def action_view_synced_files(self):
@@ -220,6 +232,40 @@ class AttachmentSyncConfig(models.Model):
             'domain': [
                 ('res_model', '=', self.model_name),
                 ('google_file_id', '=', False),
+            ],
+            'context': {'create': False},
+            'target': 'current',
+        }
+
+    def action_view_dual_files(self):
+        """Open list of dual sync attachments for this model."""
+        self.ensure_one()
+        return {
+            'name': f'Dual Sync Files (Odoo + Drive) — {self.name}',
+            'type': 'ir.actions.act_window',
+            'res_model': 'ir.attachment',
+            'view_mode': 'tree,form',
+            'domain': [
+                ('res_model', '=', self.model_name),
+                ('google_file_id', '!=', False),
+                ('type', '!=', 'url'),
+            ],
+            'context': {'create': False},
+            'target': 'current',
+        }
+
+    def action_view_drive_only_files(self):
+        """Open list of drive only attachments for this model."""
+        self.ensure_one()
+        return {
+            'name': f'Drive Only Files (External URL) — {self.name}',
+            'type': 'ir.actions.act_window',
+            'res_model': 'ir.attachment',
+            'view_mode': 'tree,form',
+            'domain': [
+                ('res_model', '=', self.model_name),
+                ('google_file_id', '!=', False),
+                ('type', '=', 'url'),
             ],
             'context': {'create': False},
             'target': 'current',
