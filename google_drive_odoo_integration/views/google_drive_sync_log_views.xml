@@ -66,6 +66,9 @@
                     <group string="Error Details" invisible="state != 'fail'">
                         <field name="error_message" nolabel="1" colspan="2"/>
                     </group>
+                    <group string="Sync Details" invisible="not sync_details">
+                        <field name="sync_details" nolabel="1" colspan="2"/>
+                    </group>
                 </sheet>
             </form>
         </field>

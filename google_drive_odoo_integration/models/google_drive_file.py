@@ -114,6 +114,24 @@ class GoogleDriveFile(models.Model):
         # Standard Odoo unlink 
         return super(GoogleDriveFile, self).unlink()
 
+    def action_prompt_delete(self):
+        """Open a confirmation wizard before deleting the folder/file."""
+        self.ensure_one()
+        # Find if this is configured in any sync
+        configs = self.env['attachment.sync.config'].search([('google_folder_id', '=', self.id)])
+        
+        return {
+            'name': 'Confirm Deletion',
+            'type': 'ir.actions.act_window',
+            'res_model': 'google.drive.file.delete.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_folder_id': self.id,
+                'default_config_ids': [(6, 0, configs.ids)] if configs else [],
+            }
+        }
+
     def action_archive_recursive(self):
         """Archive records locally only. No changes made to Google Drive."""
         for record in self:

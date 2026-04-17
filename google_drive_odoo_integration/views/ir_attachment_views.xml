@@ -94,7 +94,6 @@
                 <filter name="filter_hr" string="HR Employees" domain="[('res_model', '=', 'hr.employee')]"/>
                 <filter name="filter_project" string="Project Tasks" domain="[('res_model', '=', 'project.task')]"/>
                 <filter name="filter_inventory" string="Inventory" domain="[('res_model', '=', 'stock.picking')]"/>
-                <filter name="filter_documents" string="Documents" domain="[('res_model', '=', 'documents.document')]"/>
 
                 <separator/>
                 <group expand="0" string="Group By">

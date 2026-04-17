@@ -499,6 +499,39 @@ class GoogleDriveSync(models.AbstractModel):
                       duration=elapsed)
         return False
 
+    def find_folder_by_name(self, folder_name, parent_id, config):
+        """Search for a folder by name under a specific parent."""
+        access_token = self._get_access_token(config)
+        if not access_token:
+            return False
+
+        headers = {"Authorization": f"Bearer {access_token}"}
+        # Prepare safe query (single quotes in name handled by escaping)
+        safe_name = folder_name.replace("'", "\\'")
+        query = f"name = '{safe_name}' and '{parent_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+        
+        url = f"https://www.googleapis.com/drive/v3/files?q={query}&fields=files(id,webViewLink)"
+        try:
+            response = http_requests.get(url, headers=headers)
+            if response.status_code == 200:
+                files = response.json().get('files', [])
+                if files:
+                    return {
+                        'google_file_id': files[0].get('id'),
+                        'google_url': files[0].get('webViewLink', ''),
+                    }
+            return False
+        except Exception as e:
+            _logger.error("Error searching for folder %s: %s", folder_name, str(e))
+            return False
+
+    def find_or_create_folder(self, folder_name, parent_id, config):
+        """Find a folder by name, or create it if it doesn't exist."""
+        existing = self.find_folder_by_name(folder_name, parent_id, config)
+        if existing:
+            return existing
+        return self.create_folder_in_drive(folder_name, config, parent_gdrive_id=parent_id)
+
     def upload_file_to_drive(self, file_name, file_content, mime_type, config, parent_gdrive_id=None):
         """Upload a file to Google Drive with optional parent folder placement.
         Automatically switches to resumable upload for large files (>= 5 MB).

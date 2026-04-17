@@ -17,6 +17,7 @@
         'data/cron_sync.xml',
         'data/gdrive_model_config.xml',
         'wizard/google_drive_folder_wizard_views.xml',
+        'wizard/google_drive_file_delete_wizard_views.xml',
         'views/attachment_sync_config_views.xml',
         'views/google_drive_config_views.xml',
         'views/google_drive_file_views.xml',

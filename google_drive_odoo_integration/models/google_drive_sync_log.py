@@ -53,6 +53,7 @@ class GoogleDriveSyncLog(models.Model):
     ], string='Status', default='success', index=True)
 
     error_message = fields.Text('Error Details')
+    sync_details = fields.Text('Sync Details')
     google_file_id = fields.Char('Google File ID')
     file_size = fields.Float('File Size (bytes)')
     duration = fields.Float('Duration (s)', digits=(10, 3), help='Time taken for the operation in seconds')
@@ -98,7 +99,7 @@ class GoogleDriveSyncLog(models.Model):
 
     @api.model
     def log_operation(self, config, file_name, operation, state='success',
-                      error_message=False, sync_type=False, file_type='file',
+                      error_message=False, sync_details=False, sync_type=False, file_type='file',
                       root_folder_name=False, folder_path=False,
                       google_file_id=False, file_size=0, duration=0,
                       user_id=False):
@@ -120,6 +121,7 @@ class GoogleDriveSyncLog(models.Model):
             'operation': operation,
             'state': state,
             'error_message': error_message,
+            'sync_details': sync_details,
             'sync_type': sync_type,
             'root_folder_name': root_folder_name,
             'folder_path': folder_path,

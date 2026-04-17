@@ -19,13 +19,14 @@ class AttachmentSyncConfig(models.Model):
         compute='_compute_model_name', store=True, readonly=False, required=True, index=True)
 
     # Step 2: Driver Selection
-    google_drive_id = fields.Many2one('google.drive.config', string='Google Drive', required=True)
+    google_drive_id = fields.Many2one('google.drive.config', string='Google Drive', required=True, ondelete='cascade')
 
     # Step 3: Folder Selection (filtered by driver)
     google_folder_id = fields.Many2one('google.drive.file',
         string='Folder',
         domain="[('file_type', '=', 'folder'), ('drive_config_id', '=', google_drive_id)]",
-        required=True)
+        required=True,
+        ondelete='cascade')
 
     # Step 4: File Type Selection
     file_type = fields.Selection([
@@ -58,11 +59,26 @@ class AttachmentSyncConfig(models.Model):
         ('paused', 'Paused'),
     ], string='State', default='draft')
 
+    # Sync statistics computed fields
+    synced_attachment_count = fields.Integer('Synced Files', compute='_compute_sync_statistics')
+    unsynced_attachment_count = fields.Integer('Unsynced Files', compute='_compute_sync_statistics')
+    sync_percentage = fields.Float('Sync %', compute='_compute_sync_statistics')
+
     @api.model
     def _get_model_selection(self):
         """Dynamic selection of models from gdrive.model.config."""
         configs = self.env['gdrive.model.config'].sudo().search([])
         return [(c.res_model, c.model_label) for c in configs]
+
+    @api.model
+    def get_config_for_model(self, res_model):
+        """Helper to get the sync configuration for a specific model."""
+        if not res_model:
+            return False
+        return self.search([
+            ('model_name', '=', res_model),
+            ('state', '=', 'active')
+        ], limit=1)
 
     # Computed field to filter available modules in the UI
     existing_module_ids = fields.Many2many('gdrive.model.config', 
@@ -154,6 +170,76 @@ class AttachmentSyncConfig(models.Model):
             else:
                 record.model_attachment_count = 0
 
+    @api.depends('model_name', 'sync_count')
+    def _compute_sync_statistics(self):
+        """Compute detailed sync statistics for the dashboard."""
+        Attachment = self.env['ir.attachment'].sudo()
+        for record in self:
+            if record.model_name:
+                synced_count = Attachment.search_count([
+                    ('res_model', '=', record.model_name),
+                    ('google_file_id', '!=', False),
+                ])
+                unsynced_count = Attachment.search_count([
+                    ('res_model', '=', record.model_name),
+                    ('google_file_id', '=', False),
+                ])
+                record.synced_attachment_count = synced_count
+                record.unsynced_attachment_count = unsynced_count
+                total = synced_count + unsynced_count
+                record.sync_percentage = (synced_count / total * 100) if total > 0 else 0
+            else:
+                record.synced_attachment_count = 0
+                record.unsynced_attachment_count = 0
+                record.sync_percentage = 0
+
+    def action_view_synced_files(self):
+        """Open list of synced attachments for this model."""
+        self.ensure_one()
+        return {
+            'name': f'Synced Files — {self.name}',
+            'type': 'ir.actions.act_window',
+            'res_model': 'ir.attachment',
+            'view_mode': 'tree,form',
+            'domain': [
+                ('res_model', '=', self.model_name),
+                ('google_file_id', '!=', False),
+            ],
+            'context': {'create': False},
+            'target': 'current',
+        }
+
+    def action_view_unsynced_files(self):
+        """Open list of unsynced attachments for this model."""
+        self.ensure_one()
+        return {
+            'name': f'Not Synced Files — {self.name}',
+            'type': 'ir.actions.act_window',
+            'res_model': 'ir.attachment',
+            'view_mode': 'tree,form',
+            'domain': [
+                ('res_model', '=', self.model_name),
+                ('google_file_id', '=', False),
+            ],
+            'context': {'create': False},
+            'target': 'current',
+        }
+
+    def action_view_all_files(self):
+        """Open list of all attachments for this model."""
+        self.ensure_one()
+        return {
+            'name': f'All Files — {self.name}',
+            'type': 'ir.actions.act_window',
+            'res_model': 'ir.attachment',
+            'view_mode': 'tree,form',
+            'domain': [
+                ('res_model', '=', self.model_name),
+            ],
+            'context': {'create': False},
+            'target': 'current',
+        }
+
     def _create_attachment_categories(self):
         """Create folder structure for attachment categorization in Google Drive."""
         self.ensure_one()
@@ -179,16 +265,29 @@ class AttachmentSyncConfig(models.Model):
         
         return folder_structure
 
-    def action_manual_sync(self):
-        """Perform manual sync for selected configuration."""
+    def action_manual_drive_sync(self):
+        """Manually sync all unsynced attachments for this model and show notification."""
         self.ensure_one()
+        
+        # 1. First check: Select Storage Mode validation
+        if not self.storage_mode or self.storage_mode == 'odoo':
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Sync Skipped',
+                    'message': 'Please select a valid Storage Mode (Drive or Dual) before syncing.',
+                    'type': 'warning',
+                    'sticky': False,
+                }
+            }
 
-        # Get attachments matching the criteria
+        # 2. Search for all attachments for this model that haven't been synced yet
         domain = [
             ('res_model', '=', self.model_name),
-            ('google_file_id', '=', False),  # Not yet synced
+            ('google_file_id', '=', False),
         ]
-
+        
         # Filter by file type if not 'all'
         if self.file_type != 'all':
             if self.file_type == 'pdf':
@@ -203,59 +302,31 @@ class AttachmentSyncConfig(models.Model):
                 domain.append(('mimetype', 'ilike', 'image'))
 
         attachments = self.env['ir.attachment'].search(domain)
-
-        if not attachments:
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'No Files Found',
-                    'message': f'No unsynced {self.file_type} files found for {self.model_name}',
-                    'type': 'warning',
-                    'sticky': False,
-                }
-            }
-
-        # Perform sync for each attachment
-        sync_count = 0
-        for attachment in attachments:
-            try:
-                # Set the drive and folder for the attachment
-                attachment.write({
-                    'google_drive_id': self.google_drive_id.id,
-                    'google_folder_id': self.google_folder_id.id,
-                    'sync_type': 'manual',
-                })
-
-                # Upload to drive
-                result = attachment.action_sync_to_drive()
-                if result and result.get('type') == 'ir.actions.client':
-                    sync_count += 1
-
-            except Exception as e:
-                self.env.cr.rollback()
-                continue
-
-        # Update sync metadata
-        self.write({
-            'sync_count': self.sync_count + sync_count,
-            'last_synced': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        })
-
-        # Create folder structure if active
-        folder_structure = self._create_attachment_categories()
         
-        message = f'Successfully synced {sync_count} out of {len(attachments)} files'
-        if self.state == 'active' and folder_structure:
-            message += f'\n\nAttachment Structure:\n{folder_structure}'
+        synced_count = 0
+        if attachments:
+            for attachment in attachments:
+                try:
+                    # Use the automated sync logic which respects storage_mode
+                    attachment.with_context(sync_type='manual')._auto_sync_to_drive(self)
+                    synced_count += 1
+                except Exception as e:
+                    self.env.cr.rollback()
+                    continue
+
+        # 3. Success Notification (Instead of routing to another page)
+        model_label = self.module_config_id.model_label or self.model_name
+        message = f"Synchronization complete! {synced_count} {model_label} files moved to Google Drive."
+        if synced_count == 0:
+            message = f"No unsynced {model_label} files found for this configuration."
 
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': 'Sync Complete',
+                'title': f'{model_label} Sync Result',
                 'message': message,
-                'type': 'success',
+                'type': 'success' if synced_count > 0 or not attachments else 'info',
                 'sticky': False,
             }
         }

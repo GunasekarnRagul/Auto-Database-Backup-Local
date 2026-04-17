@@ -11,7 +11,6 @@
                 <field name="model_name"/>
                 <field name="storage_mode"/>
                 <field name="google_drive_id"/>
-                <field name="auto_sync_mode"/>
                 <field name="sync_count"/>
                 <templates>
                     <t t-name="kanban-box">
@@ -73,15 +72,10 @@
                             </div>
 
 
-                            <!-- Footer: Sync Mode Badge -->
+                            <!-- Footer: Sync Statistics -->
                             <div class="o_cloud_card_footer d-flex justify-content-end">
-                                <div>
-                                    <span t-if="record.auto_sync_mode.raw_value" class="badge rounded-pill" style="background-color: #1f77d0; color: white; padding: 6px 12px; font-size: 11px; font-weight: 600;">
-                                        <i class="fa fa-sync me-1" style="font-size: 12px;"/> Auto Sync
-                                    </span>
-                                    <span t-else="" class="badge rounded-pill" style="background-color: #6c757d; color: white; padding: 6px 12px; font-size: 11px; font-weight: 600;">
-                                        <i class="fa fa-hand-o-up me-1" style="font-size: 12px;"/> Manual
-                                    </span>
+                                <div class="text-muted" style="font-size: 10px;">
+                                    Last Check: <field name="last_synced"/>
                                 </div>
                             </div>
                         </div>
@@ -101,7 +95,6 @@
                 <field name="module_config_id" string="Module"/>
                 <field name="model_name" string="Internal Model" groups="base.group_no_one"/>
                 <field name="google_drive_id"/>
-                <field name="auto_sync_mode" string="Type"/>
                 <field name="sync_count"/>
             </tree>
         </field>
@@ -124,22 +117,13 @@
                         <p class="text-muted">Configure automatic synchronization of attachments from Odoo models to Google Drive</p>
                     </div>
 
-                    <!-- Status Badge -->
-                    <div class="alert alert-success" invisible="state != 'active'">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="fa fa-check-circle" style="font-size: 16px;"/>
-                            <strong>
-                                ✅ ACTIVE - Attachment categorization enabled
-                            </strong>
+                    <!-- Auto Sync Toggle -->
+                    <div class="o_setting_right_pane d-flex align-items-center gap-2 mb-4 p-3 rounded" style="background-color: #f8f9fa; border: 1px solid #dee2e6;">
+                        <div class="flex-grow-1">
+                            <h5 class="mb-0 fw-bold"><i class="fa fa-refresh me-2 text-primary"/> Auto Sync Mode</h5>
+                            <small class="text-muted">When enabled, new attachments will be automatically uploaded to Google Drive.</small>
                         </div>
-                    </div>
-                    <div class="alert alert-warning" invisible="state == 'active'">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="fa fa-info-circle" style="font-size: 16px;"/>
-                            <strong>
-                                ⚠️ INACTIVE - Waiting activation
-                            </strong>
-                        </div>
+                        <field name="auto_sync_mode" widget="boolean_toggle" class="ms-auto" style="font-size: 1.2em;"/>
                     </div>
 
                     <!-- Configuration Name -->
@@ -191,54 +175,142 @@
                     <!-- Step 4: Storage Mode -->
                     <group name="step4" string="Step 4: Select Storage Mode" col="2">
                         <field name="storage_mode" widget="radio" options="{'horizontal': true}"/>
-                        <div colspan="2" class="alert alert-info" role="alert">
-                            <i class="fa fa-database me-2"/> 
-                            <strong>Drive only:</strong> Files stored only on Google Drive. 
-                            <strong>Dual:</strong> Both Odoo and Drive. 
-                            <strong>Odoo only:</strong> Local storage only.
+                        <div colspan="2" class="mt-3 mb-2" style="width:13rem">
+                            <button name="action_manual_drive_sync" 
+                                    string="Manual Drive Sync Now" 
+                                    type="object" 
+                                    class="btn btn-primary w-100 py-2 fw-bold" 
+                                    icon="fa-cloud-upload"
+                                    invisible="storage_mode == 'odoo'"/>
+                        </div>
+                        <div colspan="2" class="alert alert-light border shadow-sm p-3 mt-2" role="alert" style="border-left: 4px solid #714bca !important;">
+                            <div class="d-flex gap-3">
+                                <div class="flex-shrink-0">
+                                    <i class="fa fa-info-circle text-primary" style="font-size: 1.5rem;"/>
+                                </div>
+                                <div>
+                                    <h6 class="mb-2 fw-bold">Understanding Storage Modes:</h6>
+                                    <div class="mb-1"><strong>🚀 Drive only:</strong> Files are stored <strong>only</strong> on Google Drive. Saves server space (Odoo storage minimized).</div>
+                                    <div class="mb-1"><strong>🔄 Dual:</strong> Files are kept in <strong>both</strong> Odoo and Google Drive. Maximum redundancy.</div>
+                                    <div class="mb-0"><strong>🏠 Odoo only:</strong> Standard local storage. Google Drive synchronization is <strong>disabled</strong>.</div>
+                                </div>
+                            </div>
                         </div>
                     </group>
 
-                    <group name="sync_options" string="Sync Options" col="2">
-                        <field name="auto_sync_mode" widget="boolean_toggle" options="{'terminology': 'on_off'}"/>
-                        <div colspan="2" class="alert alert-secondary">
-                            <i class="fa fa-info-circle me-2"/> Toggle to <strong>Auto Sync</strong> or <strong>Manual Mode</strong>. Save the configuration to apply.
-                        </div>
-                    </group>
 
-                    <!-- Sync Statistics -->
-                    <group name="sync_stats" string="Sync Statistics" col="2">
-                        <field name="sync_count" readonly="1"/>
-                        <field name="last_synced" readonly="1"/>
-                    </group>
+                    <!-- ═══════════ Sync Dashboard ═══════════ -->
+                    <div class="mt-4" invisible="not model_name">
 
-                    <!-- Active Configuration Info -->
-                    <div class="alert alert-success" invisible="state != 'active'">
-                        <strong>✅ Active Configuration - Folder Structure:</strong>
-                        <div style="margin-top: 10px; font-family: monospace; font-size: 12px; white-space: pre-wrap;">
-📂 <field name="google_folder_id"/>
-├── 🧾 Customer Uploaded Files
-│   └── (Files uploaded via chatter attachments)
-├── 📑 Requirement / Project Files
-│   └── (Sales &amp; Pre-sales team files)
-└── 📧 Email Attachments
-    └── (Auto-created from incoming emails)
+                        <!-- Dashboard Header -->
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fa fa-bar-chart text-primary" style="font-size: 1.4em;"/>
+                                <h4 class="mb-0 fw-bold">Sync Dashboard</h4>
+                            </div>
+                            <button name="action_view_all_files" type="object" class="btn btn-sm btn-outline-secondary" icon="fa-list">
+                                View All Files
+                            </button>
                         </div>
+
+                        <!-- Summary Cards Row -->
+                        <div class="row g-3 mb-4 px-2">
+
+                            <!-- Total Files Card -->
+                            <div class="col-3">
+                                <button name="action_view_all_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); transition: all 0.2s;">
+                                    <div class="text-muted mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Total Files</div>
+                                    <div class="fw-bold" style="font-size: 2rem; color: #495057;">
+                                        <field name="model_attachment_count" class="p-0 m-0"/>
+                                    </div>
+                                    <small class="text-muted"><i class="fa fa-paperclip me-1"/>In Odoo</small>
+                                </button>
+                            </div>
+
+                            <!-- Synced Card -->
+                            <div class="col-3">
+                                <button name="action_view_synced_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border-color: #b1dfbb !important; transition: all 0.2s;">
+                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #155724;">Synced</div>
+                                    <div class="fw-bold" style="font-size: 2rem; color: #155724;">
+                                        <field name="synced_attachment_count" class="p-0 m-0"/>
+                                    </div>
+                                    <small style="color: #155724;"><i class="fa fa-check-circle me-1"/>On Drive</small>
+                                </button>
+                            </div>
+
+                            <!-- Not Synced Card -->
+                            <div class="col-3">
+                                <button name="action_view_unsynced_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%); border-color: #ffc107 !important; transition: all 0.2s;">
+                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #856404;">Not Synced</div>
+                                    <div class="fw-bold" style="font-size: 2rem; color: #856404;">
+                                        <field name="unsynced_attachment_count" class="p-0 m-0"/>
+                                    </div>
+                                    <small style="color: #856404;"><i class="fa fa-clock-o me-1"/>Pending</small>
+                                </button>
+                            </div>
+
+                            <!-- Last Synced Card -->
+                            <div class="col-3">
+                                <div class="border rounded-3 p-3 h-100 text-center shadow-sm" style="background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%); border-color: #9fa8da !important;">
+                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #283593;">Last Synced</div>
+                                    <div class="fw-bold" style="font-size: 1rem; color: #283593; margin-top: 8px;">
+                                        <field name="last_synced" class="p-0 m-0"/>
+                                    </div>
+                                    <small style="color: #283593;"><i class="fa fa-history me-1"/>
+                                        <field name="storage_mode" class="p-0 m-0"/> mode
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="col-12 w-100 mt-2 mb-4 px-2">
+                            <style>
+                                .o_custom_sync_progress {
+                                    width: 100% !important;
+                                }
+                                .o_custom_sync_progress .o_field_progressbar,
+                                .o_custom_sync_progress .o_progressbar {
+                                    width: 100% !important;
+                                }
+                                /* Make the bar green and thicker */
+                                .o_custom_sync_progress .o_progress {
+                                    height: 16px !important;
+                                    background-color: #e9ecef !important;
+                                    border: 1px solid #dee2e6 !important;
+                                    border-radius: 8px !important;
+                                    overflow: hidden !important;
+                                    margin-right:30px;
+                                    flex-grow: 1; /* allow it to take width */
+                                }
+                                .o_custom_sync_progress .o_progressbar_value {
+                                    
+                                    border-radius: 8px !important;
+                                }
+                                /* Fix text color to be visible properly */
+                                .o_custom_sync_progress .o_progressbar_value_text,
+                                .o_custom_sync_progress .o_progressbar_title {
+                                    color: #495057 !important;
+                                    font-weight: bold !important;
+                                    background: none !important;
+                                    border-radius: 0 !important;
+                                    margin-left: 10px;
+                                }
+                            </style>
+                            <h6 class="text-uppercase text-muted fw-bold mb-2" style="font-size: 11px; letter-spacing: 0.8px;">Overall Integration Progress</h6>
+                            <div class="o_custom_sync_progress w-100">
+                                <field name="sync_percentage" widget="progressbar" nolabel="1"/>
+                            </div>
+                        </div>
+
                     </div>
 
-                    <!-- Inactive Configuration Info -->
-                    <div class="alert alert-info" invisible="state == 'active'">
-                        <strong>ℹ️ To activate attachment categorization:</strong><br/>
-                        <ul style="margin-top: 10px; padding-left: 20px;">
-                            <li>Complete all configuration steps</li>
-                            <li>Click Save</li>
-                            <li>Configuration status will change to Active</li>
-                        </ul>
-                    </div>
+
                 </sheet>
                 <footer>
                     <button string="Save" type="object" name="action_save_and_return" class="btn btn-primary"/>
-                    <button string="Discard" class="btn btn-secondary" special="cancel"/>
+                    <button string="Manual Drive Sync" type="object" name="action_manual_drive_sync" class="btn btn-secondary" invisible="storage_mode == 'odoo'"/>
+                    <button string="Discard" class="btn btn-light" special="cancel"/>
                 </footer>
             </form>
         </field>

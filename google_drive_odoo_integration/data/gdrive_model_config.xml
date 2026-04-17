@@ -50,13 +50,6 @@
         <field name="drive_root_folder_name">Inventory</field>
     </record>
 
-    <record id="gdrive_config_documents_document" model="gdrive.model.config">
-        <field name="res_model">documents.document</field>
-        <field name="model_label">Documents</field>
-        <field name="is_enabled">True</field>
-        <field name="drive_root_folder_name">Documents</field>
-    </record>
-
     <record id="gdrive_config_helpdesk_ticket" model="gdrive.model.config">
         <field name="res_model">helpdesk.ticket</field>
         <field name="model_label">Helpdesk - Tickets</field>
