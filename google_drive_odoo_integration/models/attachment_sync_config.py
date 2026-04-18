@@ -45,6 +45,7 @@ class AttachmentSyncConfig(models.Model):
     storage_mode = fields.Selection([
         ('drive', 'Drive only'),
         ('dual', 'Dual (Drive + Odoo)'),
+        ('odoo', 'Odoo only (no sync)'),
     ], string='Storage Mode', default='dual', required=True,
     help='Choose where the attachments should be stored.')
 
@@ -149,62 +150,136 @@ class AttachmentSyncConfig(models.Model):
             if wizard.google_drive_id:
                 path_parts.append(wizard.google_drive_id.name)
             if wizard.google_folder_id:
-                path_parts.append(wizard.google_folder_id.name)
+                # Build ancestor chain from root → direct parent first, then append selected folder
+                ancestors = []
                 parent = wizard.google_folder_id.parent_folder_id
-                inner_parts = []
                 while parent:
-                    inner_parts.insert(0, parent.name)
+                    ancestors.insert(0, parent.name)
                     parent = parent.parent_folder_id
-                if inner_parts:
-                    path_parts.extend(inner_parts)
+                path_parts.extend(ancestors)
+                path_parts.append(wizard.google_folder_id.name)
             wizard.folder_path = ' / '.join(path_parts) if path_parts else ''
+
+    def _get_target_attachments(self, extra_domain=None):
+        """Get ir.attachment records for this model.
+
+        Includes mail.message chatter copies so Drive link icons appear in the chatter.
+        Deduplicates by (parent_record_id, filename): if both a direct attachment and a
+        mail.message copy exist for the SAME record and filename, only the mail.message
+        copy is returned — prevents double-counting AND correctly blocks a direct copy
+        from showing as 'unsynced' when the chatter copy is already on Drive.
+        """
+        self.ensure_one()
+        Attachment = self.env['ir.attachment'].sudo()
+        if not self.model_name:
+            return Attachment.browse()
+
+        m_name = self.model_name.strip()
+
+        # 1. Fetch messages for this model (capped to avoid memory issues on large DBs)
+        messages = self.env['mail.message'].sudo().search(
+            [('model', '=', m_name)], limit=10000
+        )
+        msg_id_to_res_id = {msg.id: msg.res_id for msg in messages if msg.res_id}
+
+        # 2. Build dedup keys from ALL mail.message attachments (no extra_domain).
+        #    This ensures a synced chatter copy blocks the direct copy even when
+        #    extra_domain filters out the chatter copy (e.g. google_file_id = False).
+        all_mail_atts = Attachment.browse()
+        if msg_id_to_res_id:
+            all_mail_atts = Attachment.search([
+                ('res_model', '=', 'mail.message'),
+                ('res_id', 'in', list(msg_id_to_res_id.keys())),
+            ])
+        mail_dedup_keys = {
+            (msg_id_to_res_id[att.res_id], att.name)
+            for att in all_mail_atts
+            if att.res_id in msg_id_to_res_id
+        }
+
+        # 3. Mail.message attachments WITH extra_domain applied
+        mail_atts = Attachment.browse()
+        if msg_id_to_res_id:
+            domain = (extra_domain or []) + [
+                ('res_model', '=', 'mail.message'),
+                ('res_id', 'in', list(msg_id_to_res_id.keys())),
+            ]
+            mail_atts = Attachment.search(domain)
+
+        # 4. Direct attachments WITH extra_domain, excluding any covered by a chatter copy
+        direct_domain = (extra_domain or []) + [('res_model', '=', m_name)]
+        direct_atts = Attachment.search(direct_domain)
+        direct_filtered = direct_atts.filtered(
+            lambda a: (a.res_id, a.name) not in mail_dedup_keys
+        )
+
+        return mail_atts | direct_filtered
 
     @api.depends('model_name')
     def _compute_model_attachment_count(self):
-        """Count total attachments in Odoo for the selected model. 
-        Uses ilike to be robust against padding/collation issues."""
+        """Count total attachments in Odoo for the selected model. """
         for record in self:
             if record.model_name:
-                record.model_attachment_count = self.env['ir.attachment'].sudo().search_count([
-                    ('res_model', 'ilike', record.model_name.strip())
-                ])
+                record.model_attachment_count = len(record._get_target_attachments())
             else:
                 record.model_attachment_count = 0
 
     @api.depends('model_name', 'sync_count')
     def _compute_sync_statistics(self):
-        """Compute detailed sync statistics for the dashboard."""
-        Attachment = self.env['ir.attachment'].sudo()
+        """Compute detailed sync statistics for the dashboard.
+        Fetches all attachments in a SINGLE call and filters in Python
+        to avoid 8 separate SQL queries per record on every page load.
+        """
         for record in self:
             if record.model_name:
-                m_name = record.model_name.strip()
-                base_domain = [('res_model', 'ilike', m_name)]
-                
-                synced_count = Attachment.search_count(base_domain + [('google_file_id', '!=', False)])
-                unsynced_count = Attachment.search_count(base_domain + [('google_file_id', '=', False)])
-                
-                dual_count = Attachment.search_count(base_domain + [
-                    ('google_file_id', '!=', False),
-                    ('type', '!=', 'url')
-                ])
-                drive_only_count = Attachment.search_count(base_domain + [
-                    ('google_file_id', '!=', False),
-                    ('type', '=', 'url')
-                ])
+                # Single fetch — all subsequent stats filter this in-memory recordset
+                all_attachments = record._get_target_attachments()
+                synced = all_attachments.filtered(lambda a: a.google_file_id)
+                unsynced = all_attachments - synced
+                dual = synced.filtered(lambda a: a.type != 'url')
+                drive_only = synced.filtered(lambda a: a.type == 'url')
 
-                record.synced_attachment_count = synced_count
-                record.unsynced_attachment_count = unsynced_count
-                record.dual_attachment_count = dual_count
-                record.drive_only_attachment_count = drive_only_count
-                
-                total = synced_count + unsynced_count
-                record.sync_percentage = (synced_count / total * 100) if total > 0 else 0
+                record.synced_attachment_count = len(synced)
+                record.unsynced_attachment_count = len(unsynced)
+                record.dual_attachment_count = len(dual)
+                record.drive_only_attachment_count = len(drive_only)
+
+                total = len(all_attachments)
+                record.sync_percentage = (len(synced) / total * 100) if total > 0 else 0
             else:
                 record.synced_attachment_count = 0
                 record.unsynced_attachment_count = 0
                 record.dual_attachment_count = 0
                 record.drive_only_attachment_count = 0
                 record.sync_percentage = 0
+
+    def _get_action_domain(self, base_extra=None):
+        """Build a correct Odoo domain for ir.attachment covering both direct
+        attachments and mail.message chatter copies for this model.
+
+        Bug fix: simply prepending base_extra to the '|' OR-block makes the
+        Odoo domain parser consume only the first leaf and silently ignore the
+        entire OR branch.  The fix is to prepend one '&' per extra condition so
+        they are properly AND-ed with the OR expression.
+        """
+        self.ensure_one()
+        m_name = self.model_name.strip() if self.model_name else ''
+        messages = self.env['mail.message'].sudo().search([('model', '=', m_name)])
+
+        # Core: direct model attachments OR chatter copies
+        core_domain = [
+            '|',
+            ('res_model', '=', m_name),
+            '&', ('res_model', '=', 'mail.message'), ('res_id', 'in', messages.ids)
+        ]
+
+        if base_extra:
+            # Each extra leaf condition needs one '&' to AND it with the OR block.
+            # e.g. base_extra=[E1, E2] → ['&', '&', E1, E2, '|', A, '&', B, C]
+            # which evaluates as: E1 AND E2 AND (A OR (B AND C))  ✓
+            return ['&'] * len(base_extra) + list(base_extra) + core_domain
+
+        return core_domain
 
     def action_view_synced_files(self):
         """Open list of synced attachments for this model."""
@@ -214,10 +289,7 @@ class AttachmentSyncConfig(models.Model):
             'type': 'ir.actions.act_window',
             'res_model': 'ir.attachment',
             'view_mode': 'tree,form',
-            'domain': [
-                ('res_model', 'ilike', self.model_name.strip()),
-                ('google_file_id', '!=', False),
-            ],
+            'domain': self._get_action_domain([('google_file_id', '!=', False)]),
             'context': {'create': False},
             'target': 'current',
         }
@@ -230,10 +302,7 @@ class AttachmentSyncConfig(models.Model):
             'type': 'ir.actions.act_window',
             'res_model': 'ir.attachment',
             'view_mode': 'tree,form',
-            'domain': [
-                ('res_model', 'ilike', self.model_name.strip()),
-                ('google_file_id', '=', False),
-            ],
+            'domain': self._get_action_domain([('google_file_id', '=', False)]),
             'context': {'create': False},
             'target': 'current',
         }
@@ -246,11 +315,7 @@ class AttachmentSyncConfig(models.Model):
             'type': 'ir.actions.act_window',
             'res_model': 'ir.attachment',
             'view_mode': 'tree,form',
-            'domain': [
-                ('res_model', 'ilike', self.model_name.strip()),
-                ('google_file_id', '!=', False),
-                ('type', '!=', 'url')
-            ],
+            'domain': self._get_action_domain([('google_file_id', '!=', False), ('type', '!=', 'url')]),
             'context': {'create': False},
             'target': 'current',
         }
@@ -263,11 +328,7 @@ class AttachmentSyncConfig(models.Model):
             'type': 'ir.actions.act_window',
             'res_model': 'ir.attachment',
             'view_mode': 'tree,form',
-            'domain': [
-                ('res_model', 'ilike', self.model_name.strip()),
-                ('google_file_id', '!=', False),
-                ('type', '=', 'url')
-            ],
+            'domain': self._get_action_domain([('google_file_id', '!=', False), ('type', '=', 'url')]),
             'context': {'create': False},
             'target': 'current',
         }
@@ -280,9 +341,7 @@ class AttachmentSyncConfig(models.Model):
             'type': 'ir.actions.act_window',
             'res_model': 'ir.attachment',
             'view_mode': 'tree,form',
-            'domain': [
-                ('res_model', '=', self.model_name),
-            ],
+            'domain': self._get_action_domain(),
             'context': {'create': False},
             'target': 'current',
         }
@@ -315,8 +374,21 @@ class AttachmentSyncConfig(models.Model):
     def action_manual_drive_sync(self):
         """Manually sync all unsynced attachments for this model and show notification."""
         self.ensure_one()
-        
-        # 1. First check: Select Storage Mode validation
+
+        # 1. Block sync when storage mode is 'odoo only'
+        if self.storage_mode == 'odoo':
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Sync Skipped',
+                    'message': 'Storage Mode is set to "Odoo Only". Change the Storage Mode to Drive or Dual to sync.',
+                    'type': 'info',
+                    'sticky': False,
+                }
+            }
+
+        # 2. Validate storage mode is selected
         if not self.storage_mode:
             return {
                 'type': 'ir.actions.client',
@@ -329,43 +401,45 @@ class AttachmentSyncConfig(models.Model):
                 }
             }
 
-        # 2. Search for all attachments for this model that haven't been synced yet
-        domain = [
-            ('res_model', 'ilike', self.model_name.strip()),
-            ('google_file_id', '=', False),
-        ]
-        
-        # Filter by file type if not 'all'
-        if self.file_type != 'all':
-            if self.file_type == 'pdf':
-                domain.append(('mimetype', 'ilike', 'pdf'))
-            elif self.file_type == 'doc':
-                domain.append(('mimetype', 'ilike', 'word'))
-            elif self.file_type == 'xls':
-                domain.append(('mimetype', 'ilike', 'excel'))
-            elif self.file_type == 'ppt':
-                domain.append(('mimetype', 'ilike', 'powerpoint'))
-            elif self.file_type == 'img':
-                domain.append(('mimetype', 'ilike', 'image'))
+        # 3. Get all unsynced attachments for this model (includes chatter copies)
+        attachments = self._get_target_attachments([('google_file_id', '=', False)])
 
-        attachments = self.env['ir.attachment'].search(domain)
-        
+        # Apply the SAME file-type filter that auto-sync uses (_matches_file_type_filter).
+        # Previously used inconsistent MIME ilike domain queries that didn't match
+        # the auto-sync logic, causing the same file to sync via one path but not the other.
+        if self.file_type != 'all':
+            ir_att = self.env['ir.attachment']
+            attachments = attachments.filtered(
+                lambda att: ir_att._matches_file_type_filter(att, self)
+            )
+
         synced_count = 0
+        failed_count = 0
         if attachments:
             for attachment in attachments:
+                # Use a savepoint per file: a failure on one file
+                # rolls back ONLY that file's changes, not all previously synced files.
                 try:
-                    # Use the automated sync logic which respects storage_mode
-                    attachment.with_context(sync_type='manual')._auto_sync_to_drive(self)
-                    synced_count += 1
-                except Exception as e:
-                    self.env.cr.rollback()
+                    with self.env.cr.savepoint():
+                        attachment.with_context(sync_type='manual')._auto_sync_to_drive(self)
+                        synced_count += 1
+                except Exception:
+                    failed_count += 1
                     continue
 
-        # 3. Success Notification (Instead of routing to another page)
+        # 4. Notification
         model_label = self.module_config_id.model_label or self.model_name
-        message = f"Synchronization complete! {synced_count} {model_label} files moved to Google Drive."
-        if synced_count == 0:
+        if synced_count > 0:
+            message = f"Synchronization complete! {synced_count} {model_label} file(s) moved to Google Drive."
+            if failed_count:
+                message += f" ({failed_count} file(s) failed — check sync logs.)"
+            notif_type = 'success'
+        elif not attachments:
             message = f"No unsynced {model_label} files found for this configuration."
+            notif_type = 'info'
+        else:
+            message = f"All {failed_count} file(s) failed to sync. Please check the sync logs."
+            notif_type = 'warning'
 
         return {
             'type': 'ir.actions.client',
@@ -373,50 +447,57 @@ class AttachmentSyncConfig(models.Model):
             'params': {
                 'title': f'{model_label} Sync Result',
                 'message': message,
-                'type': 'success' if synced_count > 0 or not attachments else 'info',
+                'type': notif_type,
                 'sticky': False,
             }
         }
 
     def action_setup_auto_sync(self):
-        """Setup auto-sync for selected configuration."""
+        """Setup auto-sync: push all unsynced historical attachments to Google Drive.
+        Uses _get_target_attachments() to correctly include chatter (mail.message) copies
+        and uses per-file savepoints so a single failure doesn't roll back all others.
+        """
         self.ensure_one()
 
-        # Create or update auto-sync configuration
-        # This could create a scheduled job or set up webhooks
-        # For now, we'll just mark attachments as auto-sync enabled
+        if self.storage_mode == 'odoo':
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Auto-Sync Skipped',
+                    'message': 'Storage Mode is set to "Odoo Only". Change the Storage Mode to Drive or Dual to sync.',
+                    'type': 'info',
+                    'sticky': False,
+                }
+            }
 
-        domain = [
-            ('res_model', '=', self.model_name),
-            ('google_file_id', '=', False),  # Not yet synced
-        ]
+        # Get all unsynced attachments (includes direct + chatter mail.message copies)
+        attachments = self._get_target_attachments([('google_file_id', '=', False)])
 
+        # Apply the SAME file-type filter as auto-sync for consistency
         if self.file_type != 'all':
-            if self.file_type == 'pdf':
-                domain.append(('mimetype', 'ilike', 'pdf'))
-            elif self.file_type == 'doc':
-                domain.append(('mimetype', 'ilike', 'word'))
-            elif self.file_type == 'xls':
-                domain.append(('mimetype', 'ilike', 'excel'))
-            elif self.file_type == 'ppt':
-                domain.append(('mimetype', 'ilike', 'powerpoint'))
-            elif self.file_type == 'img':
-                domain.append(('mimetype', 'ilike', 'image'))
+            ir_att = self.env['ir.attachment']
+            attachments = attachments.filtered(
+                lambda att: ir_att._matches_file_type_filter(att, self)
+            )
 
-        attachments = self.env['ir.attachment'].search(domain)
+        synced_count = 0
+        failed_count = 0
+        if attachments:
+            for attachment in attachments:
+                try:
+                    with self.env.cr.savepoint():
+                        attachment.with_context(sync_type='auto_setup')._auto_sync_to_drive(self)
+                        synced_count += 1
+                except Exception:
+                    failed_count += 1
+                    continue
 
-        # Configure attachments for auto-sync
-        attachments.write({
-            'google_drive_id': self.google_drive_id.id,
-            'google_folder_id': self.google_folder_id.id,
-            'sync_type': 'external',
-            'auto_sync_enabled': True,
-        })
-
-        # Create folder structure if active
         folder_structure = self._create_attachment_categories()
-        
-        message = f'Auto-sync enabled for {len(attachments)} files in {self.model_name}'
+        model_label = self.module_config_id.model_label or self.model_name
+        message = f'Auto-sync setup complete. {synced_count} historical file(s) moved to Google Drive for {model_label}.'
+        if failed_count:
+            message += f' ({failed_count} file(s) failed — check sync logs.)'
         if self.state == 'active' and folder_structure:
             message += f'\n\nAttachment Structure:\n{folder_structure}'
 
@@ -432,8 +513,39 @@ class AttachmentSyncConfig(models.Model):
         }
 
     def action_apply_sync(self):
-        """Apply the selected sync mode."""
+        """Push all unsynced historical attachments to Google Drive.
+        Always triggers a batch sync regardless of the auto_sync_mode toggle.
+        (Auto-sync for NEW files is handled automatically by ir.attachment.create/write hooks.)
+        """
         self.ensure_one()
-        if self.auto_sync_mode:
-            return self.action_setup_auto_sync()
-        return self.action_manual_sync()
+        return self.action_manual_drive_sync()
+
+    def action_pause_config(self):
+        """Pause this sync configuration: disables auto-sync triggers and sets state to paused."""
+        self.ensure_one()
+        self.write({'state': 'paused', 'auto_sync_mode': False})
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Configuration Paused',
+                'message': 'Auto-sync has been paused. New attachments will no longer be synced automatically.',
+                'type': 'warning',
+                'sticky': False,
+            }
+        }
+
+    def action_activate_config(self):
+        """Activate this sync configuration."""
+        self.ensure_one()
+        self.write({'state': 'active'})
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Configuration Activated',
+                'message': 'This configuration is now active. Enable Auto Sync Mode to sync new files automatically.',
+                'type': 'success',
+                'sticky': False,
+            }
+        }

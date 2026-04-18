@@ -46,8 +46,8 @@
                             <!-- Storage Status Bar -->
                             <div class="px-3 py-2">
                                 <div class="d-flex gap-1 flex-wrap">
-                                    <span t-attf-class="badge rounded-pill #{record.storage_mode.raw_value == 'dual' ? 'bg-success-light text-success' : 'bg-info-light text-info'}" 
-                                          style="font-size: 10px; padding: 4px 8px; border: 1px solid currentColor;">
+                                    <span t-attf-class="badge rounded-pill #{record.storage_mode.raw_value == 'dual' ? 'text-bg-success' : record.storage_mode.raw_value == 'odoo' ? 'text-bg-warning' : 'text-bg-info'}" 
+                                          style="font-size: 10px; padding: 4px 8px;">
                                         <i class="fa fa-database me-1"/>
                                         <t t-esc="record.storage_mode.value"/>
                                     </span>
@@ -122,6 +122,18 @@
         <field name="arch" type="xml">
             <form>
                 <header>
+                    <!-- Activate button: shown when config is draft or paused -->
+                    <button name="action_activate_config"
+                            string="Activate"
+                            type="object"
+                            class="btn btn-success"
+                            invisible="state == 'active'"/>
+                    <!-- Pause button: shown only when config is active -->
+                    <button name="action_pause_config"
+                            string="Pause"
+                            type="object"
+                            class="btn btn-warning"
+                            invisible="state != 'active'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,active,paused"/>
                 </header>
                 <sheet>
@@ -190,9 +202,9 @@
                     <!-- Step 4: Storage Mode -->
                     <group name="step4" string="Step 4: Select Storage Mode" col="2">
                         <field name="storage_mode" widget="radio" options="{'horizontal': true}"/>
-                        <div colspan="2" class="mt-3 mb-2" style="width:13rem">
-                            <button name="action_manual_drive_sync" 
-                                    string="Manual Drive Sync Now" 
+                        <div colspan="2" class="mt-3 mb-2" style="width:18rem">
+                            <button name="action_apply_sync" 
+                                    string="Apply Sync &amp; Push Old Files" 
                                     type="object" 
                                     class="btn btn-primary w-100 py-2 fw-bold" 
                                     icon="fa-cloud-upload"/>
@@ -205,7 +217,8 @@
                                 <div>
                                     <h6 class="mb-2 fw-bold">Understanding Storage Modes:</h6>
                                     <div class="mb-1"><strong>🚀 Drive only:</strong> Files are stored <strong>only</strong> on Google Drive. Saves server space (Odoo storage minimized).</div>
-                                    <div class="mb-0"><strong>🔄 Dual:</strong> Files are kept in <strong>both</strong> Odoo and Google Drive. Maximum redundancy.</div>
+                                    <div class="mb-1"><strong>🔄 Dual:</strong> Files are kept in <strong>both</strong> Odoo and Google Drive. Maximum redundancy.</div>
+                                    <div class="mb-0"><strong>🗄️ Odoo only:</strong> Files stay in Odoo. <strong>No</strong> sync to Google Drive will occur for this configuration.</div>
                                 </div>
                             </div>
                         </div>
@@ -337,7 +350,7 @@
                 </sheet>
                 <footer>
                     <button string="Save" type="object" name="action_save_and_return" class="btn btn-primary"/>
-                    <button string="Manual Drive Sync" type="object" name="action_manual_drive_sync" class="btn btn-secondary" invisible="storage_mode == 'odoo'"/>
+                    <button string="Apply Sync Setup" type="object" name="action_apply_sync" class="btn btn-secondary"/>
                     <button string="Discard" class="btn btn-light" special="cancel"/>
                 </footer>
             </form>

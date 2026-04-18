@@ -53,20 +53,22 @@ class IrAttachment(models.Model):
 
     @api.depends('google_drive_id', 'google_folder_id')
     def _compute_google_folder_path(self):
-        """Compute a human-readable folder path from the selected drive and folder."""
+        """Compute a human-readable folder path from the selected drive and folder.
+        Correct order: Drive / GrandParent / Parent / SelectedFolder
+        """
         for attachment in self:
             path_parts = []
             if attachment.google_drive_id:
                 path_parts.append(attachment.google_drive_id.name)
             if attachment.google_folder_id:
-                path_parts.append(attachment.google_folder_id.name)
+                # Build ancestor chain root→parent first, then append selected folder last
+                ancestors = []
                 parent = attachment.google_folder_id.parent_folder_id
-                inner_parts = []
                 while parent:
-                    inner_parts.insert(0, parent.name)
+                    ancestors.insert(0, parent.name)
                     parent = parent.parent_folder_id
-                if inner_parts:
-                    path_parts.extend(inner_parts)
+                path_parts.extend(ancestors)
+                path_parts.append(attachment.google_folder_id.name)
             attachment.google_folder_path = ' / '.join(path_parts) if path_parts else ''
 
     @api.depends('google_file_id')
@@ -101,18 +103,63 @@ class IrAttachment(models.Model):
         for vals in vals_list:
             if vals.get('model_name') and not vals.get('res_model'):
                 vals['res_model'] = vals['model_name']
-        
+
         attachments = super(IrAttachment, self).create(vals_list)
-        
-        # Auto-sync logic: check each new attachment against configured models
+
         for attachment in attachments:
             if self.env.context.get('skip_gdrive_sync'):
                 continue
-                
+
             res_model = attachment.res_model
             res_id = attachment.res_id
-            
-            # Resolve "Effective Model" for mail wizards/messages
+
+            # ────────────────────────────────────────────────────────────────────────────
+            # Case A: mail.message chatter attachment
+            # Resolve the parent model and upload ONCE to the correct model folder.
+            # Setting google_file_id on the mail.message record makes the chatter
+            # display the Drive link icon (↗) instead of a download button (↓).
+            # ────────────────────────────────────────────────────────────────────────────
+            if res_model == 'mail.message' and res_id:
+                parent_model, parent_res_id = self._resolve_mail_message_parent(res_id)
+                if not parent_model or not parent_res_id:
+                    continue
+                config = self.env['attachment.sync.config'].sudo().get_config_for_model(parent_model)
+                if not config or config.storage_mode == 'odoo' or not config.auto_sync_mode:
+                    continue
+                if not self._matches_file_type_filter(attachment, config):
+                    continue
+
+                # If this mail.message attachment has no file data (e.g. Drive-only mode
+                # already cleared the local data from the direct model attachment), try to
+                # INHERIT the Drive link from the direct attachment instead of re-uploading.
+                if not attachment.datas and not attachment.raw:
+                    direct = self.env['ir.attachment'].sudo().search([
+                        ('res_model', '=', parent_model),
+                        ('res_id', '=', parent_res_id),
+                        ('name', '=', attachment.name),
+                        ('google_file_id', '!=', False),
+                    ], limit=1)
+                    if direct:
+                        attachment.with_context(skip_gdrive_sync=True).write({
+                            'google_file_id': direct.google_file_id,
+                            'type': 'url',
+                            'url': direct.url or f"https://drive.google.com/file/d/{direct.google_file_id}/view",
+                        })
+                    continue  # No data = no upload; either inherited or will retry on write()
+
+                attachment.with_context(
+                    sync_target_model=parent_model,
+                    sync_target_id=parent_res_id,
+                )._auto_sync_to_drive(config)
+                continue
+
+            # Totally ignore non-relevant mail models
+            if res_model in ('mail.thread', 'mail.followers'):
+                continue
+
+            # ────────────────────────────────────────────────────────────────────────────
+            # Case B: mail.compose.message wizard — resolve to real model/id
+            # ────────────────────────────────────────────────────────────────────────────
             if res_model == 'mail.compose.message':
                 wizard = self.env['mail.compose.message'].sudo().browse(res_id) if res_id else False
                 if wizard and wizard.exists() and wizard.model:
@@ -130,39 +177,50 @@ class IrAttachment(models.Model):
                             res_id = 0
                     else:
                         res_id = getattr(wizard, 'res_id', 0)
-                elif not res_id:
-                    # Report created for composer with ID 0; fall back to context
-                    ctx_model = self.env.context.get('active_model') or self.env.context.get('default_model')
-                    ctx_id = self.env.context.get('active_id') or self.env.context.get('default_res_id') or (self.env.context.get('default_res_ids') or [0])[0]
-                    if ctx_model:
-                        res_model = ctx_model
-                        res_id = ctx_id
+                else:
+                    continue  # Wizard not committed or no model
 
-            elif res_model == 'mail.message' and res_id:
-                msg = self.env['mail.message'].sudo().browse(res_id)
-                if msg.exists() and msg.model:
-                    res_model = msg.model
-                    res_id = msg.res_id
-
-            # Step 1: Check if model is configured in Attachment Sync Configuration
+            # ────────────────────────────────────────────────────────────────────────────
+            # Case C: Direct model attachment
+            # Skip if the mail.message copy of the same file for this record was
+            # already synced — this prevents uploading the same file twice to Drive.
+            # ────────────────────────────────────────────────────────────────────────────
             config = self.env['attachment.sync.config'].sudo().get_config_for_model(res_model)
             if not config or config.storage_mode == 'odoo' or not config.auto_sync_mode:
                 continue
-
-            # Step 2: Check file type filter from config
             if not self._matches_file_type_filter(attachment, config):
                 continue
-
             if not attachment.datas and not attachment.raw:
                 continue
 
-            # Step 3: Trigger sync with resolved model/id for correct folder structure
+            # Dedup: skip if mail.message copy already synced this file for this record
+            msg_already_synced = self.env['ir.attachment'].sudo().search_count([
+                ('res_model', '=', 'mail.message'),
+                ('name', '=', attachment.name),
+                ('google_file_id', '!=', False),
+                ('res_id', 'in', self.env['mail.message'].sudo().search([
+                    ('model', '=', res_model), ('res_id', '=', res_id)
+                ]).ids),
+            ]) > 0
+            if msg_already_synced:
+                continue
+
             attachment.with_context(
-                sync_target_model=res_model, 
-                sync_target_id=res_id
+                sync_target_model=res_model,
+                sync_target_id=res_id,
             )._auto_sync_to_drive(config)
-            
+
         return attachments
+
+    def _resolve_mail_message_parent(self, msg_id):
+        """Safely resolve the parent model/res_id from a mail.message record."""
+        try:
+            msg = self.env['mail.message'].sudo().browse(msg_id)
+            if msg.exists() and msg.model and msg.res_id:
+                return msg.model, msg.res_id
+        except Exception:
+            pass
+        return None, None
 
     def write(self, vals):
         # Handle model_name → res_model mapping
@@ -170,29 +228,83 @@ class IrAttachment(models.Model):
             vals['res_model'] = vals['model_name']
 
         res = super(IrAttachment, self).write(vals)
-        
+
         if self.env.context.get('skip_gdrive_sync'):
             return res
-            
-        # Catch attachments re-linking to their final model OR obtaining data late
-        trigger_fields = {'res_model', 'res_id', 'datas', 'raw', 'db_datas'}
+
+        # Catch attachments that get their data late (e.g. generated report PDFs)
+        trigger_fields = {'res_model', 'res_id', 'datas', 'raw', 'db_datas', 'store_fname'}
         if any(f in vals for f in trigger_fields):
             for attachment in self:
                 if attachment.google_file_id:
                     continue  # Already synced
 
-                config = self.env['attachment.sync.config'].sudo().get_config_for_model(attachment.res_model)
-                if not config or not config.auto_sync_mode:
+                res_model = attachment.res_model
+                res_id = attachment.res_id
+
+                # ─ Case A: mail.message chatter attachment ─
+                if res_model == 'mail.message' and res_id:
+                    parent_model, parent_res_id = self._resolve_mail_message_parent(res_id)
+                    if not parent_model or not parent_res_id:
+                        continue
+                    config = self.env['attachment.sync.config'].sudo().get_config_for_model(parent_model)
+                    if not config or config.storage_mode == 'odoo' or not config.auto_sync_mode:
+                        continue
+                    if not self._matches_file_type_filter(attachment, config):
+                        continue
+
+                    # No local data: try inheriting Drive link from direct attachment
+                    if not attachment.datas and not attachment.raw:
+                        direct = self.env['ir.attachment'].sudo().search([
+                            ('res_model', '=', parent_model),
+                            ('res_id', '=', parent_res_id),
+                            ('name', '=', attachment.name),
+                            ('google_file_id', '!=', False),
+                        ], limit=1)
+                        if direct:
+                            attachment.with_context(skip_gdrive_sync=True).write({
+                                'google_file_id': direct.google_file_id,
+                                'type': 'url',
+                                'url': direct.url or f"https://drive.google.com/file/d/{direct.google_file_id}/view",
+                            })
+                        continue
+
+                    attachment.with_context(
+                        sync_target_model=parent_model,
+                        sync_target_id=parent_res_id,
+                    )._auto_sync_to_drive(config)
                     continue
 
+                if res_model in ('mail.thread', 'mail.followers'):
+                    continue
+
+                # ─ Case B: Direct model attachment ─
+                config = self.env['attachment.sync.config'].sudo().get_config_for_model(res_model)
+                # Guard matches create(): skip if no config, odoo-only mode, or auto-sync is off
+                if not config or config.storage_mode == 'odoo' or not config.auto_sync_mode:
+                    continue
                 if not self._matches_file_type_filter(attachment, config):
                     continue
-                
                 if not attachment.datas and not attachment.raw:
                     continue
-                
-                attachment._auto_sync_to_drive(config)
-                
+
+                # Dedup: skip if mail.message copy already synced this file
+                msg_already_synced = self.env['ir.attachment'].sudo().search_count([
+                    ('res_model', '=', 'mail.message'),
+                    ('name', '=', attachment.name),
+                    ('google_file_id', '!=', False),
+                    ('res_id', 'in', self.env['mail.message'].sudo().search([
+                        ('model', '=', res_model), ('res_id', '=', res_id)
+                    ]).ids),
+                ]) > 0
+                if msg_already_synced:
+                    continue
+
+                attachment.with_context(
+                    sync_target_model=res_model,
+                    sync_target_id=res_id,
+                )._auto_sync_to_drive(config)
+
         return res
 
     @api.model
@@ -230,104 +342,111 @@ class IrAttachment(models.Model):
              root = config.google_drive_id.root_ids.filtered(lambda r: r.active)[:1]
              parent_id = root.root_id if root else False
 
-        # Check if it is an email attachment
-        is_email = False
-        if 'mail.message' in self.env:
-            is_email = bool(self.env['mail.message'].search_count([('attachment_ids', 'in', self.id)]))
-
         # Apply Dynamic Folder Structure Logic
+        # Prefer explicit context targets; auto-resolve mail.message to its parent so that
+        # chatter attachment copies always land in the correct model folder (not 'General/mail_message/…').
         res_model = self.env.context.get('sync_target_model') or self.res_model
         res_id = self.env.context.get('sync_target_id') or self.res_id
+        if res_model == 'mail.message' and res_id:
+            parent_model, parent_res_id = self._resolve_mail_message_parent(res_id)
+            if parent_model and parent_res_id:
+                res_model, res_id = parent_model, parent_res_id
         
-        model_root, record_folder, model_sub = self._get_sync_subfolder_name(
-            res_model, res_id, self.mimetype, self.name, is_email
+        model_root, record_folder = self._get_sync_subfolder_name(
+            res_model, res_id
         )
         
         current_local_parent_id = config.google_folder_id.id
         current_drive_parent_id = parent_id
 
         def get_or_create_local_folder(f_name, parent_local, config_drive_id, gdrive_id, gdrive_url):
-            local_folder = self.env['google.drive.file'].sudo().search([
+            search_domain = [
                 ('name', '=', f_name),
                 ('parent_folder_id', '=', parent_local),
-                ('file_type', '=', 'folder')
-            ], limit=1)
+                ('file_type', '=', 'folder'),
+            ]
+            local_folder = self.env['google.drive.file'].sudo().search(search_domain, limit=1)
             if not local_folder:
-                local_folder = self.env['google.drive.file'].sudo().create({
-                    'name': f_name,
-                    'file_type': 'folder',
-                    'drive_config_id': config_drive_id,
-                    'parent_folder_id': parent_local,
-                    'google_file_id': gdrive_id,
-                    'google_url': gdrive_url,
-                    'sync_state': 'synced',
-                    'owner_name': self.env.user.name,
-                })
-            return local_folder.id
+                # Use a savepoint to handle concurrent uploads that race to create the
+                # same folder (avoids IntegrityError from the unique constraint).
+                try:
+                    with self.env.cr.savepoint():
+                        local_folder = self.env['google.drive.file'].sudo().create({
+                            'name': f_name,
+                            'file_type': 'folder',
+                            'drive_config_id': config_drive_id,
+                            'parent_folder_id': parent_local,
+                            'google_file_id': gdrive_id,
+                            'google_url': gdrive_url,
+                            'sync_state': 'synced',
+                            'owner_name': self.env.user.name,
+                        })
+                except Exception:
+                    # Another process won the race; re-search to get that record.
+                    local_folder = self.env['google.drive.file'].sudo().search(search_domain, limit=1)
+            return local_folder.id if local_folder else parent_local
         
         if model_root and record_folder and current_drive_parent_id:
-            # 1. Find or create Model Root Folder (e.g. Sales)
+            # 1. Find or create Model Root Folder (e.g. Sales, CRM, Accounting...)
             root_res = sync_service.find_or_create_folder(model_root, current_drive_parent_id, config.google_drive_id)
             if root_res:
                 current_local_parent_id = get_or_create_local_folder(
-                    model_root, current_local_parent_id, config.google_drive_id.id, 
+                    model_root, current_local_parent_id, config.google_drive_id.id,
                     root_res['google_file_id'], root_res.get('google_url')
                 )
-                
-                # 2. Find or create Record Hierarchy (Recursive/Loop)
-                # record_folder can now be a list of paths for deep nested structures
-                path_parts = record_folder if isinstance(record_folder, list) else [record_folder]
-                
-                for part in path_parts:
-                    if not part: continue
-                    record_res = sync_service.find_or_create_folder(part, root_res['google_file_id'], config.google_drive_id)
-                    if record_res:
-                        current_local_parent_id = get_or_create_local_folder(
-                            part, current_local_parent_id, config.google_drive_id.id, 
-                            record_res['google_file_id'], record_res.get('google_url')
-                        )
-                        # Update root_res for next iteration
-                        root_res = record_res
-                    else:
-                        break # Stop if folder creation fails
-                
-                # 3. Find or create Category Subfolder (e.g. invoices)
-                sub_res = sync_service.find_or_create_folder(model_sub, root_res['google_file_id'], config.google_drive_id)
-                if sub_res:
-                    current_local_parent_id = get_or_create_local_folder(
-                        model_sub, current_local_parent_id, config.google_drive_id.id, 
-                        sub_res['google_file_id'], sub_res.get('google_url')
-                    )
-                    parent_id = sub_res['google_file_id']
 
-        # Attempt Upload
+                # 2. Find or create Record Folder (e.g. order_idS00001, lead_idLead Name, move_idINV/2025/0001)
+                # record_folder is a list to support names with '/' (e.g. INV/2025/0001 -> ['move_idINV', '2025', '0001'])
+                path_parts = record_folder if isinstance(record_folder, list) else [record_folder]
+                last_res = root_res
+                for part in path_parts:
+                    if not part:
+                        continue
+                    part_res = sync_service.find_or_create_folder(part, last_res['google_file_id'], config.google_drive_id)
+                    if part_res:
+                        current_local_parent_id = get_or_create_local_folder(
+                            part, current_local_parent_id, config.google_drive_id.id,
+                            part_res['google_file_id'], part_res.get('google_url')
+                        )
+                        last_res = part_res
+                    else:
+                        break
+
+                # Files are uploaded directly into the record folder (no category subfolder)
+                parent_id = last_res['google_file_id']
+
+        # Attempt Upload — abort early if there is no file content (prevents 0-byte uploads)
+        import base64
+        file_content = base64.b64decode(self.datas) if self.datas else self.raw
+        if not file_content:
+            return  # No data yet; write() will retry when data arrives
+
         try:
             result = sync_service.upload_file_to_drive(
                 self.name,
-                self.raw,
+                file_content,
                 self.mimetype or 'application/octet-stream',
                 config.google_drive_id,
                 parent_gdrive_id=parent_id
             )
 
             if result:
-                vals = {
+                # Write Drive file ID + metadata back to this attachment
+                att_vals = {
                     'google_file_id': result['google_file_id'],
                     'google_drive_id': config.google_drive_id.id,
                     'google_folder_id': config.google_folder_id.id,
                     'sync_type': 'external',
                 }
-                
                 # Handle "Drive only" mode
                 if config.storage_mode == 'drive':
-                    vals.update({
+                    att_vals.update({
                         'type': 'url',
                         'url': result['google_url'],
-                        'datas': False, # Remove local binary
+                        'datas': False,  # Remove local binary
                         'db_datas': False,
                     })
-                
-                self.with_context(skip_gdrive_sync=True).write(vals)
+                self.with_context(skip_gdrive_sync=True).write(att_vals)
 
                 # Update sync count on config
                 config.write({
@@ -335,25 +454,30 @@ class IrAttachment(models.Model):
                     'last_synced': fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 })
                 
-                # Register in explorer
-                self.env['google.drive.file'].sudo().create({
-                    'name': self.name,
-                    'drive_config_id': config.google_drive_id.id,
-                    'parent_folder_id': current_local_parent_id,
-                    'file_type': 'file',
-                    'mime_type': self.mimetype or 'application/octet-stream',
-                    'file_size': len(self.raw) if self.raw else 0,
-                    'google_file_id': result['google_file_id'],
-                    'google_url': result['google_url'],
-                    'owner_name': self.env.user.name,
-                    'sync_state': 'synced',
-                    'last_synced': fields.Datetime.now(),
-                })
+                # Register in explorer — guard against duplicates from retry/race scenarios
+                existing_drive_file = self.env['google.drive.file'].sudo().search([
+                    ('google_file_id', '=', result['google_file_id']),
+                    ('drive_config_id', '=', config.google_drive_id.id),
+                ], limit=1)
+                if not existing_drive_file:
+                    self.env['google.drive.file'].sudo().create({
+                        'name': self.name,
+                        'drive_config_id': config.google_drive_id.id,
+                        'parent_folder_id': current_local_parent_id,
+                        'file_type': 'file',
+                        'mime_type': self.mimetype or 'application/octet-stream',
+                        'file_size': len(file_content) if file_content else 0,
+                        'google_file_id': result['google_file_id'],
+                        'google_url': result['google_url'],
+                        'owner_name': self.env.user.name,
+                        'sync_state': 'synced',
+                        'last_synced': fields.Datetime.now(),
+                    })
                 
                 # Detailed success logging for both auto and manual syncs
                 current_sync_type = self.env.context.get('sync_type', 'auto')
                 record_path_str = "/".join(record_folder) if isinstance(record_folder, list) else str(record_folder)
-                full_drive_path = f"{str(model_root)}/{record_path_str}/{str(model_sub)}"
+                full_drive_path = f"{str(model_root)}/{record_path_str}"
                 
                 if config.storage_mode == 'drive':
                     details = f"Storage Mode: Drive Only\nSaved to Drive folder path: {full_drive_path}\nDrive URL: {result['google_url']}"
@@ -381,7 +505,6 @@ class IrAttachment(models.Model):
                 error_message=f"Auto-sync failed: {str(e)}"
             )
 
-
     def action_toggle_auto_sync(self):
         self.ensure_one()
         self.auto_sync_enabled = not self.auto_sync_enabled
@@ -399,123 +522,72 @@ class IrAttachment(models.Model):
         }
 
     @api.model
-    def _get_sync_subfolder_name(self, model, res_id, mimetype, name, is_email):
-        """Determine the hierarchical folder structure.
-        Returns: (root_name, record_path_list, category_name)
+    def _get_sync_subfolder_name(self, model, res_id):
+        """Determine the 2-level folder structure for Google Drive sync.
+
+        Root folder name is read from gdrive.model.config.drive_root_folder_name
+        so that adding new models to the config automatically gives them the right
+        folder — no hardcoded MAP needed.
+
+        Record folder prefix is derived automatically from the model name:
+            crm.lead  → 'lead_id'
+            sale.order → 'order_id'
+            stock.picking → 'picking_id'
+
+        Returns: (root_name, record_path_list)
+            root_name        – top-level folder (e.g. 'Sales')
+            record_path_list – list of path segments for the record subfolder.
+                               Names containing '/' are split into nested segments.
+                               Examples:
+                                 S00001        → ['order_idS00001']
+                                 INV/2025/0001 → ['move_idINV', '2025', '0001']
         """
-        MAP = {
-            'crm.lead':             { 'root': 'CRM',        'prefix': 'lead_id',     'sub': ['documents', 'images', 'Email_attachments'] },
-            'sale.order':           { 'root': 'Sales',      'prefix': 'order_id',    'sub': ['quotations', 'customer_files', 'Email_attachments'] },
-            'account.move':         { 'root': 'Accounting', 'prefix': 'move_id',     'sub': ['invoices', 'vendor_bills', 'tax_docs'] },
-            'account.move.send':    { 'root': 'Accounting', 'prefix': 'move_id',     'sub': ['invoices', 'vendor_bills', 'tax_docs'] },
-            'purchase.order':       { 'root': 'Purchase',   'prefix': 'order_id',    'sub': ['vendor_docs', 'rfq', 'contracts'] },
-            'hr.employee':          { 'root': 'HR',         'prefix': 'employee_id', 'sub': ['certificates', 'id_docs', 'contracts'] },
-            'project.task':         { 'root': 'Project',    'prefix': 'task_id',     'sub': ['task_files', 'references', 'deliverables'] },
-            'stock.picking':        { 'root': 'Inventory',  'prefix': 'picking_id',  'sub': ['delivery_notes', 'packing_lists', 'customs_docs'] },
-            'helpdesk.ticket':      { 'root': 'Helpdesk',   'prefix': 'ticket_id',   'sub': ['screenshots', 'customer_files', 'resolution_docs'] },
-        }
+        if not model:
+            return 'General', ['general']
 
-        if model not in MAP:
-            return "General", [model.replace('.', '_')], "others"
+        # ── Root folder: live lookup from gdrive.model.config ──
+        model_config = self.env['gdrive.model.config'].sudo().search(
+            [('res_model', '=', model)], limit=1
+        )
+        if model_config and model_config.drive_root_folder_name:
+            root_name = model_config.drive_root_folder_name
+        else:
+            # Fallback: title-case last dotted segment  (e.g. 'mrp.production' → 'Production')
+            root_name = model.split('.')[-1].replace('_', ' ').title()
 
-        root_name = MAP[model]['root']
-        subs = MAP[model]['sub']
+        # ── Record prefix: last model segment + '_id' ──
+        prefix = model.split('.')[-1] + '_id'
+
         record_path = []
-        
-        record = False
         if res_id:
             try:
                 record = self.env[model].sudo().browse(res_id)
-                
-                # Special handling for Invoice Sending wizard
-                if model == 'account.move.send' and record.exists() and hasattr(record, 'move_ids') and record.move_ids:
-                     # Use the first move being sent for the path
-                     move = record.move_ids[0]
-                     display_name = move.name
+
+                # Special handling: Invoice Send wizard – use the actual move name
+                if model == 'account.move.send' and record.exists() \
+                        and hasattr(record, 'move_ids') and record.move_ids:
+                    display_name = record.move_ids[0].name
                 else:
-                     display_name = record.display_name if record.exists() else str(res_id)
+                    display_name = record.display_name if record.exists() else str(res_id)
             except Exception:
                 display_name = str(res_id)
-            
-            # Handle Path Splitting (Hierarchy)
-            # e.g. INV/2026/0001 -> ['move_idINV', '2026', '0001']
+
+            # Split names containing '/' into nested sub-folders.
+            # e.g.  INV/2025/0001  →  ['move_idINV', '2025', '0001']
+            # e.g.  WH/OUT/00001   →  ['picking_idWH', 'OUT', '00001']
             if '/' in display_name:
-                parts = display_name.split('/')
-                # Prefix the FIRST part
-                parts[0] = f"{MAP[model]['prefix']}{parts[0]}"
-                record_path = [p.strip() for p in parts if p.strip()]
-            else:
-                record_path = [f"{MAP[model]['prefix']}{display_name}"]
-        else:
-            record_path = [f"{MAP[model]['prefix']}General"]
-
-        category = 'others' # Default
-        lower_name = (name or '').lower()
-
-        # 1. Email Attachments
-        if is_email and 'Email_attachments' in subs:
-            category = 'Email_attachments'
-            
-        # 2. Intelligent Categorization for account.move
-        elif model == 'account.move':
-            # 1. Check for tax keywords (Deep Categorization)
-            tax_keywords = ['tax', 'gst', 'vat', 'certificate', 'tds']
-            # 2. Check for bill/receipt keywords
-            bill_keywords = ['bill', 'receipt', 'vendor', 'purchase']
-            
-            if any(k in lower_name for k in tax_keywords):
-                category = 'tax_docs'
-            elif any(k in lower_name for k in bill_keywords):
-                category = 'vendor_bills'
-            else:
-                # Check record type as fallback
-                move_type = 'unknown'
-                try:
-                    if record:
-                        move_type = record.move_type
-                except Exception:
-                    pass
-                
-                if move_type in ['in_invoice', 'in_refund']:
-                    category = 'vendor_bills'
-                elif move_type in ['out_invoice', 'out_refund']:
-                    category = 'invoices'
-                elif mimetype == 'application/pdf':
-                    # Fallback for PDFs on moves
-                    category = 'invoices' if move_type == 'out_invoice' else 'vendor_bills'
+                parts = [p.strip() for p in display_name.split('/') if p.strip()]
+                if parts:
+                    parts[0] = f"{prefix}{parts[0]}"
+                    record_path = parts
                 else:
-                    category = 'invoices' if move_type == 'out_invoice' else 'vendor_bills'
-
-        # 3. Categorization for other models (Existing logic)
+                    record_path = [f"{prefix}Draft_{res_id}"]
+            else:
+                record_path = [f"{prefix}{display_name}"]
         else:
-            is_pdf = mimetype == 'application/pdf'
-            if is_pdf:
-                if model == 'sale.order' and 'quotations' in subs:
-                    category = 'quotations'
-                elif model == 'crm.lead' and 'documents' in subs:
-                    category = 'documents'
-                elif model == 'purchase.order' and 'rfq' in subs:
-                    category = 'rfq'
-                elif model == 'hr.employee' and 'contracts' in subs:
-                    category = 'contracts'
-                    
-            if model == 'hr.employee':
-                if 'contract' in lower_name and 'contracts' in subs:
-                    category = 'contracts'
-                elif ('id' in lower_name or 'passport' in lower_name) and 'id_docs' in subs:
-                    category = 'id_docs'
-                    
-            if model == 'stock.picking':
-                if ('note' in lower_name or 'delivery' in lower_name) and 'delivery_notes' in subs:
-                    category = 'delivery_notes'
-                elif 'packing' in lower_name and 'packing_lists' in subs:
-                    category = 'packing_lists'
+            record_path = [f"{prefix}General"]
 
-        # Ensure selected category is in allowed subs, otherwise use first available or 'others'
-        if category not in subs:
-            category = subs[0] if subs else 'others'
-
-        return root_name, record_path, category
+        return root_name, record_path
 
     def action_sync_to_drive(self):
         """Manually sync an attachment to Google Drive."""
