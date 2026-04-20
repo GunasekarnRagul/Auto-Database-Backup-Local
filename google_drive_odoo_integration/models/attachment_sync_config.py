@@ -56,7 +56,7 @@ class AttachmentSyncConfig(models.Model):
         ('draft', 'Draft'),
         ('active', 'Active'),
         ('paused', 'Paused'),
-    ], string='State', default='draft')
+    ], string='State', default='active')
 
     # Sync statistics computed fields
     synced_attachment_count = fields.Integer('Synced Files', compute='_compute_sync_statistics')
@@ -234,6 +234,16 @@ class AttachmentSyncConfig(models.Model):
             if record.model_name:
                 # Single fetch — all subsequent stats filter this in-memory recordset
                 all_attachments = record._get_target_attachments()
+                # Exclude ghosts: purely web links with no ID, or any attachment missing physical data
+                all_attachments = all_attachments.filtered(lambda a: a.google_file_id or a.datas or a.raw)
+
+                # Apply the specific file-type filter (so XMLs don't get counted when configured for PDFs)
+                if record.file_type != 'all':
+                    ir_att = self.env['ir.attachment']
+                    all_attachments = all_attachments.filtered(
+                        lambda att: ir_att._matches_file_type_filter(att, record)
+                    )
+
                 synced = all_attachments.filtered(lambda a: a.google_file_id)
                 unsynced = all_attachments - synced
                 dual = synced.filtered(lambda a: a.type != 'url')
@@ -256,12 +266,8 @@ class AttachmentSyncConfig(models.Model):
     def _get_action_domain(self, base_extra=None):
         """Build a correct Odoo domain for ir.attachment covering both direct
         attachments and mail.message chatter copies for this model.
-
-        Bug fix: simply prepending base_extra to the '|' OR-block makes the
-        Odoo domain parser consume only the first leaf and silently ignore the
-        entire OR branch.  The fix is to prepend one '&' per extra condition so
-        they are properly AND-ed with the OR expression.
         """
+        from odoo.osv import expression
         self.ensure_one()
         m_name = self.model_name.strip() if self.model_name else ''
         messages = self.env['mail.message'].sudo().search([('model', '=', m_name)])
@@ -273,13 +279,27 @@ class AttachmentSyncConfig(models.Model):
             '&', ('res_model', '=', 'mail.message'), ('res_id', 'in', messages.ids)
         ]
 
-        if base_extra:
-            # Each extra leaf condition needs one '&' to AND it with the OR block.
-            # e.g. base_extra=[E1, E2] → ['&', '&', E1, E2, '|', A, '&', B, C]
-            # which evaluates as: E1 AND E2 AND (A OR (B AND C))  ✓
-            return ['&'] * len(base_extra) + list(base_extra) + core_domain
+        final_domain = core_domain
 
-        return core_domain
+        # Inject File Type filtering into the visual layout (so XML files don't show when PDF is selected)
+        type_domain = []
+        if self.file_type == 'pdf':
+            type_domain = ['|', ('mimetype', 'ilike', 'pdf'), ('name', 'ilike', '.pdf')]
+        elif self.file_type == 'doc':
+            type_domain = ['|', '|', ('mimetype', 'ilike', 'word'), ('mimetype', 'ilike', 'document'), '|', ('name', 'ilike', '.doc'), ('name', 'ilike', '.docx')]
+        elif self.file_type == 'xls':
+            type_domain = ['|', '|', ('mimetype', 'ilike', 'excel'), ('mimetype', 'ilike', 'spreadsheet'), '|', ('name', 'ilike', '.xls'), ('name', 'ilike', '.xlsx')]
+        elif self.file_type == 'ppt':
+            type_domain = ['|', '|', ('mimetype', 'ilike', 'powerpoint'), ('mimetype', 'ilike', 'presentation'), '|', ('name', 'ilike', '.ppt'), ('name', 'ilike', '.pptx')]
+        elif self.file_type == 'img':
+            type_domain = ['|', ('mimetype', 'ilike', 'image/'), '|', ('name', 'ilike', '.jpg'), '|', ('name', 'ilike', '.jpeg'), '|', ('name', 'ilike', '.png'), '|', ('name', 'ilike', '.gif'), ('name', 'ilike', '.webp')]
+            
+        if type_domain:
+            final_domain = expression.AND([final_domain, type_domain])
+        if base_extra:
+            final_domain = expression.AND([final_domain, base_extra])
+
+        return final_domain
 
     def action_view_synced_files(self):
         """Open list of synced attachments for this model."""
@@ -302,7 +322,7 @@ class AttachmentSyncConfig(models.Model):
             'type': 'ir.actions.act_window',
             'res_model': 'ir.attachment',
             'view_mode': 'tree,form',
-            'domain': self._get_action_domain([('google_file_id', '=', False)]),
+            'domain': self._get_action_domain([('google_file_id', '=', False), ('type', '!=', 'url')]),
             'context': {'create': False},
             'target': 'current',
         }
@@ -371,6 +391,11 @@ class AttachmentSyncConfig(models.Model):
         
         return folder_structure
 
+    def action_refresh_dashboard(self):
+        """Manual refresh of the dashboard statistics."""
+        self.ensure_one()
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
+
     def action_manual_drive_sync(self):
         """Manually sync all unsynced attachments for this model and show notification."""
         self.ensure_one()
@@ -403,6 +428,8 @@ class AttachmentSyncConfig(models.Model):
 
         # 3. Get all unsynced attachments for this model (includes chatter copies)
         attachments = self._get_target_attachments([('google_file_id', '=', False)])
+        # Absolute fail-safe: ignore ghost copies that have no physical data
+        attachments = attachments.filtered(lambda a: a.datas or a.raw)
 
         # Apply the SAME file-type filter that auto-sync uses (_matches_file_type_filter).
         # Previously used inconsistent MIME ilike domain queries that didn't match
@@ -449,6 +476,7 @@ class AttachmentSyncConfig(models.Model):
                 'message': message,
                 'type': notif_type,
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             }
         }
 
@@ -473,6 +501,8 @@ class AttachmentSyncConfig(models.Model):
 
         # Get all unsynced attachments (includes direct + chatter mail.message copies)
         attachments = self._get_target_attachments([('google_file_id', '=', False)])
+        # Absolute fail-safe: ignore ghost copies that have no physical data
+        attachments = attachments.filtered(lambda a: a.datas or a.raw)
 
         # Apply the SAME file-type filter as auto-sync for consistency
         if self.file_type != 'all':
@@ -509,6 +539,7 @@ class AttachmentSyncConfig(models.Model):
                 'message': message,
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             }
         }
 

@@ -881,8 +881,22 @@
         <Dialog title="props.file.name" size="'xl'">
             <div class="gd_preview_container">
                 <iframe t-att-src="previewUrl" class="gd_preview_iframe" frameborder="0" allowfullscreen="true"/>
+                <!-- Fallback hint — shown when Drive blocks the embed (sign-in / sharing) -->
+                <div style="text-align: center; padding: 7px 16px; background: #f8f9fa; border-top: 1px solid #e8eaed; font-size: 0.8rem; color: #5f6368; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <i class="fa fa-info-circle" style="color: #1a73e8;"/>
+                    <span>If the preview is blank, the file may need Google Sign-in or sharing permissions.</span>
+                    <a t-att-href="openInDriveUrl" target="_blank" rel="noopener noreferrer"
+                       style="color: #1a73e8; font-weight: 600; text-decoration: none; white-space: nowrap;">
+                        <i class="fa fa-external-link" style="margin-right: 3px;"/>Open in Google Drive
+                    </a>
+                </div>
             </div>
             <t t-set-slot="footer">
+                <!-- Left-aligned: direct Drive link as reliable fallback -->
+                <a t-att-href="openInDriveUrl" target="_blank" rel="noopener noreferrer"
+                   class="btn btn-outline-primary me-auto">
+                    <i class="fa fa-external-link" style="margin-right: 5px;"/>Open in Drive
+                </a>
                 <button class="btn btn-primary" t-on-click="props.onDownload">Download</button>
                 <button class="btn btn-secondary" t-on-click="props.onOpenDetails">File Details</button>
                 <button class="btn btn-secondary" t-on-click="props.close">Close</button>

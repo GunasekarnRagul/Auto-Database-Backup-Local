@@ -948,15 +948,14 @@ export class FileExplorer extends Component {
         if (file.file_type === 'folder') {
             this.onFolderClick(file);
         } else {
-            // Google Drive preview supports a wide array of formats including office files.
-            const previewableTypes = [
-                'image', 'pdf', 'video', 'audio', 'text', 'document', 'spreadsheet', 'presentation',
-                'msword', 'excel', 'powerpoint', 'officedocument' // Add MS Office formats
-            ];
+            // Google Drive's previewer handles virtually all formats natively (PDF, Office,
+            // images, video, audio, code, etc.). Only skip the dialog for types Drive truly
+            // cannot preview: archives and raw executables.
             const mime = file.mime_type || '';
-            const isPreviewable = previewableTypes.some(t => mime.includes(t));
+            const skipPreviewMimes = ['zip', 'x-rar', 'x-tar', 'archive', 'compressed', 'x-msdownload', 'x-executable'];
+            const canSkipPreview = skipPreviewMimes.some(t => mime.includes(t));
 
-            if (isPreviewable && file.google_file_id) {
+            if (file.google_file_id && !canSkipPreview) {
                 this.dialogService.add(FilePreviewDialog, {
                     file: file,
                     onDownload: () => {
@@ -2318,8 +2317,14 @@ class FilePreviewDialog extends Component {
 
     get previewUrl() {
         const { file } = this.props;
-        // Use Google's standard previewer for a consistent, rich experience
+        // Embedded preview — works for most file types when Drive permissions allow it
         return `https://drive.google.com/file/d/${file.google_file_id}/preview`;
+    }
+
+    get openInDriveUrl() {
+        const { file } = this.props;
+        // Direct /view link — opens in Google Drive, bypasses any iframe embedding restrictions
+        return file.google_url || `https://drive.google.com/file/d/${file.google_file_id}/view`;
     }
 }
 

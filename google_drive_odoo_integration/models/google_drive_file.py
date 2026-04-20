@@ -456,6 +456,8 @@ class GoogleDriveFile(models.Model):
                         'sync_state': 'synced',
                         'last_synced': fields.Datetime.now(),
                     })
+                    # Notify explorer about the new folder in its parent
+                    self.env['google.drive.sync'].sudo()._notify_folder_sync(record.parent_folder_id.id)
                     return True
                 else:
                     record.write({'sync_state': 'error'})
@@ -528,6 +530,8 @@ class GoogleDriveFile(models.Model):
                         'upload_progress': 100.0,
                         'last_synced': fields.Datetime.now(),
                     })
+                    # Notify explorer about the new file in its parent
+                    self.env['google.drive.sync'].sudo()._notify_folder_sync(record.parent_folder_id.id)
                     attachment.with_context(skip_gdrive_sync=True).write({
                         'google_file_id': result['google_file_id'],
                     })

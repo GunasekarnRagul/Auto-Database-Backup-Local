@@ -24,8 +24,7 @@
                             <div class="o_cloud_card_header">
                                 <div class="d-flex align-items-center gap-2">
                                     <div class="o_cloud_card_icon">
-                                        <i class="fa fa-refresh text-primary" t-if="record.auto_sync_mode.raw_value"/>
-                                        <i class="fa fa-pause text-muted" t-if="!record.auto_sync_mode.raw_value"/>
+                                        <i class="fa fa-refresh text-primary"/>
                                     </div>
                                     <div class="min-w-0">
                                         <div class="o_cloud_card_title text-truncate">
@@ -121,21 +120,7 @@
         <field name="model">attachment.sync.config</field>
         <field name="arch" type="xml">
             <form>
-                <header>
-                    <!-- Activate button: shown when config is draft or paused -->
-                    <button name="action_activate_config"
-                            string="Activate"
-                            type="object"
-                            class="btn btn-success"
-                            invisible="state == 'active'"/>
-                    <!-- Pause button: shown only when config is active -->
-                    <button name="action_pause_config"
-                            string="Pause"
-                            type="object"
-                            class="btn btn-warning"
-                            invisible="state != 'active'"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,active,paused"/>
-                </header>
+
                 <sheet>
                     <div class="oe_title">
                         <h1>
@@ -234,9 +219,14 @@
                                 <i class="fa fa-bar-chart text-primary" style="font-size: 1.4em;"/>
                                 <h4 class="mb-0 fw-bold">Sync Dashboard</h4>
                             </div>
-                            <button name="action_view_all_files" type="object" class="btn btn-sm btn-outline-secondary" icon="fa-list">
-                                View All Files
-                            </button>
+                            <div class="d-flex gap-2">
+                                <button name="action_refresh_dashboard" type="object" class="btn btn-sm btn-outline-primary" icon="fa-refresh">
+                                    Refresh Stats
+                                </button>
+                                <button name="action_view_all_files" type="object" class="btn btn-sm btn-outline-secondary" icon="fa-list">
+                                    View All Files
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Summary Cards Rows -->

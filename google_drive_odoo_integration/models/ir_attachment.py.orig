@@ -331,8 +331,6 @@ class IrAttachment(models.Model):
             linked_messages = self.env['mail.message'].sudo().search([
                 ('attachment_ids', 'in', [self.id])
             ])
-            
-        _logger.info(f"GD_SYNC: linked_messages = {linked_messages}")
 
         btn_html = (
             "<div class='mt-3 mb-2 p-2 border rounded bg-light drive-attachment-links'>"
@@ -347,21 +345,13 @@ class IrAttachment(models.Model):
         for msg in linked_messages:
             if not msg.model:
                 continue
-            _logger.info(f"GD_SYNC: writing body to message {msg.id}")
-            write_vals = {'attachment_ids': [(3, self.id)]}  # always unlink file card M2M
+            write_vals = {'attachment_ids': [(3, self.id)]}  # always unlink file card
             if drive_url not in (msg.body or ''):
                 write_vals['body'] = (msg.body or '') + btn_html
             msg.with_context(
                 skip_drive_attachment_process=True,
                 skip_gdrive_sync=True,
             ).write(write_vals)
-            
-            # Key fix for "0kb ghost card" for mail.message duplicates:
-            # If the attachment's res_model is literally 'mail.message', Odoo will
-            # always show it in the chatter regardless of missing the M2M link.
-            # We change res_model so Odoo ignores it, leaving only the button!
-            if self.res_model == 'mail.message':
-                self.with_context(skip_gdrive_sync=True).write({'res_model': 'google.drive.discard'})
 
     def write(self, vals):
         # Handle model_name → res_model mapping
@@ -562,8 +552,6 @@ class IrAttachment(models.Model):
                     model_root, current_local_parent_id, config.google_drive_id.id,
                     root_res['google_file_id'], root_res.get('google_url')
                 )
-                # Notify explorer that the root config folder has new contents (the model folder)
-                self.env['google.drive.sync'].sudo()._notify_folder_sync(config.google_folder_id.id)
 
                 # 2. Find or create Record Folder (e.g. order_idS00001, lead_idLead Name, move_idINV/2025/0001)
                 # record_folder is a list to support names with '/' (e.g. INV/2025/0001 -> ['move_idINV', '2025', '0001'])
@@ -574,14 +562,10 @@ class IrAttachment(models.Model):
                         continue
                     part_res = sync_service.find_or_create_folder(part, last_res['google_file_id'], config.google_drive_id)
                     if part_res:
-                        # Capture parent ID before updating it to the new sub-folder
-                        folder_to_notify = current_local_parent_id
                         current_local_parent_id = get_or_create_local_folder(
                             part, current_local_parent_id, config.google_drive_id.id,
                             part_res['google_file_id'], part_res.get('google_url')
                         )
-                        # Notify explorer that this parent folder now has a new sub-folder
-                        self.env['google.drive.sync'].sudo()._notify_folder_sync(folder_to_notify)
                         last_res = part_res
                     else:
                         break
@@ -695,9 +679,6 @@ class IrAttachment(models.Model):
                         'sync_state': 'synced',
                         'last_synced': fields.Datetime.now(),
                     })
-                
-                # Trigger real-time File Explorer refresh for the target folder
-                self.env['google.drive.sync'].sudo()._notify_folder_sync(current_local_parent_id)
                 
                 # Detailed success logging for both auto and manual syncs
                 current_sync_type = self.env.context.get('sync_type', 'auto')

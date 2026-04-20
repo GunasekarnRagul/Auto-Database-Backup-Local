@@ -556,7 +556,7 @@ class GoogleDriveSync(models.Model):
             'file': (file_name, file_content, mime_type)
         }
         response = http_requests.post(
-            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink",
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,mimeType",
             headers=headers, files=files,
         )
         if response.status_code == 200:
@@ -564,6 +564,7 @@ class GoogleDriveSync(models.Model):
             return {
                 'google_file_id': data.get('id'),
                 'google_url': data.get('webViewLink', ''),
+                'mime_type': data.get('mimeType', ''),
             }
         _logger.warning("Failed to upload file to Drive: %s", response.text)
         return False
@@ -592,7 +593,7 @@ class GoogleDriveSync(models.Model):
         }
         try:
             init_resp = http_requests.post(
-                "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,webViewLink",
+                "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,webViewLink,mimeType",
                 headers=init_headers,
                 data=json.dumps(metadata),
                 timeout=30,
@@ -622,6 +623,7 @@ class GoogleDriveSync(models.Model):
                 return {
                     'google_file_id': data.get('id'),
                     'google_url': data.get('webViewLink', ''),
+                    'mime_type': data.get('mimeType', ''),
                 }
             _logger.warning("Resumable upload failed for %s: %s", file_name, upload_resp.text)
             return False
@@ -734,13 +736,11 @@ class GoogleDriveSync(models.Model):
     def _notify_folder_sync(self, folder_id):
         """Send a notification to the Odoo bus for real-time UI refresh."""
         try:
-            # We use the current user's partner_id as the target
-            target = self.env.user.partner_id
-            if target:
-                self.env['bus.bus']._sendone(target, 'google.drive.sync', {
-                    'folder_id': folder_id or False,
-                    'type': 'folder_synced'
-                })
+            # Broadcast to the general channel so all active explorers refresh
+            self.env['bus.bus']._sendone('google.drive.sync', 'google.drive.sync', {
+                'folder_id': folder_id or False,
+                'type': 'folder_synced'
+            })
         except Exception as e:
             _logger.warning("Failed to send bus notification: %s", str(e))
 
