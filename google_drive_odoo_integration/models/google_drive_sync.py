@@ -669,7 +669,7 @@ class GoogleDriveSync(models.Model):
                     f"https://www.googleapis.com/drive/v3/files"
                     f"?q={query}"
                     f"&pageSize=1000"
-                    f"&fields=nextPageToken,files(id,name,mimeType,size,webViewLink,owners,modifiedTime,starred)"
+                    f"&fields=nextPageToken,files(id,name,mimeType,size,md5Checksum,webViewLink,owners,modifiedTime,starred)"
                 )
                 if page_token:
                     url += f"&pageToken={page_token}"
@@ -750,6 +750,7 @@ class GoogleDriveSync(models.Model):
         name = file_data.get('name')
         mimetype = file_data.get('mimeType')
         size = int(file_data.get('size', 0))
+        md5_checksum = file_data.get('md5Checksum')
         url = file_data.get('webViewLink')
         is_folder = mimetype == 'application/vnd.google-apps.folder'
 
@@ -781,6 +782,7 @@ class GoogleDriveSync(models.Model):
             'file_type': 'folder' if is_folder else 'file',
             'mime_type': mimetype,
             'file_size': size,
+            'md5_checksum': md5_checksum,
             'google_file_id': g_id,
             'google_url': url,
             'parent_folder_id': parent_folder_id,

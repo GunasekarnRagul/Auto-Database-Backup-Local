@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_duplicate_pruner_wizard_form" model="ir.ui.view">
+        <field name="name">duplicate.pruner.wizard.form</field>
+        <field name="model">duplicate.pruner.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Duplicate File Pruner">
+                <sheet>
+                    <div class="alert alert-warning" role="alert" invisible="duplicate_groups_count == 0">
+                        Found <b><field name="duplicate_groups_count" nolabel="1"/></b> duplicate groups containing <b><field name="duplicate_count" nolabel="1"/></b> redundant files.
+                    </div>
+                    <div class="alert alert-info" role="alert" invisible="duplicate_groups_count != 0">
+                        No duplicate files were detected in Google Drive sync.
+                    </div>
+                    <group invisible="duplicate_groups_count == 0">
+                        <field name="prune_strategy" widget="radio"/>
+                    </group>
+                    <group>
+                        <field name="summary_text" widget="text" nolabel="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Execute Pruning" name="action_prune_duplicates" type="object" class="btn-primary" invisible="duplicate_groups_count == 0"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_duplicate_pruner_wizard" model="ir.actions.act_window">
+        <field name="name">Prune Duplicates</field>
+        <field name="res_model">duplicate.pruner.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

@@ -6,3 +6,5 @@ from . import gdrive_model_config
 from . import attachment_sync_config
 from . import google_drive_sync_log
 from . import mail_message
+from . import google_drive_dashboard
+from . import gdrive_dashboard_layout

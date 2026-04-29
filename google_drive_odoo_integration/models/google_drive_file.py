@@ -23,6 +23,7 @@ class GoogleDriveFile(models.Model):
     ], string='Type', default='file', required=True)
     mime_type = fields.Char('MIME Type')
     file_size = fields.Float('Size (KB)')
+    md5_checksum = fields.Char('MD5 Checksum', index=True, help="Google Drive MD5 hash for exact content matching")
     owner_name = fields.Char('Owner', default='Me')
     last_modified = fields.Datetime('Last Modified')
     starred = fields.Boolean('Starred', default=False)
@@ -434,6 +435,11 @@ class GoogleDriveFile(models.Model):
             while parent:
                 parts.append(parent.name or '')
                 parent = parent.parent_folder_id
+            
+            # If it's a root folder item, the parent is the root_folder_id itself
+            if not parts and record.root_folder_id:
+                parts.insert(0, record.root_folder_id.name or '')
+                
             if parts:
                 folder_path = ' / '.join(reversed(parts))
         except Exception:
@@ -657,3 +663,71 @@ class GoogleDriveFile(models.Model):
             writers_can_share=writers_can_share,
             copy_requires_writer=copy_requires_writer
         )
+
+    # ─── Duplicate Detection and Pruning ───
+
+    @api.model
+    def get_duplicate_groups(self):
+        """Find duplicate files using a 3-layer production-grade strategy:
+        Primary: md5_checksum
+        Fallback: file_size + mime_type
+        Final Filter: name + parent_folder_id
+        """
+        files = self.search_read(
+            [('file_type', '=', 'file'), ('active', '=', True)], 
+            ['id', 'name', 'md5_checksum', 'file_size', 'mime_type', 'parent_folder_id', 'create_date']
+        )
+        
+        groups = {}
+        for f in files:
+            # Layer 1 & 2: Primary Hash or Fallback Metrics
+            content_hash = f['md5_checksum'] if f['md5_checksum'] else f"{f['file_size']}_{f['mime_type']}"
+            # Layer 3: Folder boundary and filename safety limit
+            folder_id = f['parent_folder_id'][0] if f['parent_folder_id'] else False
+            name = f['name']
+            
+            duplicate_key = (content_hash, folder_id, name)
+            
+            if duplicate_key not in groups:
+                groups[duplicate_key] = []
+            groups[duplicate_key].append(f['id'])
+            
+        result = []
+        for key, ids in groups.items():
+            if len(ids) > 1:
+                records = self.browse(ids).sorted(key=lambda r: r.create_date, reverse=True)
+                folder_id = key[1]
+                parent_name = '/'
+                if folder_id:
+                    parent_rec = self.browse(folder_id)
+                    parent_name = parent_rec.display_path or parent_rec.name
+                
+                result.append({
+                    'name': key[2],
+                    'parent_name': parent_name,
+                    'count': len(records),
+                    'duplicate_ids': records.ids,
+                    'records': records
+                })
+        return result
+
+    @api.model
+    def prune_duplicates(self, keep_newest=True):
+        """Automatically keep the newest (or oldest) and delete the rest."""
+        duplicate_groups = self.get_duplicate_groups()
+        files_to_delete = self.env['google.drive.file']
+        
+        for group in duplicate_groups:
+            records = group['records']
+            if len(records) > 1:
+                if keep_newest:
+                    # Records are ordered by create_date desc, so [0] is newest
+                    for rec in records[1:]:
+                        files_to_delete |= rec
+                else:
+                    for rec in records[:-1]:
+                        files_to_delete |= rec
+                
+        if files_to_delete:
+            return self.delete_on_drive_and_unlink(files_to_delete.ids)
+        return True

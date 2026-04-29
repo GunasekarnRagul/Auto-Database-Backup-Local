@@ -702,7 +702,10 @@ class IrAttachment(models.Model):
                 # Detailed success logging for both auto and manual syncs
                 current_sync_type = self.env.context.get('sync_type', 'auto')
                 record_path_str = "/".join(record_folder) if isinstance(record_folder, list) else str(record_folder)
-                full_drive_path = f"{str(model_root)}/{record_path_str}"
+                
+                # Prepend the Base Folder Name from the config to show the full hierarchy
+                base_folder_name = config.google_folder_id.name or "My Odoo Files"
+                full_drive_path = f"{base_folder_name}/{str(model_root)}/{record_path_str}"
                 
                 if config.storage_mode == 'drive':
                     details = f"Storage Mode: Drive Only\nSaved to Drive folder path: {full_drive_path}\nDrive URL: {result['google_url']}"
@@ -715,18 +718,27 @@ class IrAttachment(models.Model):
                     operation='upload',
                     state='success',
                     sync_type=current_sync_type,
-                    folder_path=full_drive_path,
+                    root_folder_name=base_folder_name,
+                    folder_path=f"{str(model_root)}/{record_path_str}",
                     google_file_id=result['google_file_id'],
                     file_size=len(self.raw) if self.raw else 0,
                     sync_details=details
                 )
         except Exception as e:
             # Fallback: Record remained in Odoo, just log failure
+            # Reconstruct path info for the failure log so the user knows where it was going
+            current_sync_type = self.env.context.get('sync_type', 'auto')
+            record_path_str = "/".join(record_folder) if isinstance(record_folder, list) else str(record_folder)
+            base_folder_name = config.google_folder_id.name or "My Odoo Files"
+            
             self.env['google.drive.sync.log'].log_operation(
                 config=config.google_drive_id,
                 file_name=self.name,
                 operation='upload',
                 state='fail',
+                sync_type=current_sync_type,
+                root_folder_name=base_folder_name,
+                folder_path=f"{str(model_root)}/{record_path_str}",
                 error_message=f"Auto-sync failed: {str(e)}"
             )
 

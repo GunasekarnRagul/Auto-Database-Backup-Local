@@ -141,7 +141,7 @@
                         </div>
                         <div t-if="state.showAccountMenu" class="gd_account_dropdown">
                             <div class="gd_account_header">
-                                <span class="gd_account_label">Connected Drives</span>
+                                <span class="gd_account_label">Connected Drivers</span>
                             </div>
                             <t t-foreach="state.drives" t-as="drive" t-key="drive.id">
                                 <a class="gd_account_drive"
@@ -971,13 +971,54 @@
                         <div class="gd_share_add_row">
                             <div class="gd_share_add_input_wrap">
                                 <i class="fa fa-user-plus gd_share_add_icon"/>
-                                <input type="email" class="gd_share_add_input"
-                                       placeholder="Add people by email"
-                                       t-att-value="state.addEmail"
-                                       t-on-input="onEmailInput"
-                                       t-on-keydown="onEmailKeydown"
-                                       t-att-disabled="state.addingPerson"/>
-                            </div>
+                                 <input type="email" class="gd_share_add_input"
+                                        placeholder="Add people by email"
+                                        t-att-value="state.addEmail"
+                                        t-on-input="onEmailInput"
+                                        t-on-keydown="onEmailKeydown"
+                                        t-att-disabled="state.addingPerson"/>
+                                 <button class="gd_share_contact_btn" t-on-click="toggleContactPicker" title="Pick from Odoo Contacts">
+                                     <i class="fa fa-address-book-o"/>
+                                 </button>
+                                 
+                                 <!-- Contact Picker Dropdown -->
+                                 <div class="gd_contact_picker" t-if="state.showContactPicker" t-on-click.stop="">
+                                     <div class="gd_contact_search">
+                                         <i class="fa fa-search"/>
+                                         <input type="text" placeholder="Search contacts..."
+                                                t-att-value="state.contactSearchQuery"
+                                                t-on-input="onContactSearchInput"
+                                                t-on-keydown="onContactKeydown"
+                                                autofocus="true"/>
+                                     </div>
+                                     <div class="gd_contact_list">
+                                         <t t-if="state.contactLoading">
+                                             <div class="gd_contact_status"><i class="fa fa-refresh fa-spin"/> Searching...</div>
+                                         </t>
+                                         <t t-elif="state.contactSearchResults.length === 0">
+                                             <div class="gd_contact_status">No contacts found</div>
+                                         </t>
+                                         <t t-else="">
+                                             <t t-foreach="state.contactSearchResults" t-as="contact" t-key="contact.id">
+                                                 <div class="gd_contact_row" t-on-click="() => this.selectContact(contact)">
+                                                     <div class="gd_contact_icon">
+                                                         <t t-if="contact.image_128">
+                                                             <img t-attf-src="data:image/png;base64,#{contact.image_128}"/>
+                                                         </t>
+                                                         <t t-else="">
+                                                             <span t-esc="contact.name.charAt(0).toUpperCase()"/>
+                                                         </t>
+                                                     </div>
+                                                     <div class="gd_contact_details">
+                                                         <div class="gd_contact_name" t-esc="contact.name"/>
+                                                         <div class="gd_contact_email" t-esc="contact.email"/>
+                                                     </div>
+                                                 </div>
+                                             </t>
+                                         </t>
+                                     </div>
+                                 </div>
+                             </div>
                             <div class="gd_share_add_role_wrap" t-on-click.stop="">
                                 <select class="gd_share_add_role_select" t-on-change="(ev) => this.setAddRole(ev.target.value)">
                                     <option value="reader" t-att-selected="state.addRole === 'reader'">Viewer</option>

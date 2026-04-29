@@ -254,3 +254,144 @@
     margin-top: 4px;
     text-align: center;
 }
+
+/* Contact Picker */
+.gd_share_add_input_wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: #f1f3f4;
+    border-radius: 8px;
+    padding: 0 12px;
+    flex: 1;
+    transition: background 0.2s, box-shadow 0.2s;
+}
+
+.gd_share_add_input_wrap:focus-within {
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+}
+
+.gd_share_contact_btn {
+    background: none;
+    border: none;
+    color: #5f6368;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: background 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gd_share_contact_btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #1a73e8;
+}
+
+.gd_contact_picker {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+    z-index: 1000;
+    overflow: hidden;
+    animation: gdFadeInScale 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes gdFadeInScale {
+    from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.gd_contact_search {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e8eaed;
+    gap: 12px;
+}
+
+.gd_contact_search i {
+    color: #5f6368 !important;
+}
+
+.gd_contact_search input {
+    border: none !important;
+    outline: none !important;
+    flex: 1;
+    font-size: 0.9rem;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.gd_contact_list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.gd_contact_status {
+    padding: 24px;
+    text-align: center;
+    color: #5f6368;
+    font-size: 0.9rem;
+}
+
+.gd_contact_row {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    cursor: pointer;
+    gap: 12px;
+    transition: background 0.15s;
+}
+
+.gd_contact_row:hover {
+    background: #f8f9fa;
+}
+
+.gd_contact_icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #e8f0fe;
+    color: #1a73e8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.gd_contact_icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.gd_contact_details {
+    flex: 1;
+    min-width: 0;
+}
+
+.gd_contact_name {
+    font-weight: 500;
+    color: #202124;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gd_contact_email {
+    color: #5f6368;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

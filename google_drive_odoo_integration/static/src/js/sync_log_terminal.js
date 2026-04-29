@@ -333,4 +333,4 @@ export class SyncLogTerminal extends Component {
 
 SyncLogTerminal.template = "google_drive_odoo_integration.SyncLogTerminal";
 
-registry.category("actions").add("google_drive_sync_log_terminal", SyncLogTerminal);
+registry.category("actions").add("google_drive_odoo_integration.sync_log_terminal", SyncLogTerminal);

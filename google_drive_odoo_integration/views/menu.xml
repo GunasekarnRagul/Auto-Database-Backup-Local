@@ -3,7 +3,7 @@
     <menuitem id="google_drive_menu_root" name="Cloud storage" web_icon="google_drive_odoo_integration,static/description/security.png"/>
 
     <!-- 1. Dashboard -->
-    <menuitem id="google_drive_menu_dashboard" name="Dashboard" parent="google_drive_menu_root" sequence="1"/>
+    <menuitem id="google_drive_menu_dashboard" name="Dashboard" parent="google_drive_menu_root" action="action_google_drive_dashboard" sequence="1"/>
 
     <!-- 2. File Explorer -->
     <menuitem id="google_drive_menu_explorer" name="File Explorer" parent="google_drive_menu_root" action="action_google_drive_file_explorer" sequence="2"/>

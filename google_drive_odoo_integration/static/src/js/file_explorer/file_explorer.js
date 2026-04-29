@@ -2303,7 +2303,7 @@ export class FileExplorer extends Component {
 
 FileExplorer.template = "google_drive_odoo_integration.FileExplorer";
 
-registry.category("actions").add("google_drive_file_explorer", FileExplorer);
+registry.category("actions").add("google_drive_odoo_integration.file_explorer", FileExplorer);
 
 class FilePreviewDialog extends Component {
     static template = "google_drive_odoo_integration.FilePreviewDialog";
@@ -2355,6 +2355,11 @@ class ShareDriveLinkDialog extends Component {
             addEmail: '',
             addRole: 'reader',
             addingPerson: false,
+            // Contact Picker
+            showContactPicker: false,
+            contactSearchResults: [],
+            contactLoading: false,
+            contactSearchQuery: '',
             // Dropdowns
             showGeneralAccessDropdown: false,
             showAnyoneRoleDropdown: false,
@@ -2375,6 +2380,56 @@ class ShareDriveLinkDialog extends Component {
             }
             if (this.props.onReady) this.props.onReady();
         });
+    }
+
+    // ─── Contact Picker ───
+
+    async toggleContactPicker() {
+        this.state.showContactPicker = !this.state.showContactPicker;
+        this.closeAllShareMenus();
+        if (this.state.showContactPicker && this.state.contactSearchResults.length === 0) {
+            await this.searchContacts('');
+        }
+    }
+
+    async onContactSearchInput(ev) {
+        this.state.contactSearchQuery = ev.target.value;
+        await this.searchContacts(this.state.contactSearchQuery);
+    }
+
+    async searchContacts(query) {
+        this.state.contactLoading = true;
+        try {
+            const domain = [['email', '!=', false]];
+            if (query) {
+                domain.push('|');
+                domain.push(['name', 'ilike', query]);
+                domain.push(['email', 'ilike', query]);
+            }
+            
+            const results = await this.orm.searchRead(
+                "res.partner",
+                domain,
+                ["id", "name", "email", "image_128"],
+                { limit: 8, order: "name asc" }
+            );
+            this.state.contactSearchResults = results;
+        } catch (e) {
+            console.error("Failed to search contacts", e);
+        } finally {
+            this.state.contactLoading = false;
+        }
+    }
+
+    selectContact(partner) {
+        this.state.addEmail = partner.email;
+        this.state.showContactPicker = false;
+    }
+
+    onContactKeydown(ev) {
+        if (ev.key === 'Escape') {
+            this.state.showContactPicker = false;
+        }
     }
 
     get file() {
@@ -2582,6 +2637,7 @@ class ShareDriveLinkDialog extends Component {
     closeAllShareMenus() {
         this.state.showGeneralAccessDropdown = false;
         this.state.showAnyoneRoleDropdown = false;
+        this.state.showContactPicker = false;
         this.state.activePermRoleDropdown = null;
     }
 

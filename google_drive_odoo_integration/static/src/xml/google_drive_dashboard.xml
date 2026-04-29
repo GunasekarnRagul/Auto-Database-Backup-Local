@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+
+  <t t-name="google_drive_odoo_integration.Dashboard" owl="1">
+    <div class="gdrive-dash">
+
+      <!-- ════ LOADING ════ -->
+      <t t-if="state.isLoading">
+        <div class="gdrive-loading">
+          <div class="gd-spinner-ring"/>
+          <h2>Loading Dashboard…</h2>
+          <p>Connecting to Google Drive</p>
+        </div>
+      </t>
+
+      <t t-else="">
+
+        <!-- ════ TOOLBAR ════ -->
+        <div class="gd-toolbar">
+          <div class="gd-toolbar__brand">
+            <img src="/google_drive_odoo_integration/static/src/img/upload.png" class="gd-brand-ico" alt="Upload Icon"/>
+            <div class="gd-toolbar__title-block">
+              <h1>Drive Dashboard</h1>
+              <p>
+                <span t-attf-class="gd-pulse2 {{ state.health.online_drives > 0 ? 'gd-pulse2--on' : 'gd-pulse2--off' }}"/>
+                <t t-esc="state.health.online_drives"/> / <t t-esc="state.health.total_drives"/> Drives Online
+              </p>
+            </div>
+          </div>
+
+          <div class="gd-toolbar__controls">
+
+            <button class="gd-btn gd-btn--folder" t-on-click="openFileExplorer">
+              <i class="fa fa-folder-open-o"/> File Explorer
+            </button>
+            <button class="gd-btn gd-btn--attachments" t-on-click="configureModels">
+              <i class="fa fa-sliders"/> Attachments
+            </button>
+            <button class="gd-btn gd-btn--logs" t-on-click="openActivityLogs">
+              <i class="fa fa-list-alt"/> Activity Logs
+            </button>
+
+            <!-- Customize toggle -->
+            <button t-attf-class="gd-btn {{ state.editMode ? 'gd-btn--active' : 'gd-btn--outline' }}"
+                    t-on-click="() => this.state.editMode = !this.state.editMode">
+              <i t-attf-class="fa {{ state.editMode ? 'fa-lock' : 'fa-pencil-square-o' }}"/>
+              <t t-esc="state.editMode ? 'Done' : 'Customize'"/>
+            </button>
+
+            <!-- Add Widget -->
+            <button class="gd-btn gd-btn--accent"
+                    t-on-click="() => this.state.showAddPanel = true">
+              <i class="fa fa-plus-circle"/> Add Widget
+            </button>
+          </div>
+        </div>
+
+        <!-- ════ WIDGET GRID ════ -->
+        <!-- Each widget is rendered by OWL; body content is filled imperatively -->
+        <div class="gd-grid">
+          <t t-foreach="state.activeWidgets" t-as="wId" t-key="wId">
+            <div t-attf-class="gd-cell {{ getCellClass(wId) }}"
+                 t-att-data-widget-id="wId"
+                 t-att-style="getCellStyle(wId)"
+                 t-att-draggable="state.editMode ? 'true' : 'false'"
+                 t-on-dragstart="onDragStart"
+                 t-on-dragover="onDragOver"
+                 t-on-dragleave="onDragLeave"
+                 t-on-drop="onDrop"
+                 t-on-dragend="onDragEnd">
+
+              <div t-attf-class="gd-widget {{ state.editMode ? 'gd-widget--edit' : '' }}">
+
+                <!-- Widget header -->
+                <div class="gd-widget__hd">
+                  <span t-attf-class="gd-drag-handle {{ state.editMode ? 'gd-drag-handle--visible' : '' }}">
+                    <i class="fa fa-grip-horizontal"/>
+                  </span>
+                  <i t-attf-class="fa {{ getCatalog(wId).icon }} gd-widget__icon"/>
+                  <span class="gd-widget__ttl" style="flex:1;" t-esc="getCatalog(wId).label"/>
+
+                  <!-- Widget-specific Toolbar Controls -->
+                  <t t-if="wId === 'sync_trend'">
+                    <div style="display:flex; gap:10px; align-items:center; margin-right:12px;" t-if="!state.editMode">
+                        <select class="gd-trend-filter" 
+                                t-model="state.globalTrendFilter"
+                                t-on-change="onGlobalTrendFilterChange"
+                                style="padding:6px 14px; border-radius:6px; border:1px solid var(--gd-border); font-size:12px; font-family:var(--gd-font); font-weight:500; color:var(--gd-tx); background:var(--gd-page-bg); outline:none; cursor:pointer;">
+                            <option value="today">Today</option>
+                            <option value="7days">Last 7 Days</option>
+                            <option value="30days">Last 30 Days</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                        
+                        <div class="gd-custom-dates" 
+                             t-if="state.globalTrendFilter === 'custom'"
+                             style="display:flex; align-items:center; gap:6px; background:var(--gd-page-bg); padding:4px 10px; border-radius:6px; border:1px solid var(--gd-border);">
+                            <input type="date" 
+                                   class="gd-trend-start" 
+                                   t-model="state.globalTrendStart"
+                                   t-on-change="onGlobalTrendDatesChange"
+                                   style="border:none; background:transparent; font-size:12px; font-family:var(--gd-font); font-weight:500; color:var(--gd-tx); padding:2px; outline:none; cursor:pointer;"/>
+                            <span style="color:var(--gd-txm); font-size:12px; font-weight:500;">→</span>
+                            <input type="date" 
+                                   class="gd-trend-end" 
+                                   t-model="state.globalTrendEnd"
+                                   t-on-change="onGlobalTrendDatesChange"
+                                   style="border:none; background:transparent; font-size:12px; font-family:var(--gd-font); font-weight:500; color:var(--gd-tx); padding:2px; outline:none; cursor:pointer;"/>
+                        </div>
+                    </div>
+                  </t>
+
+                  <div class="gd-widget__acts">
+                    <!-- Refresh always visible -->
+                    <button class="gd-hd-btn" t-on-click.stop="() => this._renderWidget(wId)" title="Refresh widget">
+                      <i class="fa fa-refresh"/>
+                    </button>
+                    <!-- Remove only in edit mode -->
+                    <button t-if="state.editMode"
+                            class="gd-hd-btn gd-hd-btn--remove"
+                            t-on-click.stop="() => this.removeWidget(wId)"
+                            title="Remove widget">
+                      <i class="fa fa-times"/>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Widget body — filled imperatively by _renderWidget -->
+                <div class="gd-widget__bd" t-att-id="'wb-' + wId">
+                  <div class="gd-spinner"><i class="fa fa-spinner fa-spin"/></div>
+                </div>
+
+              </div>
+            </div>
+          </t>
+
+          <!-- Empty state when no widgets active -->
+          <t t-if="state.activeWidgets.length === 0">
+            <div class="gd-empty-grid">
+              <div class="gd-empty-grid__icon"><i class="fa fa-th-large"/></div>
+              <h3>No widgets added yet</h3>
+              <p>Click <strong>+ Add Widget</strong> to build your dashboard</p>
+              <button class="gd-btn gd-btn--accent" t-on-click="() => this.state.showAddPanel = true">
+                <i class="fa fa-plus-circle"/> Add Your First Widget
+              </button>
+            </div>
+          </t>
+        </div>
+
+        <!-- ════ ADD WIDGET PANEL ════ -->
+        <t t-if="state.showAddPanel">
+          <!-- Overlay -->
+          <div class="gd-overlay" t-on-click="() => this.state.showAddPanel = false"/>
+
+          <!-- Panel -->
+          <div class="gd-panel">
+            <div class="gd-panel__hd">
+              <div class="gd-panel__title">
+                <i class="fa fa-th-large"/> Widget Library
+              </div>
+              <button class="gd-panel__close" t-on-click="() => this.state.showAddPanel = false">
+                <i class="fa fa-times"/>
+              </button>
+            </div>
+
+            <!-- Category tabs -->
+            <div class="gd-panel__cats">
+              <t t-foreach="panelCategories" t-as="cat" t-key="cat">
+                <button t-attf-class="gd-cat-tab {{ state.panelFilter === cat ? 'active' : '' }}"
+                        t-on-click="() => this.state.panelFilter = cat">
+                  <t t-esc="cat === 'all' ? 'All' : cat"/>
+                </button>
+              </t>
+            </div>
+
+            <!-- Widget list -->
+            <div class="gd-panel__list">
+              <t t-foreach="catalogForPanel" t-as="w" t-key="w.id">
+                <div t-attf-class="gd-wcard {{ w.active ? 'gd-wcard--active' : '' }}"
+                     t-on-click="() => this.toggleWidget(w.id)">
+                  <div t-attf-class="gd-wcard__ico {{ w.active ? 'gd-wcard__ico--active' : '' }}">
+                    <i t-attf-class="fa {{ w.icon }}"/>
+                  </div>
+                  <div class="gd-wcard__info">
+                    <span class="gd-wcard__name" t-esc="w.label"/>
+                    <span class="gd-wcard__cat"  t-esc="w.cat"/>
+                  </div>
+                  <div class="gd-wcard__toggle">
+                    <i t-attf-class="fa {{ w.active ? 'fa-check-circle' : 'fa-plus-circle' }}"
+                       t-attf-style="{{ w.active ? 'color:var(--gd-green)' : 'color:var(--gd-blue)' }}"/>
+                  </div>
+                </div>
+              </t>
+            </div>
+
+            <div class="gd-panel__ft">
+              <button class="gd-btn gd-btn--ghost gd-btn--sm" t-on-click="resetLayout">
+                <i class="fa fa-undo"/> Reset Layout
+              </button>
+              <button class="gd-btn gd-btn--accent gd-btn--sm"
+                      t-on-click="() => this.state.showAddPanel = false">
+                Done
+              </button>
+            </div>
+          </div>
+        </t>
+
+      </t>
+    </div>
+  </t>
+
+</templates>
