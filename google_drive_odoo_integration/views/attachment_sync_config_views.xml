@@ -21,24 +21,41 @@
                     <t t-name="kanban-box">
                         <div class="oe_kanban_global_click oe_kanban_card o_cloud_card">
                             <!-- Header Layer -->
-                            <div class="o_cloud_card_header">
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="o_cloud_card_icon">
-                                        <i class="fa fa-refresh text-primary"/>
+                            <div class="o_cloud_card_header d-flex align-items-center justify-content-between" style="font-family: inherit; padding-right: 35px;">
+                                <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
+                                    <div class="o_cloud_card_icon" style="background: none; box-shadow: none; width: auto; height: auto;">
+                                        <img src="/google_drive_odoo_integration/static/src/img/sync.png" alt="Sync" style="width: 24px; height: 24px;"/>
                                     </div>
                                     <div class="min-w-0">
-                                        <div class="o_cloud_card_title text-truncate">
+                                        <div class="text-truncate" style="font-size: 0.875rem; font-weight: 500; color: #202124;">
                                             <field name="name"/>
                                         </div>
-                                        <div class="o_cloud_card_subtitle">
+                                        <div class="text-truncate" style="font-size: 0.75rem; color: #5f6368;">
                                             <field name="module_config_id"/>
                                         </div>
                                     </div>
                                 </div>
                                 
-                                <!-- Toggle Button in Top Right -->
-                                <div class="ms-auto" title="Auto Sync Mode">
-                                    <field name="auto_sync_mode" widget="boolean_toggle"/>
+                                <div class="d-flex align-items-center flex-shrink-0" style="padding-right: 15px;">
+                                    <!-- Toggle Button -->
+                                    <div title="Auto Sync Mode">
+                                        <field name="auto_sync_mode" widget="boolean_toggle"/>
+                                    </div>
+                                </div>
+                                
+                                <!-- 3-dot dropdown menu -->
+                                <div class="o_cloud_card_menu o_dropdown_kanban dropdown" style="position: absolute; top: 12px; right: 6px;">
+                                    <a class="dropdown-toggle o-no-caret" role="button" data-bs-toggle="dropdown" href="#" style="color: #5f6368;">
+                                        <i class="fa fa-ellipsis-v" title="Actions"/>
+                                    </a>
+                                    <div class="dropdown-menu dropdown-menu-end" role="menu">
+                                        <a role="menuitem" type="edit" class="dropdown-item">
+                                            <i class="fa fa-pencil me-2 text-primary"/>Edit
+                                        </a>
+                                        <a role="menuitem" type="delete" class="dropdown-item text-danger" confirm="Warning: Deleting this configuration will remove its past sync history data. If you configure this module again later, it will start syncing from scratch.">
+                                            <i class="fa fa-trash-o me-2"/>Delete
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
 
