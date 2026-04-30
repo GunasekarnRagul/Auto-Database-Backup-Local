@@ -50,18 +50,25 @@ class GoogleDriveSync(models.Model):
     def _log(self, config, file_name, operation, state='success',
              error_message=False, file_type='file', root_folder_name=False,
              folder_path=False, google_file_id=False, file_size=0, duration=0,
-             **kwargs):
-        """Create a sync log entry. Captures real UID to persist through sudo."""
+             sync_type=None, **kwargs):
+        """Create a sync log entry. Captures real UID to persist through sudo.
+
+        sync_type can be supplied explicitly by the caller (e.g. the cron runner
+        passes 'cron' so backward-sync entries are not mis-labelled as 'manual').
+        Falls back to the context value and then to 'auto' as the safe default.
+        """
         # Capture the UID of the current environment (the person who triggered this)
         real_uid = self.env.uid
-        
+        # Explicit argument > context > safe default
+        effective_sync_type = sync_type or self.env.context.get('sync_type', 'auto')
+
         self.env['google.drive.sync.log'].log_operation(
             config=config,
             file_name=file_name,
             operation=operation,
             state=state,
             error_message=error_message,
-            sync_type=self.env.context.get('sync_type', 'manual'),
+            sync_type=effective_sync_type,
             file_type=file_type,
             root_folder_name=root_folder_name,
             folder_path=folder_path,
@@ -802,14 +809,28 @@ class GoogleDriveSync(models.Model):
         # Log the sync operation (only for new files to avoid flooding logs)
         if is_new:
             root_name = False
+            folder_path_val = False
             if root_folder_id:
                 root_rec = self.env['google.drive.root.folder'].sudo().browse(root_folder_id)
                 root_name = root_rec.name if root_rec.exists() else False
+            # Build full folder path by walking the parent chain of the new record.
+            # This ensures "Folder Path" in the Activity Log shows the complete hierarchy
+            # (e.g. "Invoices / move_idINV / 2025 / 0001") for every Drive→Odoo sync entry.
+            try:
+                _, folder_path_val = self._get_file_info(explorer_record)
+            except Exception:
+                folder_path_val = False
+
+            # Preserve sync_type from context so cron runs are labelled "Scheduled (Cron)"
+            # instead of falling back to "Manual Sync".
+            sync_type_ctx = self.env.context.get('sync_type', 'auto')
             self._log(config, name, 'sync',
                       file_type='folder' if is_folder else 'file',
                       root_folder_name=root_name,
+                      folder_path=folder_path_val,
                       google_file_id=g_id,
-                      file_size=size)
+                      file_size=size,
+                      sync_type=sync_type_ctx)
 
         # NOTE: File downloads during sync have been removed for performance.
         # Files are downloaded on-demand when explicitly accessed/viewed by the user.

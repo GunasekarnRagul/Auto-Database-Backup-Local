@@ -29,6 +29,7 @@ class GoogleDriveSyncLog(models.Model):
         ('auto', 'Auto Sync'),
         ('upload', 'Upload'),
         ('cron', 'Scheduled (Cron)'),
+        ('auto_setup', 'Historical Setup'),
     ], string='Sync Type', default='manual', index=True)
 
     operation = fields.Selection([
@@ -63,7 +64,7 @@ class GoogleDriveSyncLog(models.Model):
     # Computed color field for terminal-style display
     state_color = fields.Char(compute='_compute_state_color')
 
-    @api.depends('drive_name', 'root_folder_name', 'file_name', 'operation')
+    @api.depends('drive_name', 'root_folder_name', 'folder_path', 'file_name', 'operation')
     def _compute_display_name(self):
         for rec in self:
             parts = []
@@ -71,9 +72,13 @@ class GoogleDriveSyncLog(models.Model):
                 parts.append(rec.drive_name)
             if rec.root_folder_name:
                 parts.append(rec.root_folder_name)
+            # Include intermediate folder path segments so two logs for the same
+            # file in different subfolders are visually distinguishable.
+            if rec.folder_path:
+                parts.append(rec.folder_path)
             if rec.file_name:
                 parts.append(rec.file_name)
-            rec.display_name = ' → '.join(parts) if parts else 'Sync Log'
+            rec.display_name = ' / '.join(parts) if parts else 'Sync Log'
 
     @api.depends('state')
     def _compute_state_color(self):

@@ -12,6 +12,7 @@
                 <field name="create_date" string="Timestamp" widget="datetime"/>
                 <field name="drive_name" string="Drive"/>
                 <field name="root_folder_name" string="Root Folder"/>
+                <field name="folder_path" string="Folder Path" optional="show"/>
                 <field name="file_name" string="File / Folder"/>
                 <field name="file_type" string="Type"/>
                 <field name="operation"/>
@@ -85,6 +86,7 @@
                 <field name="file_name"/>
                 <field name="drive_name"/>
                 <field name="root_folder_name"/>
+                <field name="folder_path"/>
                 <field name="error_message"/>
                 <separator/>
                 <filter name="filter_success" string="Success" domain="[('state', '=', 'success')]" icon="fa-check-circle"/>
@@ -92,8 +94,9 @@
                 <separator/>
                 <filter name="filter_manual" string="Manual Sync" domain="[('sync_type', '=', 'manual')]"/>
                 <filter name="filter_auto" string="Auto Sync" domain="[('sync_type', '=', 'auto')]"/>
-                <filter name="filter_cron" string="Scheduled" domain="[('sync_type', '=', 'cron')]"/>
+                <filter name="filter_cron" string="Scheduled (Cron)" domain="[('sync_type', '=', 'cron')]"/>
                 <filter name="filter_upload" string="Upload" domain="[('sync_type', '=', 'upload')]"/>
+                <filter name="filter_auto_setup" string="Historical Setup" domain="[('sync_type', '=', 'auto_setup')]"/>
                 <separator/>
                 <filter name="filter_today" string="Today" domain="[('create_date', '&gt;=', (context_today()).strftime('%%Y-%%m-%%d'))]"/>
                 <separator/>

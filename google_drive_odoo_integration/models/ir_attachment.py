@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+import logging
 from odoo import models, fields, api
+
+_logger = logging.getLogger(__name__)
 
 class IrAttachment(models.Model):
     _inherit = 'ir.attachment'
@@ -497,9 +500,7 @@ class IrAttachment(models.Model):
         return True
 
     def _auto_sync_to_drive(self, config):
-        import logging
-        _logger = logging.getLogger(__name__)
-        _logger.info(f"START _auto_sync_to_drive for {self.name} {self.res_model} {self.res_id}")
+        _logger.info("START _auto_sync_to_drive for %s %s %s", self.name, self.res_model, self.res_id)
         """Automated sync to drive with storage mode handling (Drive only vs Dual)."""
         self.ensure_one()
         sync_service = self.env['google.drive.sync'].sudo()
@@ -698,39 +699,65 @@ class IrAttachment(models.Model):
                 
                 # Trigger real-time File Explorer refresh for the target folder
                 self.env['google.drive.sync'].sudo()._notify_folder_sync(current_local_parent_id)
-                
-                # Detailed success logging for both auto and manual syncs
+
+                # ── Detailed Activity Log ────────────────────────────────────────────────
+                # Captures sync_type, full hierarchical folder path, timestamp, Drive URL,
+                # and storage mode so the Activity Log shows a complete audit trail.
+                import pytz as _pytz
+                import datetime as _dt
                 current_sync_type = self.env.context.get('sync_type', 'auto')
                 record_path_str = "/".join(record_folder) if isinstance(record_folder, list) else str(record_folder)
-                
-                # Prepend the Base Folder Name from the config to show the full hierarchy
+
+                # Build the base folder name from the config root folder
                 base_folder_name = config.google_folder_id.name or "My Odoo Files"
+                # full_drive_path is the complete, human-readable file path on Drive
                 full_drive_path = f"{base_folder_name}/{str(model_root)}/{record_path_str}"
-                
+                # Timestamp in the user's local timezone (e.g. IST), not the server UTC clock.
+                _user_tz = _pytz.timezone(self.env.user.tz or 'UTC')
+                _utc_now = _dt.datetime.utcnow().replace(tzinfo=_pytz.utc)
+                ts = _utc_now.astimezone(_user_tz).strftime('%Y-%m-%d %H:%M:%S')
+
                 if config.storage_mode == 'drive':
-                    details = f"Storage Mode: Drive Only\nSaved to Drive folder path: {full_drive_path}\nDrive URL: {result['google_url']}"
+                    details = (
+                        f"Synced At: {ts}\n"
+                        f"Storage Mode: Drive Only\n"
+                        f"Drive Folder Path: {full_drive_path}\n"
+                        f"Drive URL: {result['google_url']}"
+                    )
                 else:
-                    details = f"Storage Mode: Dual\nSaved to Drive folder path: {full_drive_path}\nDrive URL: {result['google_url']}\nSaved internally in: Odoo Internal DB/Filestore"
-                    
+                    details = (
+                        f"Synced At: {ts}\n"
+                        f"Storage Mode: Dual (Drive + Odoo)\n"
+                        f"Drive Folder Path: {full_drive_path}\n"
+                        f"Drive URL: {result['google_url']}\n"
+                        f"Also saved in: Odoo Internal DB / Filestore"
+                    )
+
                 self.env['google.drive.sync.log'].log_operation(
                     config=config.google_drive_id,
                     file_name=self.name,
                     operation='upload',
                     state='success',
                     sync_type=current_sync_type,
+                    # root_folder_name = the Drive root config folder (e.g. "My Odoo Files")
                     root_folder_name=base_folder_name,
+                    # folder_path = full sub-path after the root (e.g. "Invoices/move_idINV/2025/0001")
                     folder_path=f"{str(model_root)}/{record_path_str}",
                     google_file_id=result['google_file_id'],
-                    file_size=len(self.raw) if self.raw else 0,
+                    file_size=len(file_content) if file_content else 0,
                     sync_details=details
                 )
         except Exception as e:
-            # Fallback: Record remained in Odoo, just log failure
-            # Reconstruct path info for the failure log so the user knows where it was going
+            # Fallback: Record remained in Odoo — log the failure so it appears in Activity Log
+            import pytz as _pytz
+            import datetime as _dt
             current_sync_type = self.env.context.get('sync_type', 'auto')
             record_path_str = "/".join(record_folder) if isinstance(record_folder, list) else str(record_folder)
             base_folder_name = config.google_folder_id.name or "My Odoo Files"
-            
+            # User-timezone-aware timestamp
+            _user_tz = _pytz.timezone(self.env.user.tz or 'UTC')
+            ts = _dt.datetime.utcnow().replace(tzinfo=_pytz.utc).astimezone(_user_tz).strftime('%Y-%m-%d %H:%M:%S')
+
             self.env['google.drive.sync.log'].log_operation(
                 config=config.google_drive_id,
                 file_name=self.name,
@@ -739,7 +766,7 @@ class IrAttachment(models.Model):
                 sync_type=current_sync_type,
                 root_folder_name=base_folder_name,
                 folder_path=f"{str(model_root)}/{record_path_str}",
-                error_message=f"Auto-sync failed: {str(e)}"
+                error_message=f"[{ts}] Auto-sync failed: {str(e)}"
             )
 
     def action_toggle_auto_sync(self):
@@ -829,12 +856,13 @@ class IrAttachment(models.Model):
     def action_sync_to_drive(self):
         """Manually sync an attachment to Google Drive."""
         self.ensure_one()
-        
+
         if not self.google_drive_id:
             raise ValueError("Please select a Google Drive first")
-        
+
         sync = self.env['google.drive.sync'].sudo()
-        
+        import datetime as _dt
+
         try:
             # Determine parent folder ID
             parent_gdrive_id = False
@@ -844,7 +872,27 @@ class IrAttachment(models.Model):
                 # Use first active root folder
                 root = self.google_drive_id.root_ids.filtered(lambda r: r.active)[:1]
                 parent_gdrive_id = root.root_id if root else False
-            
+
+            # Determine folder path for the log
+            root_folder_name = self.google_folder_id.name if self.google_folder_id else (
+                self.google_drive_id.root_ids.filtered(lambda r: r.active)[:1].name
+                if self.google_drive_id.root_ids else False
+            )
+            # Build human-readable path: drive_name / folder / subfolder ...
+            path_parts = []
+            parent = self.google_folder_id.parent_folder_id if self.google_folder_id else False
+            ancestors = []
+            while parent:
+                ancestors.insert(0, parent.name or '')
+                parent = parent.parent_folder_id
+            if ancestors:
+                path_parts.extend(ancestors)
+            if self.google_folder_id:
+                path_parts.append(self.google_folder_id.name or '')
+            folder_path_log = ' / '.join(path_parts) if path_parts else (root_folder_name or '')
+
+            t0 = _dt.datetime.utcnow()  # capture in UTC; timezone conversion done at log time
+
             # Upload file to Google Drive
             result = sync.upload_file_to_drive(
                 self.name,
@@ -853,25 +901,59 @@ class IrAttachment(models.Model):
                 self.google_drive_id,
                 parent_gdrive_id=parent_gdrive_id
             )
-            
+
             if result:
-                self.write({
+                self.with_context(skip_gdrive_sync=True).write({
                     'google_file_id': result['google_file_id']
                 })
                 # Also create google.drive.file record
-                self.env['google.drive.file'].create({
-                    'name': self.name,
-                    'drive_config_id': self.google_drive_id.id,
-                    'parent_folder_id': self.google_folder_id.id if self.google_folder_id else False,
-                    'file_type': 'file',
-                    'mime_type': self.mimetype or 'application/octet-stream',
-                    'file_size': len(self.raw) if self.raw else 0,
-                    'google_file_id': result['google_file_id'],
-                    'google_url': result['google_url'],
-                    'owner_name': self.env.user.name,
-                    'sync_state': 'synced',
-                    'last_synced': fields.Datetime.now(),
-                })
+                existing = self.env['google.drive.file'].sudo().search([
+                    ('google_file_id', '=', result['google_file_id']),
+                    ('drive_config_id', '=', self.google_drive_id.id),
+                ], limit=1)
+                if not existing:
+                    self.env['google.drive.file'].sudo().create({
+                        'name': self.name,
+                        'drive_config_id': self.google_drive_id.id,
+                        'parent_folder_id': self.google_folder_id.id if self.google_folder_id else False,
+                        'file_type': 'file',
+                        'mime_type': self.mimetype or 'application/octet-stream',
+                        'file_size': len(self.raw) if self.raw else 0,
+                        'google_file_id': result['google_file_id'],
+                        'google_url': result['google_url'],
+                        'owner_name': self.env.user.name,
+                        'sync_state': 'synced',
+                        'last_synced': fields.Datetime.now(),
+                    })
+
+                # ── Log the manual sync to the Activity Log ──────────────────────────
+                # Convert the UTC start-time (t0) to the user's local timezone for display.
+                import pytz as _pytz
+                _user_tz = _pytz.timezone(self.env.user.tz or 'UTC')
+                _t0_utc = t0.replace(tzinfo=_pytz.utc)
+                ts = _t0_utc.astimezone(_user_tz).strftime('%Y-%m-%d %H:%M:%S')
+                _now_utc = _dt.datetime.utcnow().replace(tzinfo=_pytz.utc)
+                elapsed = (_now_utc - _t0_utc).total_seconds()
+                details = (
+                    f"Synced At: {ts}\n"
+                    f"Storage Mode: Manual Upload\n"
+                    f"Drive Folder Path: {self.google_drive_id.name} / {folder_path_log}\n"
+                    f"Drive URL: {result.get('google_url', '')}"
+                )
+                self.env['google.drive.sync.log'].log_operation(
+                    config=self.google_drive_id,
+                    file_name=self.name,
+                    operation='upload',
+                    state='success',
+                    sync_type='manual',
+                    root_folder_name=root_folder_name,
+                    folder_path=folder_path_log,
+                    google_file_id=result['google_file_id'],
+                    file_size=len(self.raw) if self.raw else 0,
+                    duration=elapsed,
+                    sync_details=details,
+                )
+
                 return {
                     'type': 'ir.actions.client',
                     'tag': 'display_notification',
@@ -885,6 +967,26 @@ class IrAttachment(models.Model):
             else:
                 raise ValueError("Failed to upload file to Google Drive")
         except Exception as e:
+            # ── Log the failure to the Activity Log ──────────────────────────────────
+            import pytz as _pytz2
+            import datetime as _dt2
+            _user_tz2 = _pytz2.timezone(self.env.user.tz or 'UTC')
+            ts = _dt2.datetime.utcnow().replace(tzinfo=_pytz2.utc).astimezone(_user_tz2).strftime('%Y-%m-%d %H:%M:%S')
+            try:
+                self.env['google.drive.sync.log'].log_operation(
+                    config=self.google_drive_id,
+                    file_name=self.name,
+                    operation='upload',
+                    state='fail',
+                    sync_type='manual',
+                    root_folder_name=(
+                        self.google_folder_id.name if self.google_folder_id else False
+                    ),
+                    error_message=f"[{ts}] Manual sync failed: {str(e)}",
+                )
+            except Exception:
+                pass  # Never let logging break the user-facing notification
+
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
