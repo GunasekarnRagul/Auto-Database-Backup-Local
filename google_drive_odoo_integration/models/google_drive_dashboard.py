@@ -158,8 +158,6 @@ class GoogleDriveDashboard(models.AbstractModel):
                     'uploading_count': uploading_count,
                     'fails_today': fails_today,
                     'last_sync_time': last_sync_time,
-                    'storage_saved_formatted': '—',
-                    'drive_space_used_formatted': '—',
                     'files_this_month': files_this_month,
                     'active_share_links': active_share_links,
                 },

@@ -207,6 +207,14 @@
 .gd-spinner { display:flex; align-items:center; justify-content:center;
                height:100%; min-height:80px; color:var(--gd-txm); font-size:22px; }
 
+/* Refresh feedback */
+.gd-refresh-overlay { position:absolute; inset:0; background:rgba(255,255,255,0.7); display:flex; align-items:center; justify-content:center; z-index:10; border-radius:inherit; backdrop-filter:blur(1px); -webkit-backdrop-filter:blur(1px); }
+.gd-refresh-overlay__ring { width:36px; height:36px; border:3px solid var(--gd-blue-lt); border-top-color:var(--gd-blue); border-radius:50%; animation:gd-spin .8s linear infinite; }
+.gd-refresh-toast { display:flex; align-items:center; gap:5px; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:700; opacity:0; transform:translateY(4px); transition:all .2s ease; pointer-events:none; }
+.gd-refresh-toast--visible { opacity:1; transform:translateY(0); }
+.gd-refresh-toast--ok { background:var(--gd-green-lt); color:var(--gd-green); }
+.gd-refresh-toast--fail { background:var(--gd-red-lt); color:var(--gd-red); }
+
 /* ═══════════════ KPI CARD ═══════════════ */
 .gd-kpi { display:flex; flex-direction:column; align-items:center; justify-content:center;
           height:100%; gap:6px; text-align:center; padding:6px; }

@@ -110,8 +110,21 @@ export class FileExplorer extends Component {
             showUploadLoader: false,
             showRenameLoader: false,
             showManualSyncLoader: false,
+            showManualSyncLoader: false,
             loaderMessage: 'Loading...',
         });
+
+        const params = this.props.action && this.props.action.params ? this.props.action.params : {};
+        if (params.drive_config_id) this.state.activeDriveId = params.drive_config_id;
+        if (params.parent_folder_id) this.state.currentFolderId = params.parent_folder_id;
+        if (params.root_folder_id) this.state.activeRootId = params.root_folder_id;
+
+        // Also check URL hash for deep linking (when opened in new tab)
+        const hashString = window.location.hash.substring(1);
+        const urlParams = new URLSearchParams(hashString);
+        if (urlParams.get('gd_drive_id')) this.state.activeDriveId = parseInt(urlParams.get('gd_drive_id'));
+        if (urlParams.get('gd_parent_id')) this.state.currentFolderId = parseInt(urlParams.get('gd_parent_id'));
+        if (urlParams.get('gd_root_id')) this.state.activeRootId = parseInt(urlParams.get('gd_root_id'));
 
         this.uploadProgressTimers = {};
 
@@ -128,14 +141,26 @@ export class FileExplorer extends Component {
             if (this.state.activeDriveId) {
                 await this.loadRoots(this.state.activeDriveId);
             }
-            const driveName = this.activeDriveName;
-            this.state.currentFolderName = driveName;
-            this.state.breadcrumbs = [{ id: 'section', name: driveName }];
-            if (this.state.activeRootId) {
-                const root = this.state.rootFolders.find(r => r.id === this.state.activeRootId);
-                if (root) {
-                    this.state.breadcrumbs.push({ id: null, name: root.name });
-                    this.state.currentFolderName = root.name;
+            if (this.state.currentFolderId) {
+                try {
+                    const breadcrumbs = await this.orm.call("google.drive.file", "get_folder_breadcrumbs", [this.state.currentFolderId]);
+                    this.state.breadcrumbs = breadcrumbs;
+                    this.state.currentFolderName = breadcrumbs.length ? breadcrumbs[breadcrumbs.length - 1].name : this.activeDriveName;
+                } catch (e) {
+                    // Fallback
+                    this.state.breadcrumbs = [{ id: 'section', name: this.activeDriveName }];
+                    this.state.currentFolderName = this.activeDriveName;
+                }
+            } else {
+                const driveName = this.activeDriveName;
+                this.state.currentFolderName = driveName;
+                this.state.breadcrumbs = [{ id: 'section', name: driveName }];
+                if (this.state.activeRootId) {
+                    const root = this.state.rootFolders.find(r => r.id === this.state.activeRootId);
+                    if (root) {
+                        this.state.breadcrumbs.push({ id: null, name: root.name });
+                        this.state.currentFolderName = root.name;
+                    }
                 }
             }
             await this.loadFiles(this.state.currentFolderId);

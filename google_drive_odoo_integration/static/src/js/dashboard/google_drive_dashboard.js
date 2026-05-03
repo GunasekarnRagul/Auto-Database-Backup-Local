@@ -73,7 +73,7 @@ const WIDGET_CATALOG = [
     { id: "sync_trend",       label: "Sync Activity Chart", icon: "fa-area-chart",         cat: "Sync",     colSpan: 8, rowClass: "chart" },
     { id: "sync_status",      label: "Sync Status",         icon: "fa-check-circle",       cat: "Sync",     colSpan: 4, rowClass: "sm" },
     { id: "failed_syncs",     label: "Failed Syncs",        icon: "fa-times-circle",       cat: "Sync",     colSpan: 4, rowClass: "sm" },
-    { id: "duplicates",       label: "Duplicates",          icon: "fa-clone",              cat: "Sync",     colSpan: 4, rowClass: "sm" },
+    { id: "duplicates",       label: "Duplicate Files",     icon: "fa-clone",              cat: "Sync",     colSpan: 4, rowClass: "sm" },
     // Files
     { id: "activity_log",     label: "Activity Log",        icon: "fa-list-alt",           cat: "Sync",     colSpan: 8, rowClass: "lg" },
     { id: "recent_files",     label: "Recent Files",        icon: "fa-folder-open-o",      cat: "Files",    colSpan: 4, rowClass: "lg" },
@@ -153,9 +153,11 @@ export class GoogleDriveDashboard extends Component {
         this.state.globalTrendStart = start.toISOString().split('T')[0];
         this.state.globalTrendEnd = today.toISOString().split('T')[0];
 
-        this._charts     = {};    // Chart.js instances keyed by widgetId
-        this._dataLoaded = false; // true after first full lazy load
-        this._dragSrcId  = null;  // drag-and-drop source widget id
+        this._charts          = {};    // Chart.js instances keyed by widgetId
+        this._dataLoaded      = false; // true after first full lazy load
+        this._dragSrcId       = null;  // drag-and-drop source widget id
+        this._widgetRefreshing = new Set(); // widget ids currently being refreshed
+        this._widgetToasts     = {};   // widgetId -> timeout handle for toast cleanup
 
         onWillStart(async () => {
             await this._loadLayout();
@@ -393,7 +395,134 @@ export class GoogleDriveDashboard extends Component {
         if (fn) fn.call(this, body);
     }
 
-    // ── KPI helper ────────────────────────────────────────────────────────────
+    // ── Per-widget refresh (with loader + toast) ──────────────────────────
+
+    /**
+     * Map of widget id → async function that fetches fresh data for that widget.
+     * Must update this.state before resolving.
+     */
+    get _widgetFetchers() {
+        const s = this.state;
+        return {
+            kpi_total_files:  async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); s.health = d.health; },
+            kpi_total_size:   async () => { const d = await this.orm.call("google.drive.dashboard", "get_storage_stats", []); Object.assign(s.kpis, d); },
+            kpi_files_month:  async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
+            kpi_pending:      async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
+            kpi_errors:       async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
+            kpi_share_links:  async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
+            kpi_last_sync:    async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
+            kpi_orphans:      async () => { const d = await this.orm.call("google.drive.dashboard", "get_orphan_attachments", []); s.orphan_count = d.orphan_count; },
+            fleet_overview:   async () => {
+                const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []);
+                s.health = d.health;
+                Object.assign(s.kpis, d.kpis);
+                s.fleet_quotas = {};
+                if (s.health && s.health.fleet) {
+                    for (const drive of s.health.fleet) {
+                        s.fleet_quotas[drive.id] = { available: false, loading: true };
+                        this.orm.call("google.drive.dashboard", "get_drive_quota", [], { config_id: drive.id })
+                            .then(q => { q.loading = false; s.fleet_quotas[drive.id] = q; this._renderWidget("fleet_overview"); })
+                            .catch(() => { s.fleet_quotas[drive.id] = { available: false, loading: false }; });
+                    }
+                }
+            },
+            storage_meter:    async () => { s.sm_quotas = {}; },
+            storage_by_model: async () => { const d = await this.orm.call("google.drive.dashboard", "get_storage_by_model", []); s.storage_by_model = d; },
+            top_file_types:   async () => { const d = await this.orm.call("google.drive.dashboard", "get_top_file_types", []); s.top_file_types = d; },
+            largest_files:    async () => { const d = await this.orm.call("google.drive.dashboard", "get_largest_files", []); s.largest_files = d; },
+            sync_trend:       async () => { const d = await this.orm.call("google.drive.dashboard", "get_sync_trend_data", [], { start_date: s.globalTrendStart, end_date: s.globalTrendEnd }); s.trendData = d; },
+            sync_status:      async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
+            failed_syncs:     async () => { const d = await this.orm.call("google.drive.dashboard", "get_error_summary", []); s.error_summary = d; },
+            duplicates:       async () => { const d = await this.orm.call("google.drive.dashboard", "get_duplicate_summary", []); s.duplicate_count = d.duplicate_count; },
+            activity_log:     async () => { const d = await this.orm.call("google.drive.dashboard", "get_activity_logs", [], { period: s.logFilter }); s.recent_logs = d; },
+            recent_files:     async () => { const d = await this.orm.call("google.drive.dashboard", "get_recent_files", []); s.recent_files = d; },
+            files_by_model:   async () => { const d = await this.orm.call("google.drive.dashboard", "get_files_by_model", []); s.files_by_model = d; },
+            top_uploaders:    async () => { const d = await this.orm.call("google.drive.dashboard", "get_top_uploaders", []); s.top_uploaders = d; },
+            business_models:  async () => { const d = await this.orm.call("google.drive.dashboard", "get_business_model_counts", []); s.business_models = d; },
+            model_breakdown:  async () => { const d = await this.orm.call("google.drive.dashboard", "get_model_breakdown", []); s.model_breakdown = d; },
+        };
+    }
+
+    /**
+     * Refresh a single widget:
+     *  1. Show spinner overlay on the body (content stays dim behind it)
+     *  2. Spin the refresh icon in the header
+     *  3. Fetch fresh data via _widgetFetchers
+     *  4. Re-render the widget
+     *  5. Show success / fail toast, auto-dismiss after 2.5 s
+     */
+    async _refreshWidget(wId) {
+        if (this._widgetRefreshing.has(wId)) return; // prevent double-click
+        this._widgetRefreshing.add(wId);
+
+        // 1. Spinner overlay on body
+        const body = this._getBody(wId);
+        let overlay = null;
+        if (body) {
+            overlay = document.createElement("div");
+            overlay.className = "gd-refresh-overlay";
+            overlay.innerHTML = `<div class="gd-refresh-overlay__ring"></div>`;
+            body.style.position = "relative";
+            body.appendChild(overlay);
+        }
+
+        // 2. Spin the header refresh icon
+        const cell        = body && body.closest(".gd-cell");
+        const refreshBtn  = cell && cell.querySelector(".gd-hd-btn:not(.gd-hd-btn--remove)");
+        const refreshIcon = refreshBtn && refreshBtn.querySelector(".fa");
+        if (refreshIcon) refreshIcon.classList.add("fa-spin");
+        if (refreshBtn)  refreshBtn.disabled = true;
+
+        // 3. Fetch
+        let success = true;
+        let errMsg  = "";
+        try {
+            const fetcher = this._widgetFetchers[wId];
+            if (fetcher) await fetcher();
+            else         await this._fetchCoreData();
+        } catch (e) {
+            success = false;
+            errMsg  = e.message || "Unknown error";
+            console.error(`[Dashboard] Refresh failed for widget "${wId}":`, e);
+        }
+
+        // 4. Remove overlay + re-render
+        if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        if (refreshIcon) refreshIcon.classList.remove("fa-spin");
+        if (refreshBtn)  refreshBtn.disabled = false;
+        this._widgetRefreshing.delete(wId);
+        this._renderWidget(wId);
+
+        // 5. Toast
+        this._showWidgetToast(wId, success, errMsg);
+    }
+
+    /** Show a small success/fail chip in the widget header, auto-dismiss after 2.5 s. */
+    _showWidgetToast(wId, success, message) {
+        const body = this._getBody(wId);
+        const cell = body && body.closest(".gd-cell");
+        const hd   = cell && cell.querySelector(".gd-widget__hd");
+        if (!hd) return;
+
+        const prev = hd.querySelector(".gd-refresh-toast");
+        if (prev) prev.remove();
+        if (this._widgetToasts[wId]) clearTimeout(this._widgetToasts[wId]);
+
+        const toast = document.createElement("span");
+        toast.className = `gd-refresh-toast gd-refresh-toast--${success ? "ok" : "fail"}`;
+        toast.title     = success ? "Refreshed successfully" : message;
+        toast.innerHTML = success
+            ? `<i class="fa fa-check-circle"></i> Updated`
+            : `<i class="fa fa-times-circle"></i> Failed`;
+        hd.appendChild(toast);
+
+        requestAnimationFrame(() => toast.classList.add("gd-refresh-toast--visible"));
+
+        this._widgetToasts[wId] = setTimeout(() => {
+            toast.classList.remove("gd-refresh-toast--visible");
+            setTimeout(() => { if (toast.parentNode) toast.remove(); }, 350);
+        }, 2500);
+    }
 
     _kpi(el, value, label, icon, color) {
         el.innerHTML = `
@@ -871,9 +1000,11 @@ export class GoogleDriveDashboard extends Component {
             name: "Sync Logs", views: [[false, "list"], [false, "form"]], domain: [["state","=","fail"]] });
     }
 
-    _openDuplicatePruner() {
+    async _openDuplicatePruner() {
+        const wizardId = await this.orm.create("duplicate.pruner.wizard", [{}]);
         this.action.doAction({ type: "ir.actions.act_window", res_model: "duplicate.pruner.wizard",
-            name: "Prune Duplicates", views: [[false, "form"]], target: "new" });
+            res_id: wizardId[0], name: "Prune Duplicates", views: [[false, "form"]], target: "new",
+            flags: { mode: 'readonly' } });
     }
 
     _openDriveSettings(id) {

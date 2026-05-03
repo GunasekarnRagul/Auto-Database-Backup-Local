@@ -7,3 +7,5 @@ access_attachment_sync_config,attachment.sync.config,model_attachment_sync_confi
 access_google_drive_sync_log,google.drive.sync.log,model_google_drive_sync_log,base.group_system,1,1,1,1
 access_google_drive_file_delete_wizard,access_google_drive_file_delete_wizard,model_google_drive_file_delete_wizard,base.group_user,1,1,1,1
 access_gdrive_dashboard_layout,gdrive.dashboard.layout,model_gdrive_dashboard_layout,base.group_user,1,1,1,1
+access_duplicate_pruner_wizard,duplicate.pruner.wizard,model_duplicate_pruner_wizard,base.group_user,1,1,1,1
+access_duplicate_pruner_wizard_line,duplicate.pruner.wizard.line,model_duplicate_pruner_wizard_line,base.group_user,1,1,1,1

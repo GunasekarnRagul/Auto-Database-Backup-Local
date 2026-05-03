@@ -156,7 +156,12 @@ export class SyncLogTerminal extends Component {
 
     formatTimestamp(dateStr) {
         if (!dateStr) return '00:00:00';
-        const d = new Date(dateStr);
+        // Odoo returns UTC datetime strings without a timezone suffix
+        // (e.g. "2026-05-03 06:03:05"). Appending " UTC" ensures the JS
+        // engine always parses it as UTC, then getHours/getMinutes/etc.
+        // automatically convert to the browser's local timezone (e.g. IST +05:30).
+        const utcStr = dateStr.includes('Z') || dateStr.includes('+') ? dateStr : dateStr + ' UTC';
+        const d = new Date(utcStr);
         const pad = (n) => String(n).padStart(2, '0');
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     }

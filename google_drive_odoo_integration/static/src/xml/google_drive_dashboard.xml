@@ -112,7 +112,7 @@
 
                   <div class="gd-widget__acts">
                     <!-- Refresh always visible -->
-                    <button class="gd-hd-btn" t-on-click.stop="() => this._renderWidget(wId)" title="Refresh widget">
+                    <button class="gd-hd-btn" t-on-click.stop="() => this._refreshWidget(wId)" title="Refresh widget">
                       <i class="fa fa-refresh"/>
                     </button>
                     <!-- Remove only in edit mode -->

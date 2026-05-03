@@ -667,44 +667,51 @@ class GoogleDriveFile(models.Model):
     # ─── Duplicate Detection and Pruning ───
 
     @api.model
-    def get_duplicate_groups(self):
-        """Find duplicate files using a 3-layer production-grade strategy:
-        Primary: md5_checksum
-        Fallback: file_size + mime_type
-        Final Filter: name + parent_folder_id
+    def get_duplicate_groups(self, config_id=None):
+        """Find duplicate files using a production-grade strategy.
+        Allows filtering by a specific Google Drive config.
         """
+        domain = [('file_type', '=', 'file'), ('active', '=', True)]
+        if config_id:
+            domain.append(('drive_config_id', '=', config_id))
+            
         files = self.search_read(
-            [('file_type', '=', 'file'), ('active', '=', True)], 
-            ['id', 'name', 'md5_checksum', 'file_size', 'mime_type', 'parent_folder_id', 'create_date']
+            domain, 
+            ['id', 'name', 'md5_checksum', 'file_size', 'mime_type', 'create_date']
         )
         
-        groups = {}
+        name_groups = {}
         for f in files:
-            # Layer 1 & 2: Primary Hash or Fallback Metrics
-            content_hash = f['md5_checksum'] if f['md5_checksum'] else f"{f['file_size']}_{f['mime_type']}"
-            # Layer 3: Folder boundary and filename safety limit
-            folder_id = f['parent_folder_id'][0] if f['parent_folder_id'] else False
             name = f['name']
-            
-            duplicate_key = (content_hash, folder_id, name)
-            
-            if duplicate_key not in groups:
-                groups[duplicate_key] = []
-            groups[duplicate_key].append(f['id'])
+            if name not in name_groups:
+                name_groups[name] = []
+            name_groups[name].append(f)
             
         result = []
-        for key, ids in groups.items():
-            if len(ids) > 1:
-                records = self.browse(ids).sorted(key=lambda r: r.create_date, reverse=True)
-                folder_id = key[1]
-                parent_name = '/'
-                if folder_id:
-                    parent_rec = self.browse(folder_id)
-                    parent_name = parent_rec.display_path or parent_rec.name
+        for name, file_list in name_groups.items():
+            if len(file_list) > 1:
+                content_groups = {}
+                for f in file_list:
+                    content_hash = f['md5_checksum'] if f['md5_checksum'] else f"{f['file_size']}_{f['mime_type']}"
+                    if content_hash not in content_groups:
+                        content_groups[content_hash] = []
+                    content_groups[content_hash].append(f['id'])
+                
+                # Determine type
+                if len(content_groups) == 1:
+                    dup_type = 'exact'
+                    group_name = f"Exact Match: {name}"
+                else:
+                    dup_type = 'conflict'
+                    group_name = f"Name Conflict: {name}"
+                    
+                all_ids = [f['id'] for f in file_list]
+                records = self.browse(all_ids).sorted(key=lambda r: r.create_date, reverse=True)
                 
                 result.append({
-                    'name': key[2],
-                    'parent_name': parent_name,
+                    'name': name,
+                    'type': dup_type,
+                    'group_name': group_name,
                     'count': len(records),
                     'duplicate_ids': records.ids,
                     'records': records
