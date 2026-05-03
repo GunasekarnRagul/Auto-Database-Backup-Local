@@ -220,7 +220,7 @@ class GoogleDriveDashboard(models.AbstractModel):
             return {'storage_saved_formatted': '0 B', 'drive_space_used_formatted': '0 B'}
 
     @api.model
-    def get_activity_logs(self, period='today', operation=False, limit=25):
+    def get_activity_logs(self, period='today', operation=False, limit=1000):
         """Fetch sync logs with optional date-range and operation filters."""
         try:
             SyncLog = self.env['google.drive.sync.log'].sudo()
@@ -246,7 +246,7 @@ class GoogleDriveDashboard(models.AbstractModel):
                     'file_name': log.file_name,
                     'operation': log.operation,
                     'state': log.state,
-                    'date': log.create_date.strftime("%Y-%m-%d %H:%M") if log.create_date else '',
+                    'date': fields.Datetime.context_timestamp(self, log.create_date).strftime("%Y-%m-%d %H:%M:%S") if log.create_date else '',
                     'error_message': log.error_message or '',
                 })
             return recent_logs

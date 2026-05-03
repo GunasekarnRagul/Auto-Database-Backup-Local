@@ -124,6 +124,7 @@ export class GoogleDriveDashboard extends Component {
             health:        { fleet: [], online_drives: 0, total_drives: 0 },
             recent_logs:   [],
             logFilter:     "today",
+            activityLogPage: 1,
             duplicate_count: null,
             model_breakdown: [],
             error_summary: { fails_24h: 0, fails_7d: 0, top_errors: [] },
@@ -712,23 +713,54 @@ export class GoogleDriveDashboard extends Component {
             // ─── Activity Log ─────────────────────────────────
             activity_log: el => {
                 const logs = s.recent_logs;
+                const itemsPerPage = 10;
+                const totalPages = Math.ceil(logs.length / itemsPerPage) || 1;
+                const currentPage = s.activityLogPage;
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const paginatedLogs = logs.slice(startIndex, startIndex + itemsPerPage);
+
+                let paginationHtml = '';
+                if (totalPages > 1) {
+                    let pagesHtml = '';
+                    for (let i = 1; i <= totalPages; i++) {
+                        pagesHtml += `<button class="gd-page-btn${i === currentPage ? ' active' : ''}" data-page="${i}">${i}</button>`;
+                    }
+                    paginationHtml = `<div class="gd-pagination" style="display:flex; justify-content:center; gap:5px; margin-top:10px; padding-bottom:5px;">
+                        <button class="gd-page-nav" data-page="${currentPage > 1 ? currentPage - 1 : 1}" ${currentPage === 1 ? 'disabled' : ''}>&laquo; Prev</button>
+                        ${pagesHtml}
+                        <button class="gd-page-nav" data-page="${currentPage < totalPages ? currentPage + 1 : totalPages}" ${currentPage === totalPages ? 'disabled' : ''}>Next &raquo;</button>
+                    </div>`;
+                }
+
                 el.innerHTML = `
                   <div class="gd-log-bar">
                     ${["today","7d","30d","all"].map(p => `<button class="gd-fpill${s.logFilter===p?" active":""}" data-period="${p}">${p==="today"?"Today":p==="all"?"All":p}</button>`).join("")}
                   </div>
                   <div class="gd-scroll"><table class="gd-table gd-log-tbl">
                     <thead><tr><th>File</th><th>Op</th><th>Status</th><th>Time</th></tr></thead>
-                    <tbody>${!logs.length
+                    <tbody>${!paginatedLogs.length
                         ? `<tr><td colspan="4" class="gd-empty-row">No activity for this period.</td></tr>`
-                        : logs.map(l => `<tr>
+                        : paginatedLogs.map(l => `<tr>
                             <td class="gd-fn gd-fn--sm">${_esc(l.file_name)}</td>
                             <td><span class="gd-op-badge">${_esc(l.operation)}</span></td>
                             <td><span class="gd-status-badge gd-status-badge--${l.state==="success"?"ok":"fail"}">${l.state}</span></td>
                             <td class="gd-time">${l.date}</td>
                           </tr>`).join("")}
-                    </tbody></table></div>`;
+                    </tbody></table>
+                    ${paginationHtml}
+                  </div>`;
+                  
                 el.querySelectorAll(".gd-fpill").forEach(b =>
                     b.addEventListener("click", () => this._filterLogs(b.dataset.period)));
+                
+                el.querySelectorAll(".gd-page-btn, .gd-page-nav").forEach(b => {
+                    b.addEventListener("click", () => {
+                        if (!b.disabled) {
+                            s.activityLogPage = parseInt(b.dataset.page);
+                            this._renderWidget("activity_log");
+                        }
+                    });
+                });
             },
 
             // ─── Failed Syncs ─────────────────────────────────
@@ -988,6 +1020,7 @@ export class GoogleDriveDashboard extends Component {
 
     async _filterLogs(period) {
         this.state.logFilter = period;
+        this.state.activityLogPage = 1;
         try {
             const logs = await this.orm.call("google.drive.dashboard", "get_activity_logs", [], { period });
             this.state.recent_logs = logs;

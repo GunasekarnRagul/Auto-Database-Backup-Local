@@ -2,7 +2,7 @@
 <templates xml:space="preserve">
 
   <t t-name="google_drive_odoo_integration.Dashboard" owl="1">
-    <div class="gdrive-dash">
+    <div class="gdrive-dash gd-gdrive-dash">
 
       <!-- ════ LOADING ════ -->
       <t t-if="state.isLoading">
