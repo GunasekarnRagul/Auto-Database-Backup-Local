@@ -344,8 +344,7 @@ export class GoogleDriveDashboard extends Component {
                 .then(d => { s.top_file_types = d; }),
             this.orm.call("google.drive.dashboard", "get_largest_files", [])
                 .then(d => { s.largest_files = d; }),
-            this.orm.call("google.drive.dashboard", "get_recent_files", [])
-                .then(d => { s.recent_files = d; }),
+            this._widgetFetchers.recent_files(),
             this.orm.call("google.drive.dashboard", "get_business_model_counts", [])
                 .then(d => { s.business_models = d; }),
             this.orm.call("google.drive.dashboard", "get_storage_by_model", [])
@@ -439,7 +438,7 @@ export class GoogleDriveDashboard extends Component {
             activity_log:     async () => { const d = await this.orm.call("google.drive.dashboard", "get_activity_logs", [], { period: s.logFilter }); s.recent_logs = d; },
             recent_files: async () => {
                 // Use the same localStorage key as the File Explorer so 'Clear Recent' syncs both
-                const recentIds = JSON.parse(localStorage.getItem('gd_recent_file_ids') || '[]');
+                const recentIds = JSON.parse(localStorage.getItem('gd_recent_files') || '[]');
                 if (!recentIds.length) { s.recent_files = []; return; }
                 const records = await this.orm.searchRead(
                     'google.drive.file',
