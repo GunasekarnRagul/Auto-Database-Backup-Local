@@ -1003,8 +1003,7 @@ export class GoogleDriveDashboard extends Component {
     async _openDuplicatePruner() {
         const wizardId = await this.orm.create("duplicate.pruner.wizard", [{}]);
         this.action.doAction({ type: "ir.actions.act_window", res_model: "duplicate.pruner.wizard",
-            res_id: wizardId[0], name: "Prune Duplicates", views: [[false, "form"]], target: "new",
-            flags: { mode: 'readonly' } });
+            res_id: wizardId[0], name: "Prune Duplicates", views: [[false, "form"]], target: "new" });
     }
 
     _openDriveSettings(id) {

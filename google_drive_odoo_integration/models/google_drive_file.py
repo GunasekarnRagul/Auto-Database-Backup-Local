@@ -667,6 +667,7 @@ class GoogleDriveFile(models.Model):
     # ─── Duplicate Detection and Pruning ───
 
     @api.model
+    @api.model
     def get_duplicate_groups(self, config_id=None):
         """Find duplicate files using a production-grade strategy.
         Allows filtering by a specific Google Drive config.
