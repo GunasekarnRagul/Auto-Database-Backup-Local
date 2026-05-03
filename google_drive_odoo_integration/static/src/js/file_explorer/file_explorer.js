@@ -375,13 +375,27 @@ export class FileExplorer extends Component {
                     commonFields
                 );
             } else if (section === 'recent') {
-                const recentIds = JSON.parse(localStorage.getItem('gd_recent_file_ids') || '[]');
-                if (recentIds.length > 0) {
-                    files = await this.orm.searchRead("google.drive.file",
-                        [["id", "in", recentIds], ["file_type", "!=", "folder"], ["active", "=", true]],
+                let recentIds = [];
+                try {
+                    recentIds = JSON.parse(localStorage.getItem('gd_recent_files') || '[]');
+                } catch (e) {
+                    recentIds = [];
+                }
+                
+                if (recentIds.length === 0) {
+                    files = [];
+                } else {
+                    const domain = [["id", "in", recentIds], ["active", "=", true], ["file_type", "!=", "folder"]];
+                    const recentFiles = await this.orm.searchRead("google.drive.file",
+                        domain,
                         commonFields
                     );
-                    files.sort((a, b) => recentIds.indexOf(a.id) - recentIds.indexOf(b.id));
+                    
+                    // Maintain the order from recentIds (most recently opened first)
+                    const fileMap = {};
+                    recentFiles.forEach(f => fileMap[f.id] = f);
+                    
+                    files = recentIds.map(id => fileMap[id]).filter(f => f !== undefined);
                 }
             } else if (section === 'trash') {
                 if (folderId === 'trash_root' || !folderId) {
@@ -949,20 +963,26 @@ export class FileExplorer extends Component {
 
     addToRecent(file) {
         if (!file || file.file_type === 'folder') return;
-        let recentIds = JSON.parse(localStorage.getItem('gd_recent_file_ids') || '[]');
-        // Remove if it exists
-        recentIds = recentIds.filter(id => id !== file.id);
-        // Add to the top of the stack
-        recentIds.unshift(file.id);
-        // Keep only top 20
-        if (recentIds.length > 20) {
-            recentIds = recentIds.slice(0, 20);
+        
+        let recentIds = [];
+        try {
+            recentIds = JSON.parse(localStorage.getItem('gd_recent_files') || '[]');
+        } catch (e) {
+            recentIds = [];
         }
-        localStorage.setItem('gd_recent_file_ids', JSON.stringify(recentIds));
+        
+        recentIds = recentIds.filter(id => id !== file.id);
+        recentIds.unshift(file.id);
+        
+        if (recentIds.length > 50) {
+            recentIds = recentIds.slice(0, 50);
+        }
+        
+        localStorage.setItem('gd_recent_files', JSON.stringify(recentIds));
     }
 
     clearRecent() {
-        localStorage.removeItem('gd_recent_file_ids');
+        localStorage.removeItem('gd_recent_files');
         this.state.files = [];
         this.state.allFiles = [];
     }

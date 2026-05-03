@@ -43,7 +43,9 @@ class GoogleDriveFile(models.Model):
     upload_progress = fields.Float('Upload Progress', default=0.0, help='Upload progress as percentage (0-100)')
     active = fields.Boolean('Active', default=True)
     display_path = fields.Char('Location', compute='_compute_display_path')
-    attachment_id = fields.Many2one('ir.attachment', string='Related Attachment', compute='_compute_attachment_id')
+    attachment_id = fields.Many2one('ir.attachment', string='Related Attachment', compute='_compute_attachment_id', store=True)
+    res_model = fields.Char('Resource Model', related='attachment_id.res_model', store=True, index=True)
+    res_id = fields.Many2oneReference('Resource ID', related='attachment_id.res_id', model_field='res_model', store=True, index=True)
 
     def _compute_attachment_id(self):
         for record in self:

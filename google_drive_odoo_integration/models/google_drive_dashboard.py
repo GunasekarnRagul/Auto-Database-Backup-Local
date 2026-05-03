@@ -632,7 +632,7 @@ class GoogleDriveDashboard(models.AbstractModel):
             return []
 
     @api.model
-    def get_recent_files(self, limit=15):
+    def get_recent_files(self, limit=1000):
         """Return recently synced files."""
         try:
             files = self.env['google.drive.file'].sudo().search([
@@ -647,8 +647,9 @@ class GoogleDriveDashboard(models.AbstractModel):
                     'name': f.name,
                     'size': _format_size(f.file_size or 0),
                     'mime_type': f.mime_type or '',
-                    'drive_url': f.drive_url or '',
-                    'date': f.write_date.strftime("%b %d, %H:%M") if f.write_date else '',
+                    'drive_url': f.google_url or '',
+                    'google_file_id': f.google_file_id or '',
+                    'date': fields.Datetime.context_timestamp(self, f.write_date).strftime("%b %d, %H:%M") if f.write_date else '',
                     'res_model': f.res_model or '',
                     'sync_state': f.sync_state or '',
                 })

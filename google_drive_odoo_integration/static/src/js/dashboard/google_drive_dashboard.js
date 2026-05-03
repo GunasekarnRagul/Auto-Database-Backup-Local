@@ -125,6 +125,7 @@ export class GoogleDriveDashboard extends Component {
             recent_logs:   [],
             logFilter:     "today",
             activityLogPage: 1,
+            recentFilesPage: 1,
             duplicate_count: null,
             model_breakdown: [],
             error_summary: { fails_24h: 0, fails_7d: 0, top_errors: [] },
@@ -436,7 +437,28 @@ export class GoogleDriveDashboard extends Component {
             failed_syncs:     async () => { const d = await this.orm.call("google.drive.dashboard", "get_error_summary", []); s.error_summary = d; },
             duplicates:       async () => { const d = await this.orm.call("google.drive.dashboard", "get_duplicate_summary", []); s.duplicate_count = d.duplicate_count; },
             activity_log:     async () => { const d = await this.orm.call("google.drive.dashboard", "get_activity_logs", [], { period: s.logFilter }); s.recent_logs = d; },
-            recent_files:     async () => { const d = await this.orm.call("google.drive.dashboard", "get_recent_files", []); s.recent_files = d; },
+            recent_files: async () => {
+                // Use the same localStorage key as the File Explorer so 'Clear Recent' syncs both
+                const recentIds = JSON.parse(localStorage.getItem('gd_recent_file_ids') || '[]');
+                if (!recentIds.length) { s.recent_files = []; return; }
+                const records = await this.orm.searchRead(
+                    'google.drive.file',
+                    [['id', 'in', recentIds], ['file_type', '!=', 'folder'], ['active', '=', true]],
+                    ['id', 'name', 'file_size', 'mime_type', 'google_url', 'google_file_id', 'sync_state', 'write_date']
+                );
+                // Sort by localStorage order (most recent first)
+                records.sort((a, b) => recentIds.indexOf(a.id) - recentIds.indexOf(b.id));
+                s.recent_files = records.map(f => ({
+                    id: f.id,
+                    name: f.name,
+                    size: f.file_size ? (f.file_size < 1024 ? f.file_size.toFixed(0) + ' KB' : (f.file_size / 1024).toFixed(1) + ' MB') : '—',
+                    mime_type: f.mime_type || '',
+                    drive_url: f.google_url || '',
+                    google_file_id: f.google_file_id || '',
+                    date: f.write_date ? f.write_date.replace('T', ' ').slice(0, 16) : '',
+                    sync_state: f.sync_state || '',
+                }));
+            },
             files_by_model:   async () => { const d = await this.orm.call("google.drive.dashboard", "get_files_by_model", []); s.files_by_model = d; },
             top_uploaders:    async () => { const d = await this.orm.call("google.drive.dashboard", "get_top_uploaders", []); s.top_uploaders = d; },
             business_models:  async () => { const d = await this.orm.call("google.drive.dashboard", "get_business_model_counts", []); s.business_models = d; },
@@ -796,16 +818,80 @@ export class GoogleDriveDashboard extends Component {
             recent_files: el => {
                 const d = s.recent_files;
                 if (!d || !d.length) { el.innerHTML = this._empty("fa-folder-open-o", "No recent files"); return; }
-                el.innerHTML = `<div class="gd-file-feed gd-scroll">${d.map(f => `
-                  <div class="gd-file-row">
+                
+                const itemsPerPage = 8;
+                const totalPages = Math.ceil(d.length / itemsPerPage) || 1;
+                const currentPage = s.recentFilesPage;
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const paginatedFiles = d.slice(startIndex, startIndex + itemsPerPage);
+
+                let paginationHtml = '';
+                if (totalPages > 1) {
+                    let pagesHtml = '';
+                    const maxVisiblePages = 5;
+                    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                    if (endPage - startPage + 1 < maxVisiblePages) {
+                        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                    }
+                    for (let i = startPage; i <= endPage; i++) {
+                        pagesHtml += `<button class="gd-page-btn${i === currentPage ? ' active' : ''}" data-page="${i}">${i}</button>`;
+                    }
+                    paginationHtml = `<div class="gd-pagination" style="display:flex; justify-content:center; gap:6px; margin-top:10px; padding-bottom:5px;">
+                        <button class="gd-page-nav" data-page="${currentPage > 1 ? currentPage - 1 : 1}" ${currentPage === 1 ? 'disabled' : ''}>&laquo;</button>
+                        ${pagesHtml}
+                        <button class="gd-page-nav" data-page="${currentPage < totalPages ? currentPage + 1 : totalPages}" ${currentPage === totalPages ? 'disabled' : ''}>&raquo;</button>
+                    </div>`;
+                }
+
+                el.innerHTML = `<div class="gd-file-feed gd-scroll">${paginatedFiles.map(f => `
+                  <div class="gd-file-row gd-file-row--clickable" data-file-id="${f.id}" data-file-gid="${f.google_file_id || ''}" data-file-name="${_esc(f.name)}" title="Click to preview ${_esc(f.name)}">
                     <div class="gd-ficon"><i class="fa ${_fileIcon(f.mime_type)}"></i></div>
                     <div class="gd-finfo">
                       <span class="gd-fname">${_esc(f.name)}</span>
                       <span class="gd-fmeta">${f.size} · ${f.date}</span>
                     </div>
                     <span class="gd-sbadge gd-sbadge--${f.sync_state}">${f.sync_state}</span>
-                  </div>`).join("")}</div>`;
+                    <span class="gd-file-open-icon"><i class="fa fa-external-link"></i></span>
+                  </div>`).join("")}
+                  ${paginationHtml}
+                </div>`;
+
+                // Pagination click
+                el.querySelectorAll(".gd-page-btn, .gd-page-nav").forEach(b => {
+                    b.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        if (!b.disabled) {
+                            s.recentFilesPage = parseInt(b.dataset.page);
+                            this._renderWidget("recent_files");
+                        }
+                    });
+                });
+
+                // File row click → open preview dialog
+                el.querySelectorAll(".gd-file-row--clickable").forEach(row => {
+                    row.addEventListener("click", () => {
+                        const fileId = parseInt(row.dataset.fileId);
+                        const googleFileId = row.dataset.fileGid;
+                        if (!fileId) return;
+
+                        if (googleFileId) {
+                            // Open iframe preview in a new tab (same as File Explorer)
+                            window.open(`https://drive.google.com/file/d/${googleFileId}/view`, '_blank');
+                        } else {
+                            // Fallback: open Odoo form view as a dialog
+                            this.action.doAction({
+                                type: 'ir.actions.act_window',
+                                res_model: 'google.drive.file',
+                                res_id: fileId,
+                                views: [[false, 'form']],
+                                target: 'new',
+                            });
+                        }
+                    });
+                });
             },
+
 
             // ─── Files by Model ───────────────────────────────
             files_by_model: el => {
