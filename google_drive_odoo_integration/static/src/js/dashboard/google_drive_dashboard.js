@@ -970,21 +970,82 @@ export class GoogleDriveDashboard extends Component {
             // ─── Model Breakdown ──────────────────────────────
             model_breakdown: el => {
                 const d = s.model_breakdown;
-                if (!d || !d.length) { el.innerHTML = this._empty("fa-tasks", "No sync configs active"); return; }
-                el.innerHTML = `<div class="gd-bd-list">${d.map(m => `
-                  <div class="gd-bd-row">
-                    <div class="gd-bd-head">
-                      <span class="gd-bd-name">${_esc(m.name)}</span>
-                      <span class="gd-mode-pill">${_esc(m.storage_mode)}</span>
-                    </div>
-                    <div class="gd-ptrack"><div class="gd-pfill" style="width:${m.sync_pct}%"></div></div>
-                    <div class="gd-bd-stats">
-                      <span class="gd-bds gd-bds--ok"><i class="fa fa-check"></i>${m.synced}</span>
-                      <span class="gd-bds gd-bds--wt"><i class="fa fa-clock-o"></i>${m.unsynced}</span>
-                      <span class="gd-bds gd-bds--pct">${m.sync_pct}%</span>
-                    </div>
-                  </div>`).join("")}</div>`;
+                if (!d || !d.length) { el.innerHTML = this._empty("fa-tasks", "No active sync configurations"); return; }
+
+                const _renderMBC = (filter = "", sortKey = "name") => {
+                    let rows = d.filter(m => !filter || m.name.toLowerCase().includes(filter.toLowerCase()) || (m.model_name||"").toLowerCase().includes(filter.toLowerCase()));
+                    if (sortKey === "pct")  rows = [...rows].sort((a,b) => b.sync_pct - a.sync_pct);
+                    if (sortKey === "total") rows = [...rows].sort((a,b) => b.total - a.total);
+                    if (sortKey === "name")  rows = [...rows].sort((a,b) => a.name.localeCompare(b.name));
+
+                    const totFiles  = d.reduce((s,m) => s + (m.total||0), 0);
+                    const totSynced = d.reduce((s,m) => s + (m.synced||0), 0);
+                    const totPend   = d.reduce((s,m) => s + (m.unsynced||0), 0);
+                    const avgPct    = d.length ? Math.round(d.reduce((s,m) => s + m.sync_pct, 0) / d.length) : 0;
+
+                    const modeClass = (mode) => {
+                        const lm = (mode||"").toLowerCase();
+                        if (lm.includes("drive") && !lm.includes("dual")) return "drive";
+                        if (lm.includes("dual"))  return "dual";
+                        if (lm.includes("odoo"))  return "odoo";
+                        return "drive";
+                    };
+
+                    const cards = rows.map(m => {
+                        const pct = m.sync_pct || 0;
+                        const fillCls = pct >= 90 ? "gd-mbc-fill--full" : pct < 30 ? "gd-mbc-fill--low" : "";
+                        const modCls  = modeClass(m.storage_mode);
+                        return `
+                        <div class="gd-mbc-card">
+                          <div class="gd-mbc-header">
+                            <div class="gd-mbc-icon"><i class="fa fa-cube"></i></div>
+                            <div class="gd-mbc-title">
+                              <h4 title="${_esc(m.name)}">${_esc(m.name)}</h4>
+                              <small>${_esc(m.model_name || "—")}</small>
+                            </div>
+                            <span class="gd-mbc-mode gd-mbc-mode--${modCls}">${_esc(m.storage_mode)}</span>
+                          </div>
+                          <div class="gd-mbc-pbar-wrap">
+                            <div class="gd-mbc-pbar-top">
+                              <span class="gd-mbc-pbar-lbl">Sync Progress</span>
+                              <span class="gd-mbc-pbar-pct">${pct}%</span>
+                            </div>
+                            <div class="gd-mbc-track"><div class="gd-mbc-fill ${fillCls}" style="width:${pct}%"></div></div>
+                          </div>
+                          <div class="gd-mbc-stats">
+                            <div class="gd-mbc-stat gd-mbc-stat--ok">
+                              <b>${m.synced||0}</b><span>Synced</span>
+                            </div>
+                            <div class="gd-mbc-stat gd-mbc-stat--pend">
+                              <b>${m.unsynced||0}</b><span>Pending</span>
+                            </div>
+                            <div class="gd-mbc-stat gd-mbc-stat--tot">
+                              <b>${m.total||0}</b><span>Total</span>
+                            </div>
+                          </div>
+                        </div>`;
+                    }).join("");
+
+                    const emptyCards = !rows.length ? `<div class="gd-empty" style="grid-column:1/-1;min-height:100px;"><i class="fa fa-search"></i><span>No matching configs</span></div>` : "";
+
+                    el.innerHTML = `
+                      <div class="gd-mbc-summary">
+                        <div class="gd-mbc-sum-item"><b>${d.length}</b><small>Active Configs</small></div>
+                        <div class="gd-mbc-sum-div"></div>
+                        <div class="gd-mbc-sum-item"><b>${totFiles.toLocaleString()}</b><small>Total Files</small></div>
+                        <div class="gd-mbc-sum-div"></div>
+                        <div class="gd-mbc-sum-item"><b style="color:var(--gd-green)">${totSynced.toLocaleString()}</b><small>Synced</small></div>
+                        <div class="gd-mbc-sum-div"></div>
+                        <div class="gd-mbc-sum-item"><b style="color:var(--gd-orange)">${totPend.toLocaleString()}</b><small>Pending</small></div>
+                        <div class="gd-mbc-sum-div"></div>
+                        <div class="gd-mbc-sum-item"><b style="color:var(--gd-blue)">${avgPct}%</b><small>Avg Sync</small></div>
+                      </div>
+                      <div class="gd-mbc-grid gd-scroll">${cards}${emptyCards}</div>`;
+                };
+
+                _renderMBC();
             },
+
 
             // ─── Fleet Overview ───────────────────────────────
             fleet_overview: el => {
