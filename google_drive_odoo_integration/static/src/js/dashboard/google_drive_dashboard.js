@@ -81,7 +81,6 @@ const WIDGET_CATALOG = [
     // Users
     { id: "top_uploaders",    label: "Top Uploaders",       icon: "fa-trophy",             cat: "Users",    colSpan: 6, rowClass: "chart" },
     // Business
-    { id: "business_models",  label: "Business Model Files",icon: "fa-briefcase",          cat: "Business", colSpan: 6, rowClass: "chart" },
     { id: "model_breakdown",  label: "Model Breakdown",     icon: "fa-tasks",              cat: "Business", colSpan: 12, rowClass: "chart" },
 ];
 
@@ -94,7 +93,7 @@ const DEFAULT_WIDGETS = [
     "sync_trend", "storage_meter",
     "sync_status", "failed_syncs", "duplicates",
     "activity_log", "recent_files",
-    "business_models", "top_uploaders",
+    "top_uploaders",
     "model_breakdown",
 ];
 
@@ -138,7 +137,6 @@ export class GoogleDriveDashboard extends Component {
             top_file_types:    [],
             largest_files:     [],
             recent_files:      [],
-            business_models:   [],
             storage_by_model:  { labels: [], data: [] },
             orphan_count:      0,
 
@@ -249,7 +247,8 @@ export class GoogleDriveDashboard extends Component {
                 // Support both old format (array of objects) and new format (array of id strings)
                 if (Array.isArray(parsed)) {
                     const ids = parsed.map(item => (typeof item === "string" ? item : item.id)).filter(Boolean);
-                    if (ids.length > 0) this.state.activeWidgets = ids;
+                    const validIds = ids.filter(id => CATALOG_MAP[id]);
+                    if (validIds.length > 0) this.state.activeWidgets = validIds;
                 }
             }
         } catch (e) {
@@ -345,8 +344,6 @@ export class GoogleDriveDashboard extends Component {
             this.orm.call("google.drive.dashboard", "get_largest_files", [])
                 .then(d => { s.largest_files = d; }),
             this._widgetFetchers.recent_files(),
-            this.orm.call("google.drive.dashboard", "get_business_model_counts", [])
-                .then(d => { s.business_models = d; }),
             this.orm.call("google.drive.dashboard", "get_storage_by_model", [])
                 .then(d => { s.storage_by_model = d; }),
             this.orm.call("google.drive.dashboard", "get_orphan_attachments", [])
@@ -460,7 +457,6 @@ export class GoogleDriveDashboard extends Component {
             },
             files_by_model:   async () => { const d = await this.orm.call("google.drive.dashboard", "get_files_by_model", []); s.files_by_model = d; },
             top_uploaders:    async () => { const d = await this.orm.call("google.drive.dashboard", "get_top_uploaders", []); s.top_uploaders = d; },
-            business_models:  async () => { const d = await this.orm.call("google.drive.dashboard", "get_business_model_counts", []); s.business_models = d; },
             model_breakdown:  async () => { const d = await this.orm.call("google.drive.dashboard", "get_model_breakdown", []); s.model_breakdown = d; },
         };
     }
@@ -919,18 +915,6 @@ export class GoogleDriveDashboard extends Component {
                       <span class="gd-lead-meta">${u.total_formatted}</span>
                     </div>
                     <span class="gd-lead-cnt">${u.upload_count} files</span>
-                  </div>`).join("")}</div>`;
-            },
-
-            // ─── Business Models ──────────────────────────────
-            business_models: el => {
-                const d = s.business_models;
-                if (!d || !d.length) { el.innerHTML = this._empty("fa-briefcase", "No data"); return; }
-                el.innerHTML = `<div class="gd-biz-grid">${d.map(m => `
-                  <div class="gd-biz-card">
-                    <i class="fa ${m.icon}"></i>
-                    <b>${m.count}</b>
-                    <span>${m.label}</span>
                   </div>`).join("")}</div>`;
             },
 

@@ -472,16 +472,6 @@
 .gd-lead-cnt   { font-size:12px; font-weight:700; color:var(--gd-blue); background:var(--gd-blue-lt);
                   padding:3px 8px; border-radius:20px; white-space:nowrap; }
 
-/* ═══════════════ BUSINESS MODELS ═══════════════ */
-.gd-biz-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
-.gd-biz-card { display:flex; flex-direction:column; align-items:center; gap:4px;
-               padding:14px 6px; border-radius:var(--gd-radius-sm);
-               background:linear-gradient(135deg,var(--gd-blue-lt),rgba(124,77,255,.06));
-               border:1px solid rgba(66,133,244,.1); text-align:center; transition:transform .15s; }
-.gd-biz-card:hover { transform:translateY(-2px); }
-.gd-biz-card i    { font-size:20px; color:var(--gd-blue); }
-.gd-biz-card b    { font-size:20px; font-weight:500; color:var(--gd-tx); line-height:1; }
-.gd-biz-card span { font-size:12px; font-weight:500; color:var(--gd-txm); letter-spacing:.2px; }
 
 /* ═══════════════ MODEL BREAKDOWN ═══════════════ */
 .gd-bd-list { display:flex; flex-direction:column; gap:6px; }
@@ -613,7 +603,6 @@
     .gd-grid { grid-template-columns:1fr; }
     .gd-cell { grid-column:1/-1 !important; }
     .gd-panel { width:100%; left:0; }
-    .gd-biz-grid { grid-template-columns:repeat(2,1fr); }
     .gd-ss-grid  { grid-template-columns:1fr 1fr; }
 }
 

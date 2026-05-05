@@ -526,17 +526,16 @@ class GoogleDriveDashboard(models.AbstractModel):
         """Return top users by number of sync log uploads."""
         try:
             self.env.cr.execute("""
-                SELECT l.create_uid AS user_id,
+                SELECT l.user_id AS user_id,
                        u.name       AS user_name,
                        COUNT(*)     AS upload_count,
-                       COALESCE(SUM(f.file_size), 0) AS total_bytes
+                       COALESCE(SUM(l.file_size), 0) AS total_bytes
                 FROM   google_drive_sync_log l
-                LEFT   JOIN res_users ru ON ru.id = l.create_uid
+                LEFT   JOIN res_users ru ON ru.id = l.user_id
                 LEFT   JOIN res_partner u ON u.id = ru.partner_id
-                LEFT   JOIN google_drive_file f ON f.id = l.file_id
                 WHERE  l.operation = 'upload'
                   AND  l.state     = 'success'
-                GROUP  BY l.create_uid, u.name
+                GROUP  BY l.user_id, u.name
                 ORDER  BY upload_count DESC
                 LIMIT  %s
             """, [limit])
@@ -655,52 +654,8 @@ class GoogleDriveDashboard(models.AbstractModel):
                 })
             return result
 
-        # ──────────────────────────────────────────────
-        # 15. NEW — Business Model File Counts
-        # ──────────────────────────────────────────────
-
         except Exception as e:
             _logger.exception("Error in get_recent_files: %s", e)
-            return []
-
-    @api.model
-    def get_business_model_counts(self):
-        """Return file counts for the 6 main business models."""
-        try:
-            GDFile = self.env['google.drive.file'].sudo()
-            models_to_check = [
-                ('crm.lead',       'CRM Leads',          'fa-handshake-o'),
-                ('sale.order',     'Sales Orders',        'fa-shopping-cart'),
-                ('account.move',   'Invoices',            'fa-file-text-o'),
-                ('hr.employee',    'HR Employees',        'fa-users'),
-                ('project.task',   'Project Tasks',       'fa-tasks'),
-                ('purchase.order', 'Purchase Orders',     'fa-truck'),
-            ]
-            result = []
-            for model_name, label, icon in models_to_check:
-                # Only query if the model exists in the registry
-                if model_name in self.env:
-                    count = GDFile.search_count([
-                        ('res_model', '=', model_name),
-                        ('active', '=', True),
-                        ('file_type', '=', 'file'),
-                    ])
-                else:
-                    count = 0
-                result.append({
-                    'model': model_name,
-                    'label': label,
-                    'icon': icon,
-                    'count': count,
-                })
-            return result
-
-        # ──────────────────────────────────────────────
-        # 16. NEW — Storage by Model (bar chart data)
-        # ──────────────────────────────────────────────
-
-        except Exception as e:
-            _logger.exception("Error in get_business_model_counts: %s", e)
             return []
 
     @api.model
