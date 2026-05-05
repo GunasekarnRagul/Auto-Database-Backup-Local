@@ -553,10 +553,18 @@ class GoogleDriveDashboard(models.AbstractModel):
             return []
 
     @api.model
-    def get_top_file_types(self, limit=8):
+    def get_top_file_types(self, limit=8, config_id=False):
         """Return file-count distribution by MIME type."""
         try:
-            self.env.cr.execute("""
+            params = []
+            where_clause = ""
+            if config_id:
+                where_clause = " AND drive_config_id = %s "
+                params.append(int(config_id))
+            
+            params.append(limit)
+
+            self.env.cr.execute(f"""
                 SELECT
                     COALESCE(
                         CASE
@@ -581,10 +589,11 @@ class GoogleDriveDashboard(models.AbstractModel):
                 WHERE  active     = TRUE
                   AND  file_type  = 'file'
                   AND  mime_type  IS NOT NULL
+                  {where_clause}
                 GROUP  BY file_type_label
                 ORDER  BY cnt DESC
                 LIMIT  %s
-            """, [limit])
+            """, params)
             return self.env.cr.dictfetchall()
 
         # ──────────────────────────────────────────────

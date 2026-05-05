@@ -339,8 +339,8 @@ export class GoogleDriveDashboard extends Component {
                 .then(d => { s.files_by_model = d; }),
             this.orm.call("google.drive.dashboard", "get_top_uploaders", [])
                 .then(d => { s.top_uploaders = d; }),
-            this.orm.call("google.drive.dashboard", "get_top_file_types", [])
-                .then(d => { s.top_file_types = d; }),
+            this.orm.call("google.drive.dashboard", "get_top_file_types", [], { config_id: s.tft_drive_id || false })
+                .then(d => { if (!s.top_file_types_data) s.top_file_types_data = {}; s.top_file_types_data[s.tft_drive_id] = d; s.top_file_types = d; }),
             this.orm.call("google.drive.dashboard", "get_largest_files", [])
                 .then(d => { s.largest_files = d; }),
             this._widgetFetchers.recent_files(),
@@ -426,7 +426,13 @@ export class GoogleDriveDashboard extends Component {
             },
             storage_meter:    async () => { s.sm_quotas = {}; },
             storage_by_model: async () => { const d = await this.orm.call("google.drive.dashboard", "get_storage_by_model", []); s.storage_by_model = d; },
-            top_file_types:   async () => { const d = await this.orm.call("google.drive.dashboard", "get_top_file_types", []); s.top_file_types = d; },
+            top_file_types:   async () => { 
+                if (s.tft_drive_id) {
+                    const d = await this.orm.call("google.drive.dashboard", "get_top_file_types", [], { config_id: s.tft_drive_id });
+                    if (!s.top_file_types_data) s.top_file_types_data = {};
+                    s.top_file_types_data[s.tft_drive_id] = d;
+                }
+            },
             largest_files:    async () => { const d = await this.orm.call("google.drive.dashboard", "get_largest_files", []); s.largest_files = d; },
             sync_trend:       async () => { const d = await this.orm.call("google.drive.dashboard", "get_sync_trend_data", [], { start_date: s.globalTrendStart, end_date: s.globalTrendEnd }); s.trendData = d; },
             sync_status:      async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
@@ -653,14 +659,57 @@ export class GoogleDriveDashboard extends Component {
 
             // ─── Top File Types (doughnut) ────────────────────
             top_file_types: el => {
-                const d = s.top_file_types;
-                if (!d || !d.length) { el.innerHTML = this._empty("fa-pie-chart", "No file type data"); return; }
+                const fleet = s.health && s.health.fleet ? s.health.fleet : [];
+                if (!fleet.length) { el.innerHTML = this._empty("fa-pie-chart", "No drivers connected"); return; }
+                
+                if (!s.tft_drive_id) s.tft_drive_id = fleet[0].id;
+                if (!s.top_file_types_data) s.top_file_types_data = {};
+                
+                let html = `
+                  <div style="margin-bottom:12px;">
+                    <select class="gd-tft-select" style="width:100%; padding:6px 10px; border-radius:8px; border:1px solid var(--gd-border); font-size:13px; font-family:var(--gd-font); font-weight:500; color:var(--gd-tx); background:var(--gd-page-bg); outline:none; cursor:pointer;">
+                      ${fleet.map(d => `<option value="${d.id}" ${d.id == s.tft_drive_id ? 'selected' : ''}>${_esc(d.name)}</option>`).join('')}
+                    </select>
+                  </div>
+                `;
+
+                const d = s.top_file_types_data[s.tft_drive_id];
+                if (!d) {
+                    el.innerHTML = html + `<div class="gd-empty" style="min-height:140px;"><i class="fa fa-spinner fa-spin"></i><span>Loading…</span></div>`;
+                    this.orm.call("google.drive.dashboard", "get_top_file_types", [], { config_id: s.tft_drive_id })
+                        .then(res => { s.top_file_types_data[s.tft_drive_id] = res; this._renderWidget("top_file_types"); })
+                        .catch(e => { s.top_file_types_data[s.tft_drive_id] = []; this._renderWidget("top_file_types"); });
+                    
+                    el.querySelector('.gd-tft-select').addEventListener('change', (e) => {
+                        s.tft_drive_id = parseInt(e.target.value);
+                        this._renderWidget("top_file_types");
+                    });
+                    return;
+                }
+
+                if (!d || !d.length) { 
+                    el.innerHTML = html + this._empty("fa-pie-chart", "No file type data");
+                    el.querySelector('.gd-tft-select').addEventListener('change', (e) => {
+                        s.tft_drive_id = parseInt(e.target.value);
+                        this._renderWidget("top_file_types");
+                    });
+                    return; 
+                }
+
                 const labels = d.map(r => r.file_type_label), counts = d.map(r => r.cnt), colors = _pieColors(labels.length);
-                el.innerHTML = `
+                html += `
                   <div class="gd-donut-wrap">
                     <canvas id="c-file-types" style="max-height:160px;width:100%;"></canvas>
                   </div>
                   <div class="gd-legend">${labels.map((l,i) => `<span class="gd-legend-item"><span class="gd-dot" style="background:${colors[i]}"></span>${_esc(l)} <b>${counts[i]}</b></span>`).join("")}</div>`;
+                
+                el.innerHTML = html;
+                
+                el.querySelector('.gd-tft-select').addEventListener('change', (e) => {
+                    s.tft_drive_id = parseInt(e.target.value);
+                    this._renderWidget("top_file_types");
+                });
+
                 this._chart("top_file_types", el.querySelector("canvas"), {
                     type: "doughnut",
                     data: { labels, datasets: [{ data: counts, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }] },
