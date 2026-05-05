@@ -899,6 +899,15 @@ class GoogleDriveSync(models.Model):
                             'photoLink': '',
                             'domain': perm.get('domain', ''),
                         })
+                
+                # Update local record with synced state
+                file_record.sudo().write({
+                    'permission_type': general_access,
+                    'anyone_role': anyone_role if general_access == 'anyone' else False,
+                    'writers_can_share': data.get('writersCanShare', True),
+                    'copy_requires_writer': data.get('copyRequiresWriterPermission', False),
+                    'shared_people_count': len([p for p in people_permissions if p['role'] != 'owner']),
+                })
 
                 return {
                     'permissions': people_permissions,
@@ -1143,6 +1152,10 @@ class GoogleDriveSync(models.Model):
                               file_type=file_record.file_type,
                               google_file_id=file_record.google_file_id,
                               duration=elapsed)
+                    file_record.sudo().write({
+                        'permission_type': 'anyone',
+                        'anyone_role': role,
+                    })
                     return {
                         'success': True,
                         'link': link,
@@ -1195,11 +1208,10 @@ class GoogleDriveSync(models.Model):
                     )
                     http_requests.delete(del_url, headers=headers, timeout=15)
 
-                self._log(config, f'{file_record.name} → general access: restricted',
-                          'share_general',
-                          file_type=file_record.file_type,
-                          google_file_id=file_record.google_file_id,
-                          duration=time.time() - t0)
+                file_record.sudo().write({
+                    'permission_type': 'restricted',
+                    'anyone_role': False,
+                })
                 return {'success': True}
             except Exception as e:
                 self._log(config, f'{file_record.name} → general access: restricted',

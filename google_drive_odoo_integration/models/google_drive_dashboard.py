@@ -123,10 +123,6 @@ class GoogleDriveDashboard(models.AbstractModel):
                     'odoo_storage_formatted': _format_size(odoo_size),
                 })
 
-            # ── Last Sync Timestamp ──
-            last_log = SyncLog.search([('state', '=', 'success')], order='create_date desc', limit=1)
-            last_sync_time = last_log.create_date.strftime("%b %d, %H:%M") if last_log and last_log.create_date else 'Never'
-
             # ── Today's Failures ──
             fails_today = SyncLog.search_count([
                 ('state', '=', 'fail'),
@@ -143,9 +139,9 @@ class GoogleDriveDashboard(models.AbstractModel):
 
             # ── Active Share Links ──
             active_share_links = GDFile.search_count([
-                ('permission_type', '!=', False),
+                '|', ('permission_type', '!=', 'restricted'), ('shared_people_count', '>', 0),
                 ('active', '=', True),
-            ]) if 'permission_type' in GDFile._fields else 0
+            ])
 
             return {
                 'kpis': {
@@ -157,7 +153,6 @@ class GoogleDriveDashboard(models.AbstractModel):
                     'error_count': error_count,
                     'uploading_count': uploading_count,
                     'fails_today': fails_today,
-                    'last_sync_time': last_sync_time,
                     'files_this_month': files_this_month,
                     'active_share_links': active_share_links,
                 },
@@ -175,10 +170,6 @@ class GoogleDriveDashboard(models.AbstractModel):
                     'fleet': fleet,
                 },
             }
-
-        # ──────────────────────────────────────────────
-        # 2. Storage Stats (lazy loaded — heavy)
-        # ──────────────────────────────────────────────
 
         except Exception as e:
             _logger.exception("Error in get_kpi_data: %s", e)
@@ -211,10 +202,6 @@ class GoogleDriveDashboard(models.AbstractModel):
                 'drive_space_used_formatted': _format_size(space_used_bytes),
             }
 
-        # ──────────────────────────────────────────────
-        # 3. Activity Logs (with filters)
-        # ──────────────────────────────────────────────
-
         except Exception as e:
             _logger.exception("Error in get_storage_stats: %s", e)
             return {'storage_saved_formatted': '0 B', 'drive_space_used_formatted': '0 B'}
@@ -233,7 +220,6 @@ class GoogleDriveDashboard(models.AbstractModel):
                 domain.append(('create_date', '>=', now - timedelta(days=7)))
             elif period == '30d':
                 domain.append(('create_date', '>=', now - timedelta(days=30)))
-            # 'all' → no date filter
 
             if operation:
                 domain.append(('operation', '=', operation))
@@ -250,10 +236,6 @@ class GoogleDriveDashboard(models.AbstractModel):
                     'error_message': log.error_message or '',
                 })
             return recent_logs
-
-        # ──────────────────────────────────────────────
-        # 4. Duplicate Summary (lazy loaded — heavy)
-        # ──────────────────────────────────────────────
 
         except Exception as e:
             _logger.exception("Error in get_activity_logs: %s", e)
@@ -272,10 +254,6 @@ class GoogleDriveDashboard(models.AbstractModel):
             return {
                 'duplicate_count': duplicate_count,
             }
-
-        # ──────────────────────────────────────────────
-        # 5. Sync Trend Chart (7-day bar chart)
-        # ──────────────────────────────────────────────
 
         except Exception as e:
             _logger.exception("Error in get_duplicate_summary: %s", e)
@@ -337,10 +315,6 @@ class GoogleDriveDashboard(models.AbstractModel):
                 'failed': [failed_map[d] for d in labels],
             }
 
-        # ──────────────────────────────────────────────
-        # 6. Per-Model Breakdown
-        # ──────────────────────────────────────────────
-
         except Exception as e:
             _logger.exception("Error in get_sync_trend_data: %s", e)
             return {'labels': [], 'success': [], 'failed': []}
@@ -369,10 +343,6 @@ class GoogleDriveDashboard(models.AbstractModel):
                     'total': cfg.model_attachment_count,
                 })
             return result
-
-        # ──────────────────────────────────────────────
-        # 7. Error / Failure Summary
-        # ──────────────────────────────────────────────
 
         except Exception as e:
             _logger.exception("Error in get_model_breakdown: %s", e)
@@ -413,10 +383,6 @@ class GoogleDriveDashboard(models.AbstractModel):
                 'top_errors': top_errors,
             }
 
-        # ──────────────────────────────────────────────
-        # 8. Drive Quota (Google API call)
-        # ──────────────────────────────────────────────
-
         except Exception as e:
             _logger.exception("Error in get_error_summary: %s", e)
             return {'fails_24h': 0, 'fails_7d': 0, 'top_errors': []}
@@ -426,24 +392,20 @@ class GoogleDriveDashboard(models.AbstractModel):
         """Fetch Google Drive storage quota via the about.get API."""
         try:
             if config_id:
-                # Ensure we have an integer ID
                 cid = int(config_id)
                 config = self.env['google.drive.config'].sudo().browse(cid)
             else:
                 config = self.env['google.drive.config'].sudo().search([], limit=1)
 
             if not config or not config.exists():
-                _logger.warning("get_drive_quota: Config not found for ID %s", config_id)
                 return {'available': False, 'error': 'Config not found'}
 
             if not config.refresh_token:
-                _logger.warning("get_drive_quota: No refresh token for drive %s", config.name)
                 return {'available': False, 'error': 'No refresh token'}
 
             sync = self.env['google.drive.sync'].sudo()
             access_token = sync._get_access_token(config)
             if not access_token:
-                _logger.warning("get_drive_quota: Failed to get access token for %s", config.name)
                 return {'available': False, 'error': 'Token refresh failed'}
 
             import requests as http_requests
@@ -455,11 +417,9 @@ class GoogleDriveDashboard(models.AbstractModel):
             
             if resp.status_code == 200:
                 quota = resp.json().get('storageQuota', {})
-                # Note: 'limit' might be missing for Unlimited (e.g. Workspace) accounts
                 limit_bytes = int(quota.get('limit', 0))
                 usage_bytes = int(quota.get('usage', 0))
                 
-                # Handling for Unlimited Drives (no limit or very high limit)
                 has_limit = limit_bytes > 0
                 usage_pct = round(usage_bytes / limit_bytes * 100, 1) if has_limit else 0
                 
@@ -472,54 +432,10 @@ class GoogleDriveDashboard(models.AbstractModel):
                     'usage_bytes': usage_bytes,
                 }
             else:
-                _logger.warning("get_drive_quota: Google API returned %s: %s", resp.status_code, resp.text)
                 return {'available': False, 'error': f'API Error {resp.status_code}'}
         except Exception as e:
             _logger.exception("Failed to fetch Drive quota for config %s: %s", config_id, str(e))
             return {'available': False, 'error': str(e)}
-
-    # ──────────────────────────────────────────────
-    # 10. NEW — Files by Model (attachment counts)
-    # ──────────────────────────────────────────────
-
-    @api.model
-    def get_files_by_model(self):
-        """Return attachment counts grouped by res_model from google.drive.file."""
-        try:
-            self.env.cr.execute("""
-                SELECT res_model, COUNT(*) AS cnt
-                FROM   google_drive_file
-                WHERE  active = TRUE
-                  AND  res_model IS NOT NULL
-                  AND  res_model != ''
-                  AND  file_type = 'file'
-                GROUP  BY res_model
-                ORDER  BY cnt DESC
-                LIMIT  15
-            """)
-            rows = self.env.cr.dictfetchall()
-
-            result = []
-            for row in rows:
-                # Try to get a human-friendly model description
-                model_rec = self.env['ir.model'].sudo().search(
-                    [('model', '=', row['res_model'])], limit=1
-                )
-                label = model_rec.name if model_rec else row['res_model']
-                result.append({
-                    'model': row['res_model'],
-                    'label': label,
-                    'count': row['cnt'],
-                })
-            return result
-
-        # ──────────────────────────────────────────────
-        # 11. NEW — Top Uploaders (by file count)
-        # ──────────────────────────────────────────────
-
-        except Exception as e:
-            _logger.exception("Error in get_files_by_model: %s", e)
-            return []
 
     @api.model
     def get_top_uploaders(self, limit=10):
@@ -543,11 +459,6 @@ class GoogleDriveDashboard(models.AbstractModel):
             for row in rows:
                 row['total_formatted'] = _format_size(row['total_bytes'] or 0)
             return rows
-
-        # ──────────────────────────────────────────────
-        # 12. NEW — Top File Types (MIME breakdown)
-        # ──────────────────────────────────────────────
-
         except Exception as e:
             _logger.exception("Error in get_top_uploaders: %s", e)
             return []
@@ -595,24 +506,25 @@ class GoogleDriveDashboard(models.AbstractModel):
                 LIMIT  %s
             """, params)
             return self.env.cr.dictfetchall()
-
-        # ──────────────────────────────────────────────
-        # 13. NEW — Largest Files
-        # ──────────────────────────────────────────────
-
         except Exception as e:
             _logger.exception("Error in get_top_file_types: %s", e)
             return []
 
     @api.model
-    def get_largest_files(self, limit=10):
-        """Return the top N largest files by size."""
+    def get_largest_files(self, limit=10, config_id=False):
+        """Return the top N largest files by size, optionally filtered by drive."""
         try:
-            files = self.env['google.drive.file'].sudo().search([
+            domain = [
                 ('file_type', '=', 'file'),
                 ('active', '=', True),
                 ('file_size', '>', 0),
-            ], order='file_size desc', limit=limit)
+            ]
+            if config_id:
+                domain.append(('drive_config_id', '=', int(config_id)))
+
+            files = self.env['google.drive.file'].sudo().search(
+                domain, order='file_size desc', limit=limit
+            )
 
             result = []
             for f in files:
@@ -627,16 +539,55 @@ class GoogleDriveDashboard(models.AbstractModel):
                     'res_model': f.res_model or '',
                     'res_model_label': model_rec.name if model_rec else (f.res_model or ''),
                     'mime_type': f.mime_type or '',
-                    'drive_url': f.drive_url or '',
+                    'drive_url': f.google_url or '',
+                    'display_path': f.display_path or '',
+                    'drive_config_id': f.drive_config_id.id,
+                    'parent_folder_id': f.parent_folder_id.id if f.parent_folder_id else False,
+                    'root_folder_id': f.root_folder_id.id if f.root_folder_id else False,
                 })
             return result
+        except Exception:
+            return []
 
-        # ──────────────────────────────────────────────
-        # 14. NEW — Recent Files
-        # ──────────────────────────────────────────────
+    @api.model
+    def get_active_shares(self, limit=20):
+        """Return files/folders that have active sharing permissions."""
+        try:
+            GDFile = self.env['google.drive.file'].sudo()
+            shared_records = GDFile.search([
+                '|', ('permission_type', '!=', 'restricted'), ('shared_people_count', '>', 0),
+                ('active', '=', True),
+            ], order='write_date desc', limit=limit)
 
+            result = []
+            for f in shared_records:
+                access_label = "Restricted"
+                if f.permission_type == 'anyone':
+                    access_label = f"Anyone ({f.anyone_role.capitalize() if f.anyone_role else 'Reader'})"
+                elif f.permission_type == 'domain':
+                    access_label = "Domain"
+                
+                if f.shared_people_count > 0:
+                    access_label += f" + {f.shared_people_count} people"
+
+                result.append({
+                    'id': f.id,
+                    'name': f.name,
+                    'file_type': f.file_type,
+                    'display_path': f.display_path or '',
+                    'permission_type': f.permission_type,
+                    'access_label': access_label,
+                    'sync_state': f.sync_state,
+                    'drive_url': f.google_url or '',
+                    'writers_can_share': f.writers_can_share,
+                    'copy_requires_writer': f.copy_requires_writer,
+                    'drive_config_id': f.drive_config_id.id,
+                    'parent_folder_id': f.parent_folder_id.id if f.parent_folder_id else False,
+                    'root_folder_id': f.root_folder_id.id if f.root_folder_id else False,
+                })
+            return result
         except Exception as e:
-            _logger.exception("Error in get_largest_files: %s", e)
+            _logger.error("Error in get_active_shares: %s", str(e))
             return []
 
     @api.model
@@ -662,71 +613,9 @@ class GoogleDriveDashboard(models.AbstractModel):
                     'sync_state': f.sync_state or '',
                 })
             return result
-
         except Exception as e:
             _logger.exception("Error in get_recent_files: %s", e)
             return []
-
-    @api.model
-    def get_storage_by_model(self, limit=8):
-        """Return storage consumed per Odoo model."""
-        try:
-            self.env.cr.execute("""
-                SELECT res_model,
-                       COUNT(*)            AS file_count,
-                       SUM(file_size)      AS total_bytes
-                FROM   google_drive_file
-                WHERE  active    = TRUE
-                  AND  file_type = 'file'
-                  AND  res_model IS NOT NULL
-                  AND  res_model != ''
-                  AND  file_size IS NOT NULL
-                GROUP  BY res_model
-                ORDER  BY total_bytes DESC
-                LIMIT  %s
-            """, [limit])
-            rows = self.env.cr.dictfetchall()
-
-            labels = []
-            data = []
-            for row in rows:
-                model_rec = self.env['ir.model'].sudo().search(
-                    [('model', '=', row['res_model'])], limit=1
-                )
-                labels.append(model_rec.name if model_rec else row['res_model'])
-                data.append(round((row['total_bytes'] or 0) / (1024 * 1024), 2))  # MB
-
-            return {'labels': labels, 'data': data}
-
-        # ──────────────────────────────────────────────
-        # 17. NEW — Orphan Attachments
-        # ──────────────────────────────────────────────
-
-        except Exception as e:
-            _logger.exception("Error in get_storage_by_model: %s", e)
-            return {'labels': [], 'data': []}
-
-    @api.model
-    def get_orphan_attachments(self):
-        """Files with no linked Odoo record."""
-        try:
-            GDFile = self.env['google.drive.file'].sudo()
-            orphan_count = GDFile.search_count([
-                ('file_type', '=', 'file'),
-                ('active', '=', True),
-                '|',
-                ('res_model', '=', False),
-                ('res_id', '=', 0),
-            ])
-            return {'orphan_count': orphan_count}
-
-        # ──────────────────────────────────────────────
-        # 18. NEW — Layout Persistence
-        # ──────────────────────────────────────────────
-
-        except Exception as e:
-            _logger.exception("Error in get_orphan_attachments: %s", e)
-            return {'orphan_count': 0}
 
     @api.model
     def load_dashboard_layout(self):

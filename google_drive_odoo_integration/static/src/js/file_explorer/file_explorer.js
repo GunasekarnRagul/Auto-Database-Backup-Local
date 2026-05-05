@@ -125,6 +125,7 @@ export class FileExplorer extends Component {
         if (urlParams.get('gd_drive_id')) this.state.activeDriveId = parseInt(urlParams.get('gd_drive_id'));
         if (urlParams.get('gd_parent_id')) this.state.currentFolderId = parseInt(urlParams.get('gd_parent_id'));
         if (urlParams.get('gd_root_id')) this.state.activeRootId = parseInt(urlParams.get('gd_root_id'));
+        if (urlParams.get('gd_file_id')) this.state.selectedFiles = { [parseInt(urlParams.get('gd_file_id'))]: true };
 
         this.uploadProgressTimers = {};
 
@@ -164,6 +165,13 @@ export class FileExplorer extends Component {
                 }
             }
             await this.loadFiles(this.state.currentFolderId);
+            
+            // Apply deep-linked file selection after loadFiles clears it
+            const hashString = window.location.hash.substring(1);
+            const urlParams = new URLSearchParams(hashString);
+            if (urlParams.get('gd_file_id')) {
+                this.state.selectedFiles = { [parseInt(urlParams.get('gd_file_id'))]: true };
+            }
         });
     }
 

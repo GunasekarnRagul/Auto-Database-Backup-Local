@@ -46,6 +46,17 @@ class GoogleDriveFile(models.Model):
     attachment_id = fields.Many2one('ir.attachment', string='Related Attachment', compute='_compute_attachment_id', store=True)
     res_model = fields.Char('Resource Model', related='attachment_id.res_model', store=True, index=True)
     res_id = fields.Many2oneReference('Resource ID', related='attachment_id.res_id', model_field='res_model', store=True, index=True)
+    
+    # Sharing / Permissions tracking
+    permission_type = fields.Selection([
+        ('restricted', 'Restricted'),
+        ('anyone', 'Anyone with link'),
+        ('domain', 'Domain'),
+    ], string='General Access', default='restricted', index=True)
+    anyone_role = fields.Char('Link Role') # reader, commenter, writer
+    writers_can_share = fields.Boolean('Editors can share', default=True)
+    copy_requires_writer = fields.Boolean('Restrict download', default=False)
+    shared_people_count = fields.Integer('Shared People', default=0)
 
     def _compute_attachment_id(self):
         for record in self:

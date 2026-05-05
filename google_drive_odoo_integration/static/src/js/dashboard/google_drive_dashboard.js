@@ -53,35 +53,30 @@ function _esc(str) {
 // colSpan: 1-12 grid columns | rowClass: controls min-height via CSS
 
 const WIDGET_CATALOG = [
-    // KPI (4 per row)
-    { id: "kpi_total_files",  label: "Total Files",         icon: "fa-files-o",           cat: "KPI",      colSpan: 3, rowClass: "kpi" },
-    { id: "kpi_total_size",   label: "Total Cloud Usage",   icon: "fa-cloud-upload",      cat: "KPI",      colSpan: 3, rowClass: "kpi" },
-    { id: "kpi_files_month",  label: "Files This Month",    icon: "fa-calendar-plus-o",    cat: "KPI",      colSpan: 3, rowClass: "kpi" },
-    { id: "kpi_pending",      label: "Pending Syncs",       icon: "fa-clock-o",            cat: "KPI",      colSpan: 3, rowClass: "kpi" },
-    { id: "kpi_errors",       label: "Sync Errors",         icon: "fa-exclamation-circle", cat: "KPI",      colSpan: 3, rowClass: "kpi" },
-    { id: "kpi_share_links",  label: "Active Share Links",  icon: "fa-link",               cat: "KPI",      colSpan: 3, rowClass: "kpi" },
-    { id: "kpi_last_sync",    label: "Last Sync Time",      icon: "fa-history",            cat: "KPI",      colSpan: 3, rowClass: "kpi" },
-    { id: "kpi_orphans",      label: "Orphan Files",        icon: "fa-unlink",             cat: "KPI",      colSpan: 3, rowClass: "kpi" },
+    { id: "kpi_total_files",   label: "Total Files",         icon: "fa-files-o",          cat: "KPI",      colSpan: 3, rowClass: "kpi" },
+    { id: "kpi_total_size",    label: "Total Cloud Usage",   icon: "fa-cloud-upload",      cat: "KPI",      colSpan: 3, rowClass: "kpi" },
+    { id: "kpi_files_month",   label: "Files This Month",    icon: "fa-calendar-plus-o",    cat: "KPI",      colSpan: 3, rowClass: "kpi" },
+    { id: "kpi_pending",       label: "Pending Syncs",       icon: "fa-clock-o",            cat: "KPI",      colSpan: 3, rowClass: "kpi" },
+    { id: "kpi_errors",        label: "Sync Errors",         icon: "fa-exclamation-circle", cat: "KPI",      colSpan: 3, rowClass: "kpi" },
+    { id: "kpi_share_links",   label: "Active Share Links",  icon: "fa-link",               cat: "KPI",      colSpan: 3, rowClass: "kpi" },
     // Fleet (full width)
-    { id: "fleet_overview",   label: "Connected Drivers",   icon: "fa-hdd-o",              cat: "Fleet",    colSpan: 12, rowClass: "fleet" },
+    { id: "fleet_overview",    label: "Connected Drivers",   icon: "fa-hdd-o",              cat: "Fleet",    colSpan: 12, rowClass: "fleet" },
     // Storage
-    { id: "storage_meter",    label: "Storage Meter",       icon: "fa-pie-chart",          cat: "Storage",  colSpan: 4, rowClass: "chart" },
-    { id: "storage_by_model", label: "Storage by Model",    icon: "fa-bar-chart",          cat: "Storage",  colSpan: 8, rowClass: "chart" },
-    { id: "top_file_types",   label: "Top File Types",      icon: "fa-pie-chart",          cat: "Storage",  colSpan: 4, rowClass: "chart" },
-    { id: "largest_files",    label: "Largest Files",       icon: "fa-sort-amount-desc",   cat: "Storage",  colSpan: 8, rowClass: "chart" },
+    { id: "storage_meter",     label: "Storage Meter",       icon: "fa-pie-chart",          cat: "Storage",  colSpan: 4, rowClass: "chart" },
+    { id: "storage_by_model",  label: "Storage by Model",    icon: "fa-bar-chart",          cat: "Storage",  colSpan: 8, rowClass: "chart" },
+    { id: "top_file_types",    label: "Top File Types",      icon: "fa-pie-chart",          cat: "Storage",  colSpan: 4, rowClass: "chart" },
+    { id: "largest_files",     label: "Largest Files",       icon: "fa-sort-amount-desc",   cat: "Storage",  colSpan: 8, rowClass: "chart" },
     // Sync
-    { id: "sync_trend",       label: "Sync Activity Chart", icon: "fa-area-chart",         cat: "Sync",     colSpan: 8, rowClass: "chart" },
-    { id: "sync_status",      label: "Sync Status",         icon: "fa-check-circle",       cat: "Sync",     colSpan: 4, rowClass: "sm" },
-    { id: "failed_syncs",     label: "Failed Syncs",        icon: "fa-times-circle",       cat: "Sync",     colSpan: 4, rowClass: "sm" },
-    { id: "duplicates",       label: "Duplicate Files",     icon: "fa-clone",              cat: "Sync",     colSpan: 4, rowClass: "sm" },
+    { id: "sync_trend",        label: "Sync Activity Chart", icon: "fa-area-chart",         cat: "Sync",     colSpan: 8, rowClass: "chart" },
+    { id: "top_uploaders",     label: "Top Uploaders",       icon: "fa-trophy",             cat: "Users",    colSpan: 4, rowClass: "sm" },
+    { id: "failed_syncs",      label: "Failed Syncs",        icon: "fa-times-circle",       cat: "Sync",     colSpan: 4, rowClass: "sm" },
+    { id: "duplicates",        label: "Duplicate Files",     icon: "fa-clone",              cat: "Sync",     colSpan: 4, rowClass: "sm" },
     // Files
-    { id: "activity_log",     label: "Activity Log",        icon: "fa-list-alt",           cat: "Sync",     colSpan: 8, rowClass: "lg" },
-    { id: "recent_files",     label: "Recent Files",        icon: "fa-folder-open-o",      cat: "Files",    colSpan: 4, rowClass: "lg" },
-    { id: "files_by_model",   label: "Files by Model",      icon: "fa-th-large",           cat: "Files",    colSpan: 6, rowClass: "chart" },
-    // Users
-    { id: "top_uploaders",    label: "Top Uploaders",       icon: "fa-trophy",             cat: "Users",    colSpan: 6, rowClass: "chart" },
+    { id: "activity_log",      label: "Activity Log",        icon: "fa-list-alt",           cat: "Sync",     colSpan: 8, rowClass: "lg" },
+    { id: "recent_files",      label: "Recent Files",        icon: "fa-folder-open-o",      cat: "Files",    colSpan: 4, rowClass: "lg" },
+    { id: "active_shares",     label: "Active Share Links",  icon: "fa-share-alt",          cat: "Files",    colSpan: 6,  rowClass: "lg" },
     // Business
-    { id: "model_breakdown",  label: "Model Breakdown",     icon: "fa-tasks",              cat: "Business", colSpan: 12, rowClass: "chart" },
+    { id: "model_breakdown",   label: "Model Breakdown",     icon: "fa-tasks",              cat: "Business", colSpan: 6,  rowClass: "chart" },
 ];
 
 const CATALOG_MAP = Object.fromEntries(WIDGET_CATALOG.map(w => [w.id, w]));
@@ -91,10 +86,9 @@ const DEFAULT_WIDGETS = [
     "kpi_total_files", "kpi_total_size", "kpi_files_month", "kpi_pending",
     "fleet_overview",
     "sync_trend", "storage_meter",
-    "sync_status", "failed_syncs", "duplicates",
-    "activity_log", "recent_files",
-    "top_uploaders",
-    "model_breakdown",
+    "recent_files", "failed_syncs", "duplicates",
+    "activity_log", "top_uploaders",
+    "active_shares", "model_breakdown",
 ];
 
 // ─── Dashboard Component ──────────────────────────────────────────────────────
@@ -133,6 +127,7 @@ export class GoogleDriveDashboard extends Component {
             cron:          { available: false },
             trendData:     null,
             files_by_model:    [],
+                        active_shares:    [],
             top_uploaders:     [],
             top_file_types:    [],
             largest_files:     [],
@@ -408,8 +403,6 @@ export class GoogleDriveDashboard extends Component {
             kpi_pending:      async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
             kpi_errors:       async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
             kpi_share_links:  async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
-            kpi_last_sync:    async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
-            kpi_orphans:      async () => { const d = await this.orm.call("google.drive.dashboard", "get_orphan_attachments", []); s.orphan_count = d.orphan_count; },
             fleet_overview:   async () => {
                 const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []);
                 s.health = d.health;
@@ -435,7 +428,6 @@ export class GoogleDriveDashboard extends Component {
             },
             largest_files:    async () => { const d = await this.orm.call("google.drive.dashboard", "get_largest_files", []); s.largest_files = d; },
             sync_trend:       async () => { const d = await this.orm.call("google.drive.dashboard", "get_sync_trend_data", [], { start_date: s.globalTrendStart, end_date: s.globalTrendEnd }); s.trendData = d; },
-            sync_status:      async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
             failed_syncs:     async () => { const d = await this.orm.call("google.drive.dashboard", "get_error_summary", []); s.error_summary = d; },
             duplicates:       async () => { const d = await this.orm.call("google.drive.dashboard", "get_duplicate_summary", []); s.duplicate_count = d.duplicate_count; },
             activity_log:     async () => { const d = await this.orm.call("google.drive.dashboard", "get_activity_logs", [], { period: s.logFilter }); s.recent_logs = d; },
@@ -461,7 +453,7 @@ export class GoogleDriveDashboard extends Component {
                     sync_state: f.sync_state || '',
                 }));
             },
-            files_by_model:   async () => { const d = await this.orm.call("google.drive.dashboard", "get_files_by_model", []); s.files_by_model = d; },
+            active_shares:    async () => { const d = await this.orm.call("google.drive.dashboard", "get_active_shares", []); s.active_shares = d; },
             top_uploaders:    async () => { const d = await this.orm.call("google.drive.dashboard", "get_top_uploaders", []); s.top_uploaders = d; },
             model_breakdown:  async () => { const d = await this.orm.call("google.drive.dashboard", "get_model_breakdown", []); s.model_breakdown = d; },
         };
@@ -569,8 +561,6 @@ export class GoogleDriveDashboard extends Component {
             kpi_pending:      el => this._kpi(el, s.kpis.pending_syncs,               "Pending Syncs",       "fa-clock-o",           "orange"),
             kpi_errors:       el => this._kpi(el, s.kpis.error_count,                 "Sync Errors",         "fa-exclamation-circle", s.kpis.error_count > 0 ? "red" : "blue"),
             kpi_share_links:  el => this._kpi(el, s.kpis.active_share_links,          "Share Links",         "fa-link",              "teal"),
-            kpi_last_sync:    el => this._kpi(el, s.kpis.last_sync_time,              "Last Sync",           "fa-history",           "slate"),
-            kpi_orphans:      el => this._kpi(el, s.orphan_count,                     "Orphan Files",        "fa-unlink",            s.orphan_count > 0 ? "orange" : "green"),
 
             // ─── Storage Meter (donut) ────────────────────────
             storage_meter: el => {
@@ -766,15 +756,6 @@ export class GoogleDriveDashboard extends Component {
             },
 
             // ─── Sync Status Badge ────────────────────────────
-            sync_status: el => {
-                const { pending_count, error_count, uploading_count, total_files_synced } = s.kpis;
-                el.innerHTML = `<div class="gd-ss-grid">
-                  <div class="gd-ss-card gd-ss-card--ok">     <i class="fa fa-check-circle"></i><div><b>${total_files_synced}</b><span>Synced</span></div></div>
-                  <div class="gd-ss-card gd-ss-card--pending"> <i class="fa fa-clock-o"></i>    <div><b>${pending_count}</b><span>Pending</span></div></div>
-                  <div class="gd-ss-card gd-ss-card--err">     <i class="fa fa-times-circle"></i><div><b>${error_count}</b><span>Errors</span></div></div>
-                  ${uploading_count > 0 ? `<div class="gd-ss-card gd-ss-card--up"><i class="fa fa-upload"></i><div><b>${uploading_count}</b><span>Uploading</span></div></div>` : ""}
-                </div>`;
-            },
 
             // ─── Activity Log ─────────────────────────────────
             activity_log: el => {
@@ -938,16 +919,53 @@ export class GoogleDriveDashboard extends Component {
 
 
             // ─── Files by Model ───────────────────────────────
-            files_by_model: el => {
-                const d = s.files_by_model;
-                if (!d || !d.length) { el.innerHTML = this._empty("fa-th-large", "No data yet"); return; }
-                const max = Math.max(...d.map(r => r.count), 1);
-                el.innerHTML = `<div class="gd-mlist gd-scroll">${d.map(r => `
-                  <div class="gd-mrow">
-                    <span class="gd-mlabel">${_esc(r.label)}</span>
-                    <div class="gd-mtrack"><div class="gd-mfill" style="width:${Math.round(r.count/max*100)}%"></div></div>
-                    <span class="gd-mcount">${r.count}</span>
-                  </div>`).join("")}</div>`;
+
+                        // ─── Active Shares ────────────────────────────────
+            active_shares: el => {
+                const d = s.active_shares;
+                if (!d || !d.length) { el.innerHTML = this._empty("fa-share-alt", "No active share links found"); return; }
+                el.innerHTML = `<div class="gd-scroll"><table class="gd-table">
+                  <thead><tr><th>Item</th><th>Access</th><th>Status</th><th>Action</th></tr></thead>
+                  <tbody>${d.map(f => `<tr>
+                    <td class="gd-fn">
+                        <i class="fa ${f.file_type === 'folder' ? 'fa-folder' : 'fa-file-o'}"></i> 
+                        ${_esc(f.name)}
+                    </td>
+                    <td class="gd-access">
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <span class="gd-badge ${f.permission_type === 'anyone' ? 'gd-badge--green' : 'gd-badge--blue'}">
+                                <i class="fa ${f.permission_type === 'anyone' ? 'fa-globe' : 'fa-lock'}"></i> ${f.access_label}
+                            </span>
+                            <div style="display:flex; gap:6px; font-size:10px; color:var(--gd-txm);">
+                                <span title="Editors can share"><i class="fa ${f.writers_can_share ? 'fa-check' : 'fa-times'}"></i> Editors</span>
+                                <span title="Restrict download"><i class="fa ${f.copy_requires_writer ? 'fa-check' : 'fa-times'}"></i> Restrict</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="gd-badge gd-badge--sync">${f.sync_state.toUpperCase()}</span></td>
+                    <td>
+                        <button class="gd-btn-icon gd-share-nav" data-id="${f.id}" title="View in Explorer">
+                            <i class="fa fa-external-link"></i>
+                        </button>
+                    </td>
+                  </tr>`).join("")}</tbody></table></div>`;
+                
+                el.querySelectorAll('.gd-share-nav').forEach(btn => {
+                    btn.addEventListener('click', (ev) => {
+                        const fileId = parseInt(ev.currentTarget.dataset.id);
+                        const file = d.find(f => f.id === fileId);
+                        if (file) {
+                            const baseUrl = window.location.origin + window.location.pathname;
+                            const params = new URLSearchParams();
+                            params.set('gd_drive_id', file.drive_config_id);
+                            if (file.parent_folder_id) params.set('gd_parent_id', file.parent_folder_id);
+                            if (file.root_folder_id) params.set('gd_root_id', file.root_folder_id);
+                            params.set('gd_file_id', file.id);
+                            const explorerUrl = `${baseUrl}#action=google_drive_odoo_integration.action_google_drive_file_explorer&${params.toString()}`;
+                            window.open(explorerUrl, '_blank');
+                        }
+                    });
+                });
             },
 
             // ─── Top Uploaders ────────────────────────────────
