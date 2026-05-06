@@ -579,6 +579,8 @@ class GoogleDriveDashboard(models.AbstractModel):
                     'access_label': access_label,
                     'sync_state': f.sync_state,
                     'drive_url': f.google_url or '',
+                    'google_file_id': f.google_file_id or '',
+                    'google_url': f.google_url or '',
                     'writers_can_share': f.writers_can_share,
                     'copy_requires_writer': f.copy_requires_writer,
                     'drive_config_id': f.drive_config_id.id,

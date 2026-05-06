@@ -2381,7 +2381,7 @@ class FilePreviewDialog extends Component {
     }
 }
 
-class ShareDriveLinkDialog extends Component {
+export class ShareDriveLinkDialog extends Component {
     static template = "google_drive_odoo_integration.ShareDriveLinkDialog";
     static components = { Dialog };
     static props = {

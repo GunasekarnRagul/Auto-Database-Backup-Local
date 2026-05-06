@@ -205,6 +205,13 @@
           </div>
         </t>
 
+        <!-- Fullscreen Loader for background actions -->
+        <div class="gd_fullscreen_loader" t-if="state.showActionLoader">
+          <div class="gd_fullscreen_loader_content">
+            <div class="gd_fullscreen_spinner"/>
+            <span t-esc="state.loaderMessage"/>
+          </div>
+        </div>
       </t>
     </div>
   </t>

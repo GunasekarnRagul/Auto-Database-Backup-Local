@@ -14,6 +14,7 @@
 
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { ShareDriveLinkDialog } from "../file_explorer/file_explorer";
 import {
     Component,
     onWillStart,
@@ -86,8 +87,8 @@ const DEFAULT_WIDGETS = [
     "kpi_total_files", "kpi_total_size", "kpi_files_month", "kpi_pending",
     "fleet_overview",
     "sync_trend", "storage_meter",
-    "recent_files", "failed_syncs", "duplicates",
-    "activity_log", "top_uploaders",
+    "top_uploaders", "failed_syncs", "duplicates",
+    "activity_log", "recent_files",
     "active_shares", "model_breakdown",
 ];
 
@@ -95,8 +96,9 @@ const DEFAULT_WIDGETS = [
 
 export class GoogleDriveDashboard extends Component {
     setup() {
-        this.orm   = useService("orm");
-        this.action = useService("action");
+        this.orm           = useService("orm");
+        this.action        = useService("action");
+        this.dialogService = useService("dialog");
 
         this.state = useState({
             isLoading:    true,
@@ -119,6 +121,7 @@ export class GoogleDriveDashboard extends Component {
             logFilter:     "today",
             activityLogPage: 1,
             recentFilesPage: 1,
+            activeSharesPage: 1,
             duplicate_count: null,
             model_breakdown: [],
             error_summary: { fails_24h: 0, fails_7d: 0, top_errors: [] },
@@ -139,6 +142,10 @@ export class GoogleDriveDashboard extends Component {
             globalTrendFilter: '7days',
             globalTrendStart:  '',
             globalTrendEnd:    '',
+
+            // Loader for actions
+            showActionLoader: false,
+            loaderMessage: '',
         });
 
         // Initialize default global trend dates
@@ -339,6 +346,7 @@ export class GoogleDriveDashboard extends Component {
             this.orm.call("google.drive.dashboard", "get_largest_files", [])
                 .then(d => { s.largest_files = d; }),
             this._widgetFetchers.recent_files(),
+            this._widgetFetchers.active_shares(),
             this.orm.call("google.drive.dashboard", "get_storage_by_model", [])
                 .then(d => { s.storage_by_model = d; }),
             this.orm.call("google.drive.dashboard", "get_orphan_attachments", [])
@@ -920,49 +928,100 @@ export class GoogleDriveDashboard extends Component {
 
             // ─── Files by Model ───────────────────────────────
 
-                        // ─── Active Shares ────────────────────────────────
+            // ─── Active Shares (Table Design) ─────────
             active_shares: el => {
                 const d = s.active_shares;
                 if (!d || !d.length) { el.innerHTML = this._empty("fa-share-alt", "No active share links found"); return; }
-                el.innerHTML = `<div class="gd-scroll"><table class="gd-table">
-                  <thead><tr><th>Item</th><th>Access</th><th>Status</th><th>Action</th></tr></thead>
-                  <tbody>${d.map(f => `<tr>
-                    <td class="gd-fn">
-                        <i class="fa ${f.file_type === 'folder' ? 'fa-folder' : 'fa-file-o'}"></i> 
-                        ${_esc(f.name)}
-                    </td>
-                    <td class="gd-access">
-                        <div style="display:flex; flex-direction:column; gap:4px;">
-                            <span class="gd-badge ${f.permission_type === 'anyone' ? 'gd-badge--green' : 'gd-badge--blue'}">
-                                <i class="fa ${f.permission_type === 'anyone' ? 'fa-globe' : 'fa-lock'}"></i> ${f.access_label}
+
+                const permIcon  = (p) => p === 'anyone' ? 'fa-globe' : p === 'domain' ? 'fa-building' : 'fa-lock';
+                const permClass = (p) => p === 'anyone' ? 'gd-sl-badge--public' : p === 'domain' ? 'gd-sl-badge--domain' : 'gd-sl-badge--private';
+                const permLabel = (f) => f.access_label || (f.permission_type === 'anyone' ? 'Public' : f.permission_type === 'domain' ? 'Domain' : 'Restricted');
+                const fileIcon  = (f) => f.file_type === 'folder' ? 'fa-folder' : 'fa-file-o';
+
+                const itemsPerPage = 6;
+                const totalPages = Math.ceil(d.length / itemsPerPage) || 1;
+                const currentPage = s.activeSharesPage;
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const paginatedShares = d.slice(startIndex, startIndex + itemsPerPage);
+
+                let paginationHtml = '';
+                if (totalPages > 1) {
+                    let pagesHtml = '';
+                    const maxVisiblePages = 5;
+                    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                    if (endPage - startPage + 1 < maxVisiblePages) {
+                        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                    }
+                    for (let i = startPage; i <= endPage; i++) {
+                        pagesHtml += `<button class="gd-page-btn${i === currentPage ? ' active' : ''}" data-page="${i}">${i}</button>`;
+                    }
+                    paginationHtml = `<div class="gd-pagination" style="display:flex; justify-content:center; gap:6px; margin-top:10px; padding-bottom:5px;">
+                        <button class="gd-page-nav" data-page="${currentPage > 1 ? currentPage - 1 : 1}" ${currentPage === 1 ? 'disabled' : ''}>&laquo;</button>
+                        ${pagesHtml}
+                        <button class="gd-page-nav" data-page="${currentPage < totalPages ? currentPage + 1 : totalPages}" ${currentPage === totalPages ? 'disabled' : ''}>&raquo;</button>
+                    </div>`;
+                }
+
+                el.innerHTML = `
+                  <div class="gd-sl-summary" style="margin-bottom: 12px;">
+                    <span class="gd-sl-sum-item"><i class="fa fa-link"></i> <b>${d.length}</b> shared items</span>
+                    <span class="gd-sl-sum-divider"></span>
+                    <span class="gd-sl-sum-item gd-sl-sum-item--pub">
+                      <i class="fa fa-globe"></i> <b>${d.filter(f => f.permission_type === 'anyone').length}</b> public
+                    </span>
+                    <span class="gd-sl-sum-item gd-sl-sum-item--priv">
+                      <i class="fa fa-lock"></i> <b>${d.filter(f => f.permission_type === 'restricted').length}</b> restricted
+                    </span>
+                  </div>
+                  <div class="gd-scroll">
+                    <table class="gd-table">
+                      <thead>
+                        <tr>
+                          <th>File</th>
+                          <th>Location</th>
+                          <th>Access</th>
+                          <th style="width: 80px; text-align: right;">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${paginatedShares.map(f => `
+                        <tr>
+                          <td class="gd-fn"><i class="fa ${fileIcon(f)}"></i> ${_esc(f.name)}</td>
+                          <td class="text-muted" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${_esc(f.display_path || '—')}">${_esc(f.display_path || '—')}</td>
+                          <td>
+                            <span class="gd-sl-badge ${permClass(f.permission_type)}">
+                              <i class="fa ${permIcon(f.permission_type)}"></i> ${permLabel(f)}
                             </span>
-                            <div style="display:flex; gap:6px; font-size:10px; color:var(--gd-txm);">
-                                <span title="Editors can share"><i class="fa ${f.writers_can_share ? 'fa-check' : 'fa-times'}"></i> Editors</span>
-                                <span title="Restrict download"><i class="fa ${f.copy_requires_writer ? 'fa-check' : 'fa-times'}"></i> Restrict</span>
-                            </div>
-                        </div>
-                    </td>
-                    <td><span class="gd-badge gd-badge--sync">${f.sync_state.toUpperCase()}</span></td>
-                    <td>
-                        <button class="gd-btn-icon gd-share-nav" data-id="${f.id}" title="View in Explorer">
-                            <i class="fa fa-external-link"></i>
-                        </button>
-                    </td>
-                  </tr>`).join("")}</tbody></table></div>`;
-                
-                el.querySelectorAll('.gd-share-nav').forEach(btn => {
-                    btn.addEventListener('click', (ev) => {
-                        const fileId = parseInt(ev.currentTarget.dataset.id);
+                          </td>
+                          <td style="text-align: right;">
+                            <button class="gd-btn gd-btn--ghost gd-btn--sm gd-share-wizard-btn" data-id="${f.id}" title="Manage Share Link"><i class="fa fa-cog"></i></button>
+                          </td>
+                        </tr>`).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                  ${paginationHtml}
+                `;
+
+                // Manage Share Link button → open the file explorer's ShareDriveLinkDialog
+                el.querySelectorAll('.gd-share-wizard-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const fileId = parseInt(btn.dataset.id);
                         const file = d.find(f => f.id === fileId);
-                        if (file) {
-                            const baseUrl = window.location.origin + window.location.pathname;
-                            const params = new URLSearchParams();
-                            params.set('gd_drive_id', file.drive_config_id);
-                            if (file.parent_folder_id) params.set('gd_parent_id', file.parent_folder_id);
-                            if (file.root_folder_id) params.set('gd_root_id', file.root_folder_id);
-                            params.set('gd_file_id', file.id);
-                            const explorerUrl = `${baseUrl}#action=google_drive_odoo_integration.action_google_drive_file_explorer&${params.toString()}`;
-                            window.open(explorerUrl, '_blank');
+                        if (file) this._openShareWizard(file);
+                    });
+                });
+
+
+
+                // Pagination click
+                el.querySelectorAll(".gd-page-btn, .gd-page-nav").forEach(b => {
+                    b.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        if (!b.disabled) {
+                            s.activeSharesPage = parseInt(b.dataset.page);
+                            this._renderWidget("active_shares");
                         }
                     });
                 });
@@ -1239,6 +1298,21 @@ export class GoogleDriveDashboard extends Component {
     _openDriveSettings(id) {
         this.action.doAction({ type: "ir.actions.act_window", res_model: "google.drive.config",
             res_id: id, name: "Drive Configuration", views: [[false, "form"]], target: "current" });
+    }
+
+    /**
+     * Open the existing file explorer ShareDriveLinkDialog for a file from the dashboard.
+     * Reuses the same wizard component without duplicating any logic.
+     */
+    _openShareWizard(file) {
+        this.state.loaderMessage = "Opening share settings...";
+        this.state.showActionLoader = true;
+        this.dialogService.add(ShareDriveLinkDialog, {
+            files: [file],
+            onReady: () => {
+                this.state.showActionLoader = false;
+            }
+        });
     }
 
     openFileExplorer() {
