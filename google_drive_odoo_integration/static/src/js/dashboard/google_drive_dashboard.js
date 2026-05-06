@@ -58,13 +58,10 @@ const WIDGET_CATALOG = [
     { id: "kpi_total_size",    label: "Total Cloud Usage",   icon: "fa-cloud-upload",      cat: "KPI",      colSpan: 3, rowClass: "kpi" },
     { id: "kpi_files_month",   label: "Files This Month",    icon: "fa-calendar-plus-o",    cat: "KPI",      colSpan: 3, rowClass: "kpi" },
     { id: "kpi_pending",       label: "Pending Syncs",       icon: "fa-clock-o",            cat: "KPI",      colSpan: 3, rowClass: "kpi" },
-    { id: "kpi_errors",        label: "Sync Errors",         icon: "fa-exclamation-circle", cat: "KPI",      colSpan: 3, rowClass: "kpi" },
-    { id: "kpi_share_links",   label: "Active Share Links",  icon: "fa-link",               cat: "KPI",      colSpan: 3, rowClass: "kpi" },
     // Fleet (full width)
     { id: "fleet_overview",    label: "Connected Drivers",   icon: "fa-hdd-o",              cat: "Fleet",    colSpan: 12, rowClass: "fleet" },
     // Storage
     { id: "storage_meter",     label: "Storage Meter",       icon: "fa-pie-chart",          cat: "Storage",  colSpan: 4, rowClass: "chart" },
-    { id: "storage_by_model",  label: "Storage by Model",    icon: "fa-bar-chart",          cat: "Storage",  colSpan: 8, rowClass: "chart" },
     { id: "top_file_types",    label: "Top File Types",      icon: "fa-pie-chart",          cat: "Storage",  colSpan: 4, rowClass: "chart" },
     { id: "largest_files",     label: "Largest Files",       icon: "fa-sort-amount-desc",   cat: "Storage",  colSpan: 8, rowClass: "chart" },
     // Sync
@@ -111,10 +108,9 @@ export class GoogleDriveDashboard extends Component {
             kpis: {
                 total_files_synced: "…", total_folders_synced: 0,
                 synced_today: 0, pending_syncs: "…", pending_count: 0,
-                error_count: 0, uploading_count: 0, fails_today: 0,
+                uploading_count: 0, fails_today: 0,
                 last_sync_time: "Never", storage_saved_formatted: "—",
                 drive_space_used_formatted: "—", files_this_month: 0,
-                active_share_links: 0,
             },
             health:        { fleet: [], online_drives: 0, total_drives: 0 },
             recent_logs:   [],
@@ -122,6 +118,7 @@ export class GoogleDriveDashboard extends Component {
             activityLogPage: 1,
             recentFilesPage: 1,
             activeSharesPage: 1,
+            asl_drive_id: null,
             duplicate_count: null,
             model_breakdown: [],
             error_summary: { fails_24h: 0, fails_7d: 0, top_errors: [] },
@@ -135,7 +132,6 @@ export class GoogleDriveDashboard extends Component {
             top_file_types:    [],
             largest_files:     [],
             recent_files:      [],
-            storage_by_model:  { labels: [], data: [] },
             orphan_count:      0,
 
             // Global Trend Filter State
@@ -409,8 +405,6 @@ export class GoogleDriveDashboard extends Component {
             kpi_total_size:   async () => { const d = await this.orm.call("google.drive.dashboard", "get_storage_stats", []); Object.assign(s.kpis, d); },
             kpi_files_month:  async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
             kpi_pending:      async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
-            kpi_errors:       async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
-            kpi_share_links:  async () => { const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []); Object.assign(s.kpis, d.kpis); },
             fleet_overview:   async () => {
                 const d = await this.orm.call("google.drive.dashboard", "get_kpi_data", []);
                 s.health = d.health;
@@ -426,7 +420,6 @@ export class GoogleDriveDashboard extends Component {
                 }
             },
             storage_meter:    async () => { s.sm_quotas = {}; },
-            storage_by_model: async () => { const d = await this.orm.call("google.drive.dashboard", "get_storage_by_model", []); s.storage_by_model = d; },
             top_file_types:   async () => { 
                 if (s.tft_drive_id) {
                     const d = await this.orm.call("google.drive.dashboard", "get_top_file_types", [], { config_id: s.tft_drive_id });
@@ -461,7 +454,12 @@ export class GoogleDriveDashboard extends Component {
                     sync_state: f.sync_state || '',
                 }));
             },
-            active_shares:    async () => { const d = await this.orm.call("google.drive.dashboard", "get_active_shares", []); s.active_shares = d; },
+            active_shares:    async () => { 
+                const d = await this.orm.call("google.drive.dashboard", "get_active_shares", [], { 
+                    config_id: s.asl_drive_id || false 
+                }); 
+                s.active_shares = d; 
+            },
             top_uploaders:    async () => { const d = await this.orm.call("google.drive.dashboard", "get_top_uploaders", []); s.top_uploaders = d; },
             model_breakdown:  async () => { const d = await this.orm.call("google.drive.dashboard", "get_model_breakdown", []); s.model_breakdown = d; },
         };
@@ -567,8 +565,6 @@ export class GoogleDriveDashboard extends Component {
             kpi_total_size:   el => this._kpi(el, s.kpis.drive_space_used_formatted,  "Total Cloud Usage",   "fa-cloud-upload",      "green"),
             kpi_files_month:  el => this._kpi(el, s.kpis.files_this_month,            "Files This Month",    "fa-calendar-plus-o",   "purple"),
             kpi_pending:      el => this._kpi(el, s.kpis.pending_syncs,               "Pending Syncs",       "fa-clock-o",           "orange"),
-            kpi_errors:       el => this._kpi(el, s.kpis.error_count,                 "Sync Errors",         "fa-exclamation-circle", s.kpis.error_count > 0 ? "red" : "blue"),
-            kpi_share_links:  el => this._kpi(el, s.kpis.active_share_links,          "Share Links",         "fa-link",              "teal"),
 
             // ─── Storage Meter (donut) ────────────────────────
             storage_meter: el => {
@@ -633,25 +629,6 @@ export class GoogleDriveDashboard extends Component {
                     type: "doughnut",
                     data: { labels: ["Used","Free"], datasets: [{ data: [pct, 100-pct], backgroundColor: [clr,"#e8eaed"], borderWidth: 0 }] },
                     options: { cutout: "75%", responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
-                });
-            },
-
-            // ─── Storage by Model (horizontal bar) ────────────
-            storage_by_model: el => {
-                const d = s.storage_by_model;
-                if (!d || !d.labels || !d.labels.length) { el.innerHTML = this._empty("fa-bar-chart", "No storage data"); return; }
-                el.innerHTML = `<canvas id="c-storage-model" style="height:200px;width:100%;"></canvas>`;
-                this._chart("storage_by_model", el.querySelector("canvas"), {
-                    type: "bar",
-                    data: { labels: d.labels, datasets: [{ label: "MB", data: d.data, backgroundColor: _pieColors(d.labels.length), borderRadius: 6, borderWidth: 0 }] },
-                    options: {
-                        responsive: true, maintainAspectRatio: false, indexAxis: "y",
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            x: { grid: { color: "rgba(0,0,0,.04)" }, ticks: { color: "#9ca3af", font: { size: 11 } } },
-                            y: { grid: { display: false },           ticks: { color: "#6b7280", font: { size: 11 } } },
-                        },
-                    },
                 });
             },
 
@@ -930,9 +907,13 @@ export class GoogleDriveDashboard extends Component {
 
             // ─── Active Shares (Table Design) ─────────
             active_shares: el => {
-                const d = s.active_shares;
-                if (!d || !d.length) { el.innerHTML = this._empty("fa-share-alt", "No active share links found"); return; }
+                const fleet = s.health && s.health.fleet ? s.health.fleet : [];
+                if (!fleet.length) { el.innerHTML = this._empty("fa-share-alt", "No drivers connected"); return; }
+                
+                // Initialize asl_drive_id if not set (default to first driver or 'all')
+                if (s.asl_drive_id === null) s.asl_drive_id = 0; // 0 means 'All'
 
+                const d = s.active_shares;
                 const permIcon  = (p) => p === 'anyone' ? 'fa-globe' : p === 'domain' ? 'fa-building' : 'fa-lock';
                 const permClass = (p) => p === 'anyone' ? 'gd-sl-badge--public' : p === 'domain' ? 'gd-sl-badge--domain' : 'gd-sl-badge--private';
                 const permLabel = (f) => f.access_label || (f.permission_type === 'anyone' ? 'Public' : f.permission_type === 'domain' ? 'Domain' : 'Restricted');
@@ -963,18 +944,32 @@ export class GoogleDriveDashboard extends Component {
                     </div>`;
                 }
 
+                let summaryHtml = '';
+                if (d.length > 0) {
+                    summaryHtml = `
+                      <div class="gd-sl-summary" style="margin-bottom: 12px; display:flex; align-items:center; flex-wrap:wrap; gap:12px;">
+                        <span class="gd-sl-sum-item"><i class="fa fa-link"></i> <b>${d.length}</b> shared items</span>
+                        <span class="gd-sl-sum-divider"></span>
+                        <span class="gd-sl-sum-item gd-sl-sum-item--pub">
+                          <i class="fa fa-globe"></i> <b>${d.filter(f => f.permission_type === 'anyone').length}</b> public
+                        </span>
+                        <span class="gd-sl-sum-item gd-sl-sum-item--priv">
+                          <i class="fa fa-lock"></i> <b>${d.filter(f => f.permission_type === 'restricted').length}</b> restricted
+                        </span>
+                      </div>`;
+                }
+
                 el.innerHTML = `
-                  <div class="gd-sl-summary" style="margin-bottom: 12px;">
-                    <span class="gd-sl-sum-item"><i class="fa fa-link"></i> <b>${d.length}</b> shared items</span>
-                    <span class="gd-sl-sum-divider"></span>
-                    <span class="gd-sl-sum-item gd-sl-sum-item--pub">
-                      <i class="fa fa-globe"></i> <b>${d.filter(f => f.permission_type === 'anyone').length}</b> public
-                    </span>
-                    <span class="gd-sl-sum-item gd-sl-sum-item--priv">
-                      <i class="fa fa-lock"></i> <b>${d.filter(f => f.permission_type === 'restricted').length}</b> restricted
-                    </span>
+                  <div style="margin-bottom:12px; display:flex; gap:10px; align-items:center;">
+                    <i class="fa fa-filter" style="color:var(--gd-txm); font-size:14px;"></i>
+                    <select class="gd-asl-select" style="flex:1; padding:6px 12px; border-radius:8px; border:1px solid var(--gd-border); font-size:13px; font-family:var(--gd-font); font-weight:500; color:var(--gd-tx); background:var(--gd-page-bg); outline:none; cursor:pointer;">
+                      <option value="0" ${s.asl_drive_id === 0 ? 'selected' : ''}>All Drivers</option>
+                      ${fleet.map(drv => `<option value="${drv.id}" ${drv.id == s.asl_drive_id ? 'selected' : ''}>${_esc(drv.name)}</option>`).join('')}
+                    </select>
                   </div>
+                  ${summaryHtml}
                   <div class="gd-scroll">
+                    ${d.length === 0 ? this._empty("fa-share-alt", "No shared items for this driver") : `
                     <table class="gd-table">
                       <thead>
                         <tr>
@@ -999,10 +994,17 @@ export class GoogleDriveDashboard extends Component {
                           </td>
                         </tr>`).join('')}
                       </tbody>
-                    </table>
+                    </table>`}
                   </div>
                   ${paginationHtml}
                 `;
+
+                // Driver filter change
+                el.querySelector('.gd-asl-select').addEventListener('change', async (e) => {
+                    s.asl_drive_id = parseInt(e.target.value);
+                    s.activeSharesPage = 1;
+                    await this._refreshWidget("active_shares");
+                });
 
                 // Manage Share Link button → open the file explorer's ShareDriveLinkDialog
                 el.querySelectorAll('.gd-share-wizard-btn').forEach(btn => {

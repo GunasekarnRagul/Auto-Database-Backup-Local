@@ -550,14 +550,18 @@ class GoogleDriveDashboard(models.AbstractModel):
             return []
 
     @api.model
-    def get_active_shares(self, limit=20):
+    def get_active_shares(self, limit=20, config_id=False):
         """Return files/folders that have active sharing permissions."""
         try:
             GDFile = self.env['google.drive.file'].sudo()
-            shared_records = GDFile.search([
+            domain = [
                 '|', ('permission_type', '!=', 'restricted'), ('shared_people_count', '>', 0),
                 ('active', '=', True),
-            ], order='write_date desc', limit=limit)
+            ]
+            if config_id:
+                domain.append(('drive_config_id', '=', int(config_id)))
+
+            shared_records = GDFile.search(domain, order='write_date desc', limit=limit)
 
             result = []
             for f in shared_records:
