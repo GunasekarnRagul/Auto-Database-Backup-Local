@@ -53,10 +53,20 @@ class GoogleDriveDashboard(models.AbstractModel):
                 ('create_date', '>=', today_start),
             ])
 
+            # ── Configuration Overview ──
+            SyncConfig = self.env['attachment.sync.config'].sudo()
+            active_configs = SyncConfig.search([('state', '=', 'active')])
+            
             # ── Pending (breakdown by state) ──
-            pending_count = GDFile.search_count([
+            # Improved: Combine both types of pending items:
+            # 1. Manual uploads/folders from File Explorer ('pending' state)
+            # 2. Unsynced business attachments from active rules (auto-sync queue)
+            explorer_pending = GDFile.search_count([
                 ('sync_state', '=', 'pending'), ('active', '=', True),
             ])
+            attachment_pending = sum(active_configs.mapped('unsynced_attachment_count'))
+            pending_count = explorer_pending + attachment_pending
+            
             error_count = GDFile.search_count([
                 ('sync_state', '=', 'error'), ('active', '=', True),
             ])
@@ -76,7 +86,6 @@ class GoogleDriveDashboard(models.AbstractModel):
             total_roots = sum(len(c.root_ids.filtered(lambda r: r.active)) for c in configs)
 
             # ── Configuration Overview ──
-            active_configs = SyncConfig.search([('state', '=', 'active')])
             paused_configs = SyncConfig.search_count([('state', '=', 'paused')])
             total_configs = len(active_configs) + paused_configs
 
