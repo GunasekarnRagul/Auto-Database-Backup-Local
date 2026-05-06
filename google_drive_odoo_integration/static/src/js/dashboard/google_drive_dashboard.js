@@ -697,34 +697,13 @@ export class GoogleDriveDashboard extends Component {
                 const d = s.largest_files;
                 if (!d || !d.length) { el.innerHTML = this._empty("fa-sort-amount-desc", "No files found"); return; }
                 el.innerHTML = `<div class="gd-scroll"><table class="gd-table">
-                  <thead><tr><th>#</th><th>File</th><th>Model</th><th>Size</th></tr></thead>
+                  <thead><tr><th>#</th><th>File</th><th>Location</th><th>Size</th></tr></thead>
                   <tbody>${d.map((f,i) => `<tr>
                     <td class="gd-rank">${i+1}</td>
-                    <td class="gd-fn gd-largest-file-click" data-id="${f.id}" style="cursor:pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--gd-blue)'" onmouseout="this.style.color=''">
-                        <i class="fa fa-file-o"></i> ${_esc(f.name)}
-                    </td>
-                    <td class="gd-ml">${_esc(f.res_model_label)}</td>
+                    <td class="gd-fn"><i class="fa ${_fileIcon(f.mime_type)}"></i> ${_esc(f.name)}</td>
+                    <td class="text-muted" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${_esc(f.display_path || '—')}">${_esc(f.display_path || '—')}</td>
                     <td><span class="gd-size-badge">${f.size}</span></td>
                   </tr>`).join("")}</tbody></table></div>`;
-
-                el.querySelectorAll(".gd-largest-file-click").forEach(item => {
-                    item.addEventListener("click", () => {
-                        const fileId = parseInt(item.dataset.id);
-                        const file = d.find(f => f.id === fileId);
-                        if (file) {
-                            // Open Odoo File Explorer in a NEW tab at the correct location
-                            const baseUrl = window.location.origin + "/web#action=google_drive_odoo_integration.action_google_drive_file_explorer";
-                            const params = [
-                                `gd_drive_id=${file.drive_config_id}`,
-                                `gd_parent_id=${file.parent_folder_id || ''}`,
-                                `gd_root_id=${file.root_folder_id || ''}`,
-                                `gd_file_id=${file.id}`
-                            ].join('&');
-                            
-                            window.open(baseUrl + '&' + params, "_blank");
-                        }
-                    });
-                });
             },
 
             // ─── Sync Activity Chart ──────────────────────────
@@ -1338,13 +1317,9 @@ export class GoogleDriveDashboard extends Component {
         });
     }
 
-    openFileExplorer(params = {}) {
-        this.action.doAction({ 
-            type: "ir.actions.client",
-            tag: "google_drive_odoo_integration.file_explorer", 
-            name: "File Explorer",
-            params: params
-        });
+    openFileExplorer() {
+        this.action.doAction({ type: "ir.actions.client",
+            tag: "google_drive_odoo_integration.file_explorer", name: "File Explorer" });
     }
 
     openActivityLogs() {
