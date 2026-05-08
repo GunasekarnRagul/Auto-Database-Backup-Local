@@ -1,0 +1,267 @@
+/* ===== Premium Cloud Storage Kanban Cards ===== */
+
+/* Card container */
+.o_cloud_kanban .o_kanban_record {
+    padding: 0 !important;
+    margin-bottom: 12px;
+}
+
+.o_cloud_card {
+    border-radius: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    background: linear-gradient(145deg, #ffffff 0%, #f8f9fb 100%);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    font-family: 'Google Sans', 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+    position: relative;
+}
+
+.o_cloud_card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    border-color: rgba(113, 75, 234, 0.2);
+}
+
+/* Left accent stripe */
+.o_cloud_card_accent {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    border-radius: 14px 0 0 14px;
+}
+
+.o_cloud_card_accent.accent-success {
+    background: linear-gradient(180deg, #28a745, #20c997);
+}
+
+.o_cloud_card_accent.accent-warning {
+    background: linear-gradient(180deg, #fd7e14, #ffc107);
+}
+
+.o_cloud_card_accent.accent-danger {
+    background: linear-gradient(180deg, #dc3545, #e74c3c);
+}
+
+/* Header row */
+.o_cloud_card_header {
+    padding: 14px 16px 0 20px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+/* Icon bubble */
+.o_cloud_card_icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    background: #f0f2f5;
+    color: #555;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Title area */
+.o_cloud_card_title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 2px;
+    line-height: 1.3;
+}
+
+.o_cloud_card_subtitle {
+    font-size: 0.75rem;
+    color: #8e8ea0;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+/* 3-dot menu */
+.o_cloud_card_menu .dropdown-toggle {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #adb5bd;
+    transition: all 0.2s ease;
+    border: none;
+    background: transparent;
+}
+
+.o_cloud_card_menu .dropdown-toggle:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #495057;
+}
+
+.o_cloud_card_menu .dropdown-menu {
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    padding: 6px;
+    min-width: 140px;
+}
+
+.o_cloud_card_menu .dropdown-item {
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: background 0.15s;
+}
+
+.o_cloud_card_menu .dropdown-item:hover {
+    background: #f0f1f3;
+}
+
+.o_cloud_card_menu .dropdown-item .fa {
+    width: 18px;
+    text-align: center;
+}
+
+/* Footer / status bar */
+.o_cloud_card_footer {
+    padding: 10px 16px 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Status badge */
+.o_cloud_status_badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.o_cloud_status_badge.badge-connected {
+    background: rgba(40, 167, 69, 0.12);
+    color: #1e7e34;
+}
+
+.o_cloud_status_badge.badge-draft {
+    background: rgba(253, 126, 20, 0.12);
+    color: #c25e00;
+}
+
+.o_cloud_status_badge.badge-error {
+    background: rgba(220, 53, 69, 0.12);
+    color: #bd2130;
+}
+
+/* Drive type tag */
+.o_cloud_drive_tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #6c63ff;
+    background: rgba(108, 99, 255, 0.08);
+    padding: 3px 10px;
+    border-radius: 6px;
+    margin-top: 8px;
+}
+
+/* Details section */
+.o_cloud_card_details {
+    padding: 8px 16px 4px 20px;
+}
+
+.o_cloud_detail_row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 0.78rem;
+}
+
+.o_cloud_detail_label {
+    color: #8e8ea0;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.o_cloud_detail_value {
+    max-width: 60%;
+    text-align: right;
+}
+
+.o_cloud_detail_row .badge {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 3px 8px;
+}
+
+.bg-info-light {
+    background: rgba(23, 162, 184, 0.12) !important;
+}
+
+.bg-success-light {
+    background: rgba(40, 167, 69, 0.1) !important;
+}
+
+.bg-secondary-light {
+    background: rgba(108, 117, 125, 0.1) !important;
+    color: #000000 !important;
+}
+
+.bg-light-subtle {
+    background-color: #f8f9fa !important;
+}
+
+/* Detailed Stats Grid Styling */
+.o_cloud_card .border-end {
+    border-right: 1px solid #dee2e6 !important;
+}
+
+.o_cloud_card .progress {
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.075);
+}
+
+.o_cloud_card .progress-bar {
+    transition: width 0.6s ease;
+    background: linear-gradient(90deg, #714bca, #8e67ef) !important;
+}
+
+/* Hover effect for the whole card */
+.o_cloud_card {
+    cursor: pointer;
+}
+
+/* Pulse animation for active sync */
+@keyframes sync-pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.o_cloud_card_icon .fa-refresh {
+    animation: sync-pulse 2s infinite ease-in-out;
+}

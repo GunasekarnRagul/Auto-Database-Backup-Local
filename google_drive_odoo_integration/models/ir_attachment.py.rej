@@ -1,0 +1,28 @@
+--- ir_attachment.py
++++ ir_attachment.py
+@@ -3,6 +3,9 @@
+ from odoo.exceptions import ValidationError
+ import json
+ import requests
++import logging
++
++_logger = logging.getLogger(__name__)
+ 
+ class IrAttachment(models.Model):
+     _inherit = 'ir.attachment'
+@@ -107,6 +110,7 @@
+         attachments = super(IrAttachment, self).create(vals_list)
+ 
+         for attachment in attachments:
++            _logger.info(f"GD_SYNC: created attachment {attachment.id} name={attachment.name} res_model={attachment.res_model} res_id={attachment.res_id} type={attachment.type} ctx={self.env.context}")
+             if getattr(self.env.context, 'get', lambda k: None)('skip_gdrive_sync'):
+                 continue
+ 
+@@ -308,6 +312,7 @@
+         return self.env['ir.attachment'].browse()
+ 
+     def _inject_chatter_drive_button(self, drive_url, file_name=None):
++        _logger.info(f"GD_SYNC: injecting drive button for {self.id} drive_url={drive_url}")
+         self.ensure_one()
+         file_name = file_name or self.name
+         if not drive_url:

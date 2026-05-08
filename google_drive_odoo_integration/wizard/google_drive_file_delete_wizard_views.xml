@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_google_drive_file_delete_wizard_form" model="ir.ui.view">
+        <field name="name">google.drive.file.delete.wizard.form</field>
+        <field name="model">google.drive.file.delete.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Confirm Deletion">
+                <field name="folder_id" invisible="1"/>
+                <div class="alert alert-warning" role="alert">
+                    <strong>Warning:</strong> <field name="warning_message" readonly="1" nolabel="1"/>
+                </div>
+                <!-- Show associated configurations if any -->
+                <group invisible="not config_ids">
+                    <field name="config_ids" widget="many2many_tags" readonly="1" options="{'no_create': True, 'no_open': True}"/>
+                </group>
+                <footer>
+                    <button name="action_confirm_delete" string="Delete" type="object" class="btn-danger"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

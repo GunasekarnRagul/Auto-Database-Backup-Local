@@ -1,0 +1,11 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_google_drive_config,google.drive.config,model_google_drive_config,base.group_system,1,1,1,1
+access_google_drive_file,google.drive.file,model_google_drive_file,base.group_system,1,1,1,1
+access_google_drive_root_folder,google.drive.root.folder,model_google_drive_root_folder,base.group_system,1,1,1,1
+access_gdrive_model_config,gdrive.model.config,model_gdrive_model_config,base.group_system,1,1,1,1
+access_attachment_sync_config,attachment.sync.config,model_attachment_sync_config,base.group_system,1,1,1,1
+access_google_drive_sync_log,google.drive.sync.log,model_google_drive_sync_log,base.group_system,1,1,1,1
+access_google_drive_file_delete_wizard,access_google_drive_file_delete_wizard,model_google_drive_file_delete_wizard,base.group_user,1,1,1,1
+access_gdrive_dashboard_layout,gdrive.dashboard.layout,model_gdrive_dashboard_layout,base.group_user,1,1,1,1
+access_duplicate_pruner_wizard,duplicate.pruner.wizard,model_duplicate_pruner_wizard,base.group_user,1,1,1,1
+access_duplicate_pruner_wizard_line,duplicate.pruner.wizard.line,model_duplicate_pruner_wizard_line,base.group_user,1,1,1,1
