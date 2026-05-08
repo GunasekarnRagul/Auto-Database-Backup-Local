@@ -1129,11 +1129,7 @@ export class GoogleDriveDashboard extends Component {
             // ─── Fleet Overview ───────────────────────────────
             fleet_overview: el => {
                 const fleet = (s.health && s.health.fleet) || [];
-<<<<<<< HEAD
                 if (!fleet.length) { el.innerHTML = this._empty("fa-hdd-o", "No Drives connected"); return; }
-=======
-                if (!fleet.length) { el.innerHTML = this._empty("fa-hdd-o", "No Google Drives connected"); return; }
->>>>>>> fcb027b760bf3fd26768d7ff7ccfac7153158d97
                 el.innerHTML = `<div class="gd-fleet-list">${fleet.map(drive => {
                     const q = s.fleet_quotas[drive.id] || {};
                     let quotaHtml = "";
