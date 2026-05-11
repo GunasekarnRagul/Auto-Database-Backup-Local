@@ -1060,7 +1060,8 @@ export class GoogleDriveDashboard extends Component {
                     const totFiles  = d.reduce((s,m) => s + (m.total||0), 0);
                     const totSynced = d.reduce((s,m) => s + (m.synced||0), 0);
                     const totPend   = d.reduce((s,m) => s + (m.unsynced||0), 0);
-                    const avgPct    = d.length ? Math.round(d.reduce((s,m) => s + m.sync_pct, 0) / d.length) : 0;
+                    // Weighted average: total synced across ALL configs / total files across ALL configs
+                    const avgPct    = totFiles > 0 ? Math.round(totSynced / totFiles * 100) : 0;
 
                     const modeClass = (mode) => {
                         const lm = (mode||"").toLowerCase();
@@ -1075,7 +1076,7 @@ export class GoogleDriveDashboard extends Component {
                         const fillCls = pct >= 90 ? "gd-mbc-fill--full" : pct < 30 ? "gd-mbc-fill--low" : "";
                         const modCls  = modeClass(m.storage_mode);
                         return `
-                        <div class="gd-mbc-card">
+                        <div class="gd-mbc-card" data-cfg-id="${m.id}" style="cursor:pointer;" title="Click to open ${_esc(m.name)}">
                           <div class="gd-mbc-header">
                             <div class="gd-mbc-icon"><i class="fa fa-cube"></i></div>
                             <div class="gd-mbc-title">
@@ -1123,6 +1124,21 @@ export class GoogleDriveDashboard extends Component {
                 };
 
                 _renderMBC();
+
+                // ── Card click → open specific config form ──
+                el.querySelectorAll('.gd-mbc-card[data-cfg-id]').forEach(card => {
+                    card.addEventListener('click', () => {
+                        const cfgId = parseInt(card.dataset.cfgId);
+                        if (!cfgId) return;
+                        this.action.doAction({
+                            type: 'ir.actions.act_window',
+                            res_model: 'attachment.sync.config',
+                            res_id: cfgId,
+                            views: [[false, 'form']],
+                            target: 'current',
+                        });
+                    });
+                });
             },
 
 
