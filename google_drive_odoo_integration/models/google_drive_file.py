@@ -152,7 +152,6 @@ class GoogleDriveFile(models.Model):
             record.child_ids.action_archive_recursive()
             record.write({
                 'active': False,
-                'sync_state': 'synced',
             })
         return True
 
@@ -161,8 +160,6 @@ class GoogleDriveFile(models.Model):
         for record in self.with_context(active_test=False):
             record.write({
                 'active': True,
-                'sync_state': 'synced',
-                'last_synced': fields.Datetime.now(),
             })
             record.child_ids.action_unarchive()
         return True

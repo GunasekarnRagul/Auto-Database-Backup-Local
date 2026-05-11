@@ -627,7 +627,7 @@
                                                 </div>
                                             </td>
                                             <td class="gd_cell_path">
-                                                <span class="text-muted" t-esc="file.display_path" style="font-size: 0.85rem;"/>
+                                                <span class="text-muted" t-esc="file.display_path" style="font-size: 0.85rem; display: inline-block; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;" t-att-title="file.display_path"/>
                                             </td>
                                             <td class="gd_cell_owner">
                                                 <t t-esc="file.owner_name || 'Me'"/>
