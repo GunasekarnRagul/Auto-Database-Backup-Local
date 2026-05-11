@@ -182,9 +182,15 @@ export class FileExplorer extends Component {
             ["name", "state"]
         );
         this.state.drives = drives;
-        // Auto-select first drive
+        // Auto-select first drive or saved drive
         if (drives.length > 0 && !this.state.activeDriveId) {
-            this.state.activeDriveId = drives[0].id;
+            const savedDriveId = localStorage.getItem('gd_active_drive_id');
+            if (savedDriveId && drives.some(d => d.id == savedDriveId)) {
+                this.state.activeDriveId = parseInt(savedDriveId);
+            } else {
+                this.state.activeDriveId = drives[0].id;
+                localStorage.setItem('gd_active_drive_id', drives[0].id);
+            }
         }
     }
 
@@ -298,6 +304,7 @@ export class FileExplorer extends Component {
 
     async switchDrive(driveId) {
         this.state.activeDriveId = driveId;
+        localStorage.setItem('gd_active_drive_id', driveId);
         this.state.activeSection = 'my_drive';
         this.state.activeRootId = null;
         this.state.activeFolderTreeId = null;
