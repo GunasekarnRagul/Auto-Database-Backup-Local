@@ -304,9 +304,8 @@
                                 <div class="border rounded-3 p-3 h-100 text-center shadow-sm d-flex flex-column justify-content-center" style="background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%); border-color: #9fa8da !important;">
                                     <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #283593;">Last Synced Timestamp</div>
                                     <div class="fw-bold" style="font-size: 1.1rem; color: #283593;">
-                                        <field name="last_synced" class="p-0 m-0"/>
+                                        <field name="last_synced" class="p-0 m-0" readonly="1"/>
                                     </div>
-                                    <small style="color: #283593;"><i class="fa fa-history me-1"/>Mode: <field name="storage_mode" class="p-0 m-0"/></small>
                                 </div>
                             </div>
                         </div>

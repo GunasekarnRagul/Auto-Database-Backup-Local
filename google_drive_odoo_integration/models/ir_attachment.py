@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import logging
-from odoo import models, fields, api
+from odoo import models, fields, api, _
+from odoo.exceptions import UserError
+from markupsafe import Markup
 
 _logger = logging.getLogger(__name__)
 
@@ -8,8 +10,8 @@ class IrAttachment(models.Model):
     _inherit = 'ir.attachment'
 
     google_file_id = fields.Char('Google File ID', index=True)
-    google_drive_id = fields.Many2one('google.drive.config', string='Drive')
-    google_folder_id = fields.Many2one('google.drive.file', string='Folder', domain="[('file_type', '=', 'folder')]" )
+    google_drive_id = fields.Many2one('google.drive.config', string='Drive', compute='_compute_google_drive_id', store=True, readonly=False)
+    google_folder_id = fields.Many2one('google.drive.file', string='Folder', domain="[('file_type', '=', 'folder')]", compute='_compute_google_folder_id', store=True, readonly=False)
     model_name = fields.Selection(selection='_get_model_selection', string='Model Name', index=True, help="Technical name of the Odoo model")
     model_display = fields.Char('Model', compute='_compute_model_display', store=True)
     sync_type = fields.Selection([
@@ -18,21 +20,63 @@ class IrAttachment(models.Model):
     ], string='Sync Type', default='internal')
     google_folder_path = fields.Char('Folder Structure', compute='_compute_google_folder_path', store=True)
     auto_sync_enabled = fields.Boolean('Auto Sync Enabled', default=False)
+    storage_mode = fields.Selection([
+        ('drive', 'Drive only'),
+        ('dual', 'Dual (Drive + Odoo)'),
+        ('odoo', 'Odoo only (no sync)'),
+    ], string='Storage Mode', compute='_compute_storage_mode', store=True, readonly=False)
     is_google_synced = fields.Boolean('Google Synced', compute='_compute_is_google_synced', store=True)
     is_model_enabled_for_sync = fields.Boolean('Model Enabled for Sync', compute='_compute_is_model_enabled_for_sync', store=True)
 
-    @api.depends('google_file_id')
+    @api.depends('google_file_id', 'res_model', 'res_id')
     def _compute_google_drive_id(self):
-        """Get the drive associated with this attachment if synced."""
+        """Get the drive associated with this attachment. Fallback to model config if not synced."""
         for attachment in self:
             if attachment.google_file_id:
-                # Search for the file in google.drive.file to find its drive
                 file_record = self.env['google.drive.file'].sudo().search([
                     ('google_file_id', '=', attachment.google_file_id)
                 ], limit=1)
                 attachment.google_drive_id = file_record.drive_config_id.id if file_record else False
             else:
-                attachment.google_drive_id = False
+                # Fallback to model configuration
+                res_model = attachment.res_model
+                res_id = attachment.res_id
+                if res_model == 'mail.message' and res_id:
+                    res_model, _ = self._resolve_mail_message_parent(res_id)
+                
+                config = self.env['attachment.sync.config'].sudo().get_config_for_model(res_model)
+                attachment.google_drive_id = config.google_drive_id.id if config else False
+
+    @api.depends('google_file_id', 'res_model', 'res_id')
+    def _compute_google_folder_id(self):
+        """Get the folder associated with this attachment. Fallback to model config if not synced."""
+        for attachment in self:
+            if attachment.google_file_id:
+                file_record = self.env['google.drive.file'].sudo().search([
+                    ('google_file_id', '=', attachment.google_file_id)
+                ], limit=1)
+                attachment.google_folder_id = file_record.parent_folder_id.id if file_record else False
+            else:
+                # Fallback to model configuration
+                res_model = attachment.res_model
+                res_id = attachment.res_id
+                if res_model == 'mail.message' and res_id:
+                    res_model, _ = self._resolve_mail_message_parent(res_id)
+                
+                config = self.env['attachment.sync.config'].sudo().get_config_for_model(res_model)
+                attachment.google_folder_id = config.google_folder_id.id if config else False
+
+    @api.depends('res_model', 'res_id')
+    def _compute_storage_mode(self):
+        """Get the storage mode from model config for non-synced attachments."""
+        for attachment in self:
+            res_model = attachment.res_model
+            res_id = attachment.res_id
+            if res_model == 'mail.message' and res_id:
+                res_model, _ = self._resolve_mail_message_parent(res_id)
+            
+            config = self.env['attachment.sync.config'].sudo().get_config_for_model(res_model)
+            attachment.storage_mode = config.storage_mode if config else 'dual'
 
     @api.model
     def _get_model_selection(self):
@@ -306,7 +350,7 @@ class IrAttachment(models.Model):
 
         return self.env['ir.attachment'].browse()
 
-    def _inject_chatter_drive_button(self, drive_url, file_name=None):
+    def _inject_chatter_drive_button(self, drive_url, file_name=None, unlink_card=True):
         """Single source-of-truth for chatter Drive-button injection.
 
         After this attachment is set to type='url' (either via inheritance from
@@ -351,9 +395,12 @@ class IrAttachment(models.Model):
             if not msg.model:
                 continue
             _logger.info(f"GD_SYNC: writing body to message {msg.id}")
-            write_vals = {'attachment_ids': [(3, self.id)]}  # always unlink file card M2M
+            write_vals = {}
+            if unlink_card:
+                write_vals['attachment_ids'] = [(3, self.id)]  # unlink file card M2M
+            
             if drive_url not in (msg.body or ''):
-                write_vals['body'] = (msg.body or '') + btn_html
+                write_vals['body'] = Markup(msg.body or '') + Markup(btn_html)
             msg.with_context(
                 skip_drive_attachment_process=True,
                 skip_gdrive_sync=True,
@@ -505,6 +552,9 @@ class IrAttachment(models.Model):
         self.ensure_one()
         sync_service = self.env['google.drive.sync'].sudo()
         
+        # Determine the storage mode (fallback to config if not passed via context)
+        storage_mode = self.env.context.get('manual_storage_mode') or config.storage_mode
+        
         # Determine the target parent folder
         parent_id = config.google_folder_id.google_file_id
         if not parent_id and config.google_drive_id.root_ids:
@@ -614,7 +664,7 @@ class IrAttachment(models.Model):
                     'sync_type': 'external',
                 }
                 # Handle "Drive only" mode
-                if config.storage_mode == 'drive':
+                if storage_mode == 'drive':
                     att_vals.update({
                         'type': 'url',
                         'url': result['google_url'],
@@ -624,17 +674,19 @@ class IrAttachment(models.Model):
                 self.with_context(skip_gdrive_sync=True).write(att_vals)
 
                 # ── Step 2: Chatter Drive-button injection via helper ────────────────────
-                # Uses _inject_chatter_drive_button() — single source of truth for all
-                # Drive button HTML generation and chatter card removal.
-                if config.storage_mode == 'drive':
-                    self._inject_chatter_drive_button(result['google_url'])
+                # Inject the Google Drive link button into the chatter for both Drive and Dual modes.
+                # Only unlink the local attachment card if we are in "Drive only" mode.
+                self._inject_chatter_drive_button(
+                    result['google_url'], 
+                    unlink_card=(storage_mode == 'drive')
+                )
 
                 # ── Step 3: Ghost chatter-copy scan ─────────────────────────────────────
                 # When the DIRECT model attachment is synced (e.g. the account.move PDF),
                 # its 0-byte chatter copy (res_model='mail.message') may already exist but
                 # have no google_file_id because the Step 1 inheritance search ran BEFORE
                 # the direct attachment had a google_file_id. Fix all such ghosts now.
-                if config.storage_mode == 'drive':
+                if storage_mode == 'drive':
                     res_model_target = (
                         self.env.context.get('sync_target_model') or self.res_model
                     )
@@ -672,12 +724,16 @@ class IrAttachment(models.Model):
                 # ────────────────────────────────────────────────────────────────────────
 
                 # Update sync count on config
+                import pytz as _pytz
+                import datetime as _dt
+                _user_tz = _pytz.timezone(self.env.user.tz or 'UTC')
+                _utc_now = _dt.datetime.utcnow().replace(tzinfo=_pytz.utc)
+                ts = _utc_now.astimezone(_user_tz).strftime('%Y-%m-%d %H:%M:%S')
+                
                 config.write({
                     'sync_count': config.sync_count + 1,
-                    'last_synced': fields.Datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'last_synced': ts,
                 })
-                
-                # Register in explorer — guard against duplicates from retry/race scenarios
                 existing_drive_file = self.env['google.drive.file'].sudo().search([
                     ('google_file_id', '=', result['google_file_id']),
                     ('drive_config_id', '=', config.google_drive_id.id),
@@ -854,146 +910,107 @@ class IrAttachment(models.Model):
         return root_name, record_path
 
     def action_sync_to_drive(self):
-        """Manually sync an attachment to Google Drive."""
+        """Manually sync an attachment to Google Drive using the model's sync configuration.
+        Reuses _auto_sync_to_drive to ensure consistent hierarchical folder structures.
+        """
         self.ensure_one()
 
-        if not self.google_drive_id:
-            raise ValueError("Please select a Google Drive first")
+        # 1. Resolve the correct model for chatter attachments
+        res_model = self.res_model
+        res_id = self.res_id
+        if res_model == 'mail.message' and res_id:
+            res_model, res_id = self._resolve_mail_message_parent(res_id)
 
-        sync = self.env['google.drive.sync'].sudo()
-        import datetime as _dt
-
-        try:
-            # Determine parent folder ID
-            parent_gdrive_id = False
-            if self.google_folder_id and self.google_folder_id.google_file_id:
-                parent_gdrive_id = self.google_folder_id.google_file_id
-            elif self.google_drive_id.root_ids:
-                # Use first active root folder
-                root = self.google_drive_id.root_ids.filtered(lambda r: r.active)[:1]
-                parent_gdrive_id = root.root_id if root else False
-
-            # Determine folder path for the log
-            root_folder_name = self.google_folder_id.name if self.google_folder_id else (
-                self.google_drive_id.root_ids.filtered(lambda r: r.active)[:1].name
-                if self.google_drive_id.root_ids else False
-            )
-            # Build human-readable path: drive_name / folder / subfolder ...
-            path_parts = []
-            parent = self.google_folder_id.parent_folder_id if self.google_folder_id else False
-            ancestors = []
-            while parent:
-                ancestors.insert(0, parent.name or '')
-                parent = parent.parent_folder_id
-            if ancestors:
-                path_parts.extend(ancestors)
-            if self.google_folder_id:
-                path_parts.append(self.google_folder_id.name or '')
-            folder_path_log = ' / '.join(path_parts) if path_parts else (root_folder_name or '')
-
-            t0 = _dt.datetime.utcnow()  # capture in UTC; timezone conversion done at log time
-
-            # Upload file to Google Drive
-            result = sync.upload_file_to_drive(
-                self.name,
-                self.raw,
-                self.mimetype or 'application/octet-stream',
-                self.google_drive_id,
-                parent_gdrive_id=parent_gdrive_id
-            )
-
-            if result:
-                self.with_context(skip_gdrive_sync=True).write({
-                    'google_file_id': result['google_file_id']
-                })
-                # Also create google.drive.file record
-                existing = self.env['google.drive.file'].sudo().search([
-                    ('google_file_id', '=', result['google_file_id']),
-                    ('drive_config_id', '=', self.google_drive_id.id),
-                ], limit=1)
-                if not existing:
-                    self.env['google.drive.file'].sudo().create({
-                        'name': self.name,
-                        'drive_config_id': self.google_drive_id.id,
-                        'parent_folder_id': self.google_folder_id.id if self.google_folder_id else False,
-                        'file_type': 'file',
-                        'mime_type': self.mimetype or 'application/octet-stream',
-                        'file_size': len(self.raw) if self.raw else 0,
-                        'google_file_id': result['google_file_id'],
-                        'google_url': result['google_url'],
-                        'owner_name': self.env.user.name,
-                        'sync_state': 'synced',
-                        'last_synced': fields.Datetime.now(),
-                    })
-
-                # ── Log the manual sync to the Activity Log ──────────────────────────
-                # Convert the UTC start-time (t0) to the user's local timezone for display.
-                import pytz as _pytz
-                _user_tz = _pytz.timezone(self.env.user.tz or 'UTC')
-                _t0_utc = t0.replace(tzinfo=_pytz.utc)
-                ts = _t0_utc.astimezone(_user_tz).strftime('%Y-%m-%d %H:%M:%S')
-                _now_utc = _dt.datetime.utcnow().replace(tzinfo=_pytz.utc)
-                elapsed = (_now_utc - _t0_utc).total_seconds()
-                details = (
-                    f"Synced At: {ts}\n"
-                    f"Storage Mode: Manual Upload\n"
-                    f"Drive Folder Path: {self.google_drive_id.name} / {folder_path_log}\n"
-                    f"Drive URL: {result.get('google_url', '')}"
-                )
-                self.env['google.drive.sync.log'].log_operation(
-                    config=self.google_drive_id,
-                    file_name=self.name,
-                    operation='upload',
-                    state='success',
-                    sync_type='manual',
-                    root_folder_name=root_folder_name,
-                    folder_path=folder_path_log,
-                    google_file_id=result['google_file_id'],
-                    file_size=len(self.raw) if self.raw else 0,
-                    duration=elapsed,
-                    sync_details=details,
-                )
-
-                return {
-                    'type': 'ir.actions.client',
-                    'tag': 'display_notification',
-                    'params': {
-                        'title': 'Success',
-                        'message': f'File "{self.name}" uploaded to Google Drive successfully',
-                        'type': 'success',
-                        'sticky': False,
-                    }
-                }
-            else:
-                raise ValueError("Failed to upload file to Google Drive")
-        except Exception as e:
-            # ── Log the failure to the Activity Log ──────────────────────────────────
-            import pytz as _pytz2
-            import datetime as _dt2
-            _user_tz2 = _pytz2.timezone(self.env.user.tz or 'UTC')
-            ts = _dt2.datetime.utcnow().replace(tzinfo=_pytz2.utc).astimezone(_user_tz2).strftime('%Y-%m-%d %H:%M:%S')
-            try:
-                self.env['google.drive.sync.log'].log_operation(
-                    config=self.google_drive_id,
-                    file_name=self.name,
-                    operation='upload',
-                    state='fail',
-                    sync_type='manual',
-                    root_folder_name=(
-                        self.google_folder_id.name if self.google_folder_id else False
-                    ),
-                    error_message=f"[{ts}] Manual sync failed: {str(e)}",
-                )
-            except Exception:
-                pass  # Never let logging break the user-facing notification
-
+        # 2. Find the sync configuration for this model
+        config = self.env['attachment.sync.config'].sudo().get_config_for_model(res_model)
+        
+        if config:
+            # ── Case A: Model has a configuration ──
+            # Reuse the robust auto-sync function. 
+            # We override the storage_mode from the attachment if manually set.
+            self.with_context(
+                sync_type='manual',
+                sync_target_model=res_model,
+                sync_target_id=res_id,
+                manual_storage_mode=self.storage_mode
+            )._auto_sync_to_drive(config)
+            
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
-                    'title': 'Error',
-                    'message': f'Failed to upload: {str(e)}',
-                    'type': 'danger',
-                    'sticky': True,
+                    'title': _('Success'),
+                    'message': _('File "%s" uploaded to Google Drive using the %s configuration.') % (self.name, config.name),
+                    'type': 'success',
+                    'sticky': False,
+                    'next': {'type': 'ir.actions.client', 'tag': 'reload'},
                 }
             }
+        else:
+            # ── Case B: No model configuration (Standalone upload) ──
+            # Fallback to simple upload using the Drive/Folder manually selected on the attachment.
+            if not self.google_drive_id:
+                active_drives = self.env['google.drive.config'].sudo().search([('active', '=', True)], limit=1)
+                if active_drives:
+                    self.google_drive_id = active_drives.id
+                else:
+                    raise UserError(_("Please select a Google Drive first or ensure at least one Google Drive is configured and active."))
+
+            sync = self.env['google.drive.sync'].sudo()
+            import datetime as _dt
+            import base64
+
+            try:
+                # Determine parent folder ID
+                parent_gdrive_id = False
+                if self.google_folder_id and self.google_folder_id.google_file_id:
+                    parent_gdrive_id = self.google_folder_id.google_file_id
+                elif self.google_drive_id.root_ids:
+                    root = self.google_drive_id.root_ids.filtered(lambda r: r.active)[:1]
+                    parent_gdrive_id = root.root_id if root else False
+
+                file_content = base64.b64decode(self.datas) if self.datas else self.raw
+                if not file_content:
+                    raise UserError(_("This attachment has no file content to upload."))
+
+                result = sync.upload_file_to_drive(
+                    self.name,
+                    file_content,
+                    self.mimetype or 'application/octet-stream',
+                    self.google_drive_id,
+                    parent_gdrive_id=parent_gdrive_id
+                )
+
+                if result:
+                    self.with_context(skip_gdrive_sync=True).write({
+                        'google_file_id': result['google_file_id'],
+                        'google_drive_id': self.google_drive_id.id,
+                        'google_folder_id': self.google_folder_id.id,
+                    })
+                    
+                    # Log as manual upload
+                    self.env['google.drive.sync.log'].log_operation(
+                        config=self.google_drive_id,
+                        file_name=self.name,
+                        operation='upload',
+                        state='success',
+                        sync_type='manual',
+                        google_file_id=result['google_file_id'],
+                        file_size=len(file_content),
+                        sync_details=f"Manual Standalone Upload\nDrive URL: {result.get('google_url', '')}"
+                    )
+
+                    return {
+                        'type': 'ir.actions.client',
+                        'tag': 'display_notification',
+                        'params': {
+                            'title': _('Success'),
+                            'message': _('File "%s" uploaded to Google Drive successfully.') % self.name,
+                            'type': 'success',
+                            'sticky': False,
+                        }
+                    }
+                else:
+                    raise UserError(_("Failed to upload file to Google Drive."))
+            except Exception as e:
+                raise UserError(_("Error during upload: %s") % str(e))

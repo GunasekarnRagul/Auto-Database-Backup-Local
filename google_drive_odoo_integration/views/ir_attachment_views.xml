@@ -46,26 +46,19 @@
                             <field name="google_drive_id" string="Google Drive"/>
                             <field name="google_folder_id" string="Folder" domain="[('file_type', '=', 'folder'), ('drive_config_id', '=', google_drive_id)]"/>
                             <field name="google_folder_path" string="Folder Structure" readonly="1"/>
+                            <field name="storage_mode" widget="radio" string="Select Storage Mode" options="{'horizontal': true}"/>
                         </group>
                         <group>
-                            <field name="google_file_id" string="Google File ID"/>
-                            <field name="is_google_synced" string="Synced with Drive" widget="boolean"/>
-                            <field name="sync_type" string="Sync Type"/>
-                            <field name="auto_sync_enabled" string="Auto Sync Enabled"/>
-                            <field name="is_model_enabled_for_sync" string="Model Sync Enabled" readonly="1"/>
+                            <field name="google_file_id" string="Google File ID" readonly="1"/>
+                            <div class="mt-2" colspan="2">
+                                <button name="action_sync_to_drive" type="object" string="⬆ Upload to Google Drive" 
+                                        class="btn btn-primary w-100" icon="fa-cloud-upload"
+                                        invisible="google_file_id"/>
+                            </div>
                         </group>
                     </group>
 
-                    <separator string="Upload to Google Drive"/>
-                    <group>
-                        <group>
-                            <button name="action_sync_to_drive" type="object" string="⬆ Upload to Google Drive" class="btn btn-primary" icon="fa-cloud-upload"/>
-                            <button name="action_toggle_auto_sync" type="object" string="Toggle Auto-Sync" class="btn btn-secondary" icon="fa-refresh"/>
-                        </group>
-                        <group>
-                            <div class="o_form_label">Use the buttons above to upload this attachment or enable auto-sync for this record.</div>
-                        </group>
-                    </group>
+
                 </sheet>
             </form>
         </field>
