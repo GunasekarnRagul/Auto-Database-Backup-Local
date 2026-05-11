@@ -1334,6 +1334,7 @@ export class GoogleDriveDashboard extends Component {
 
     async resetLayout() {
         this.state.activeWidgets = [...DEFAULT_WIDGETS];
+        this.state.showAddPanel = false;
         await this._saveLayout();
         this._renderAllWidgets();
     }
