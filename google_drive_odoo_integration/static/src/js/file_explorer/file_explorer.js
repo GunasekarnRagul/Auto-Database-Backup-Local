@@ -69,7 +69,7 @@ export class FileExplorer extends Component {
             renameValue: '',
             // Search filters
             searchMode: false,
-            sidebarCollapsed: false,
+            sidebarCollapsed: localStorage.getItem('gd_sidebar_collapsed') === 'true',
             searchFilterDrive: null,
             searchRoots: [],
             searchFilterType: '',
@@ -842,6 +842,7 @@ export class FileExplorer extends Component {
 
     toggleSidebar() {
         this.state.sidebarCollapsed = !this.state.sidebarCollapsed;
+        localStorage.setItem('gd_sidebar_collapsed', this.state.sidebarCollapsed);
     }
 
     _sectionLabel(section) {
