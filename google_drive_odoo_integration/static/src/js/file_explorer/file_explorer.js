@@ -100,6 +100,7 @@ export class FileExplorer extends Component {
             clipboard: {
                 items: [],
                 sourceDriveId: null,
+                sourceRootId: null,
                 sourceParentId: null,
             },
 
@@ -1131,6 +1132,7 @@ export class FileExplorer extends Component {
         this.state.clipboard = {
             items: items,
             sourceDriveId: this.state.activeDriveId,
+            sourceRootId: this.state.activeRootId,
             sourceParentId: this.state.currentFolderId,
         };
 
@@ -1166,22 +1168,28 @@ export class FileExplorer extends Component {
             if (success) {
                 this.notificationService.add("Items moved successfully.", { type: "success" });
                 
-                // Save sourceParent before resetting clipboard
+                // Save clipboard data before resetting
                 const savedSourceParent = this.state.clipboard.sourceParentId;
+                const savedSourceRoot = this.state.clipboard.sourceRootId;
+                const targetParent = this.state.currentFolderId;
+                const targetRoot = this.state.activeRootId;
                 
-                this.state.clipboard = { items: [], sourceDriveId: null, sourceParentId: null };
+                this.state.clipboard = { items: [], sourceDriveId: null, sourceParentId: null, sourceRootId: null };
                 
-                // Refresh view
-                await this.loadFiles(this.state.currentFolderId);
+                // Refresh current file list view
+                await this.loadFiles(targetParent);
                 
-                // Refresh folder tree for both source and target
-                if (this.state.activeRootId) {
-                    const targetParent = this.state.currentFolderId;
-                    
-                    // Refresh source
-                    await this._refreshTreeForParent(savedSourceParent);
-                    // Refresh target and expand it
-                    await this._refreshTreeForParent(targetParent, true);
+                // Always refresh the target parent in the tree (where item landed)
+                await this._refreshTreeForParent(targetParent, true, targetRoot);
+
+                if (savedSourceRoot && savedSourceRoot !== targetRoot) {
+                    // Cross-root move: refresh the source root's parent node with the correct rootId
+                    await this._refreshTreeForParent(savedSourceParent, false, savedSourceRoot);
+                    // Also refresh the root-level entry for the source root
+                    await this._loadTreeChildren(`root_${savedSourceRoot}`, savedSourceRoot);
+                } else {
+                    // Same-root move: refresh the source parent so the item disappears from there
+                    await this._refreshTreeForParent(savedSourceParent, false, targetRoot);
                 }
             } else {
                 this.notificationService.add("Move failed. Please check folder permissions.", { type: "danger" });
@@ -1195,7 +1203,7 @@ export class FileExplorer extends Component {
     }
 
     clearClipboard() {
-        this.state.clipboard = { items: [], sourceDriveId: null, sourceParentId: null };
+        this.state.clipboard = { items: [], sourceDriveId: null, sourceParentId: null, sourceRootId: null };
         this.notificationService.add("Cut operation cancelled.", { type: "info" });
     }
 
@@ -1269,8 +1277,10 @@ export class FileExplorer extends Component {
         }
     }
 
-    async _loadTreeChildren(parentId) {
-        if (!this.state.activeRootId && String(parentId).startsWith("root_")) return;
+    async _loadTreeChildren(parentId, rootId = null) {
+        // Use the provided rootId, or fall back to the active one
+        const resolvedRootId = rootId !== null ? rootId : this.state.activeRootId;
+        if (!resolvedRootId && String(parentId).startsWith("root_")) return;
 
         try {
             const domain = [
@@ -1279,13 +1289,13 @@ export class FileExplorer extends Component {
                 ["active", "=", true]
             ];
 
-            if (this.state.activeRootId) {
-                domain.push(["root_folder_id", "=", this.state.activeRootId]);
+            if (resolvedRootId) {
+                domain.push(["root_folder_id", "=", resolvedRootId]);
             }
 
             let cacheKey = parentId;
             if (String(parentId).startsWith("root_") || parentId === false || parentId === null) {
-                cacheKey = `root_${this.state.activeRootId}`;
+                cacheKey = `root_${resolvedRootId}`;
                 domain.push(["parent_folder_id", "=", false]);
             } else {
                 domain.push(["parent_folder_id", "=", parentId]);
@@ -1307,13 +1317,14 @@ export class FileExplorer extends Component {
         }
     }
 
-    async _refreshTreeForParent(parentId, expand = false) {
+    async _refreshTreeForParent(parentId, expand = false, rootId = null) {
+        const resolvedRootId = rootId !== null ? rootId : this.state.activeRootId;
         const id = (parentId === false || parentId === null || parentId === undefined) 
-            ? `root_${this.state.activeRootId}` 
+            ? `root_${resolvedRootId}` 
             : parentId;
             
         // Always refresh the cache for this parent
-        await this._loadTreeChildren(id);
+        await this._loadTreeChildren(id, resolvedRootId);
         
         // If expansion requested and it's a folder (not root string), expand it
         if (expand && !String(id).startsWith("root_")) {
@@ -1335,21 +1346,22 @@ export class FileExplorer extends Component {
     }
 
     async onTreeFolderClick(folderId, folderName) {
-        const isAlreadySelected = this.state.activeFolderTreeId === folderId &&
-            this.state.activeSection === 'my_drive';
-
         this.state.activeSection = 'my_drive';
 
-        if (isAlreadySelected) {
+        // Set active state immediately so the UI feels responsive
+        this.state.activeFolderTreeId = folderId;
+        this.state.currentFolderName = folderName;
+
+        // Always expand the node when clicked (never collapse on click — use the arrow toggle for that)
+        if (!this.isTreeNodeExpanded(folderId)) {
             await this.toggleFolderTree(folderId);
-        } else {
-            if (!this.isTreeNodeExpanded(folderId)) {
-                await this.toggleFolderTree(folderId);
-            }
         }
 
-        await this._updateNavigationState(folderId, folderName);
-        await this.loadFiles(folderId);
+        // Load files and update breadcrumbs in parallel
+        await Promise.all([
+            this._updateNavigationState(folderId, folderName),
+            this.loadFiles(folderId),
+        ]);
     }
 
     async _updateNavigationState(folderId, folderName) {

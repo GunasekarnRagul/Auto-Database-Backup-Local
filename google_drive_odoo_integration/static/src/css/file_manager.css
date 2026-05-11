@@ -1765,18 +1765,22 @@ img.gd_drive_icon {
     margin: 2px 0 4px;
 }
 
+.gd_tree_node_wrap {
+    user-select: none;
+}
+
 .gd_tree_node {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 6px 12px;
-    margin: 2px 10px;
+    gap: 6px;
+    padding: 5px 10px 5px 8px;
+    margin: 1px 6px;
     cursor: pointer;
     border-radius: 8px;
     color: #5f6368;
     font-size: 0.85rem;
     font-weight: 500;
-    transition: all 0.2s ease;
+    transition: background 0.15s ease, color 0.15s ease;
     user-select: none;
     white-space: nowrap;
     overflow: hidden;
@@ -1784,41 +1788,52 @@ img.gd_drive_icon {
 }
 
 .gd_tree_node:hover {
-    background: rgba(60, 64, 67, 0.04);
+    background: rgba(60, 64, 67, 0.06);
     color: #202124;
 }
 
+.gd_tree_node:active {
+    background: rgba(26, 115, 232, 0.12);
+}
+
 .gd_tree_node.gd_tree_active {
-    background: rgba(26, 115, 232, 0.08);
+    background: rgba(26, 115, 232, 0.1);
     color: #1a73e8;
     font-weight: 600;
 }
 
+.gd_tree_node.gd_tree_active:hover {
+    background: rgba(26, 115, 232, 0.14);
+}
+
 .gd_tree_toggle {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     color: #80868b;
     border-radius: 4px;
-    transition: color 0.15s, background 0.15s;
+    transition: color 0.12s, background 0.12s;
+    z-index: 1;
 }
 
 .gd_tree_toggle:hover {
-    background: rgba(0, 0, 0, 0.08);
+    background: rgba(0, 0, 0, 0.1);
     color: #202124;
 }
 
 .gd_tree_toggle .fa {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    pointer-events: none;
 }
 
 .gd_tree_icon {
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
     flex-shrink: 0;
+    opacity: 0.85;
 }
 
 .gd_tree_name {
@@ -1826,7 +1841,7 @@ img.gd_drive_icon {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    cursor: pointer;
+    pointer-events: none;
 }
 
 .gd_row_open_link,

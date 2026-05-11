@@ -253,12 +253,19 @@ class GoogleDriveFile(models.Model):
             target_root = self.env['google.drive.root.folder'].browse(target_root_id)
             new_parent_gdrive_id = target_root.root_id
             
-        if not new_parent_gdrive_id:
-            return False
-            
         sync_service = self.env['google.drive.sync'].sudo()
-        
+            
         for item in items:
+            if not item.google_file_id or not new_parent_gdrive_id:
+                # If either the item or the target parent is pending,
+                # move it locally and keep its sync state as pending.
+                item.write({
+                    'parent_folder_id': target_parent_id,
+                    'root_folder_id': target_root_id if not target_parent_id else False,
+                    'sync_state': 'pending',
+                })
+                continue
+
             # Get current GDrive parent ID
             old_parent_gdrive_id = self._resolve_parent_gdrive_id(
                 parent_folder_id=item.parent_folder_id.id,
