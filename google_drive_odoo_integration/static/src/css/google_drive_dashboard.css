@@ -248,33 +248,42 @@
 }
 
 .gd-btn--folder {
-    border-color: #c2e7ff;
-    color: #1a73e8;
+    background: transparent;
+    border-color: #EBD157;
+    color: #7a6200;
 }
 
 .gd-btn--folder:hover {
-    background: #e8f0fe;
-    border-color: #1a73e8;
+    background: #fdf6c3;
+    border-color: #c9ad30;
+    color: #5a4500;
+    box-shadow: 0 1px 3px rgba(235, 209, 87, 0.25);
 }
 
 .gd-btn--attachments {
-    border-color: #ceead6;
-    color: #137333;
+    background: transparent;
+    border-color: #71639E;
+    color: #71639E;
 }
 
 .gd-btn--attachments:hover {
-    background: #e6f4ea;
-    border-color: #137333;
+    background: #f0edf8;
+    border-color: #5c5080;
+    color: #5c5080;
+    box-shadow: 0 1px 3px rgba(113, 99, 158, 0.15);
 }
 
 .gd-btn--logs {
-    border-color: #fad2cf;
-    color: #d93025;
+    background: transparent;
+    border-color: #010409;
+    color: #010409;
 }
 
 .gd-btn--logs:hover {
-    background: #fce8e6;
-    border-color: #d93025;
+    background: #ecedef;
+    border-color: #1a1f2e;
+    color: #1a1f2e;
+    box-shadow: 0 1px 3px rgba(1, 4, 9, 0.12);
 }
 
 .gd-btn--outline {
