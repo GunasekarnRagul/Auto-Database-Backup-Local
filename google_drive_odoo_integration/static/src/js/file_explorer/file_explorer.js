@@ -2458,8 +2458,10 @@ export class ShareDriveLinkDialog extends Component {
     // ─── Contact Picker ───
 
     async toggleContactPicker() {
-        this.state.showContactPicker = !this.state.showContactPicker;
+        // Close all OTHER share menus first, then toggle the picker
+        const nextState = !this.state.showContactPicker;
         this.closeAllShareMenus();
+        this.state.showContactPicker = nextState;
         if (this.state.showContactPicker && this.state.contactSearchResults.length === 0) {
             await this.searchContacts('');
         }
@@ -2710,7 +2712,8 @@ export class ShareDriveLinkDialog extends Component {
     closeAllShareMenus() {
         this.state.showGeneralAccessDropdown = false;
         this.state.showAnyoneRoleDropdown = false;
-        this.state.showContactPicker = false;
+        // Note: showContactPicker is intentionally NOT closed here.
+        // It is toggled independently by toggleContactPicker().
         this.state.activePermRoleDropdown = null;
     }
 

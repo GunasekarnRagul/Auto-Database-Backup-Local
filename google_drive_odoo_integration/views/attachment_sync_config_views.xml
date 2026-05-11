@@ -36,12 +36,7 @@
                                     </div>
                                 </div>
                                 
-                                <div class="d-flex align-items-center flex-shrink-0" style="padding-right: 15px;">
-                                    <!-- Toggle Button -->
-                                    <div title="Auto Sync Mode">
-                                        <field name="auto_sync_mode" widget="boolean_toggle"/>
-                                    </div>
-                                </div>
+
                                 
                                 <!-- 3-dot dropdown menu -->
                                 <div class="o_cloud_card_menu o_dropdown_kanban dropdown" style="position: absolute; top: 12px; right: 6px;">
@@ -104,9 +99,14 @@
                                          t-att-aria-valuenow="record.sync_percentage.raw_value" 
                                          aria-valuemin="0" aria-valuemax="100"/>
                                 </div>
-                                <div class="mt-2 text-muted d-flex justify-content-between" style="font-size: 9px;">
-                                    <span><i class="fa fa-history me-1"/> <field name="last_synced"/></span>
+                                <div class="mt-2 d-flex justify-content-between align-items-center" style="font-size: 9px;">
+                                    <span class="text-muted"><i class="fa fa-history me-1"/> <field name="last_synced"/></span>
                                     <span class="fw-bold"><i class="fa fa-check text-success" t-if="record.sync_percentage.raw_value == 100"/></span>
+                                </div>
+                                <!-- Auto Sync Toggle — bottom right -->
+                                <div class="d-flex justify-content-end align-items-center mt-2 pt-2 border-top">
+                                    <span class="text-muted me-2" style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px;">Auto Sync</span>
+                                    <field name="auto_sync_mode" widget="boolean_toggle"/>
                                 </div>
                             </div>
                         </div>

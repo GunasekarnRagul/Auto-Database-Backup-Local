@@ -977,7 +977,7 @@
                                         t-on-input="onEmailInput"
                                         t-on-keydown="onEmailKeydown"
                                         t-att-disabled="state.addingPerson"/>
-                                 <button class="gd_share_contact_btn" t-on-click="toggleContactPicker" title="Pick from Odoo Contacts">
+                                 <button class="gd_share_contact_btn" t-on-click.stop="toggleContactPicker" title="Pick from Odoo Contacts">
                                      <i class="fa fa-address-book-o"/>
                                  </button>
                                  
