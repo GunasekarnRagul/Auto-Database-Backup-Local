@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
+from odoo.exceptions import UserError
 from datetime import datetime
 
 class AttachmentSyncConfig(models.Model):
@@ -235,7 +236,11 @@ class AttachmentSyncConfig(models.Model):
                 # Single fetch — all subsequent stats filter this in-memory recordset
                 all_attachments = record._get_target_attachments()
                 # Exclude ghosts: purely web links with no ID, or any attachment missing physical data
-                all_attachments = all_attachments.filtered(lambda a: a.google_file_id or a.datas or a.raw)
+                # Also exclude url-type records with no binary data and no google_file_id — these
+                # are broken ghost links, not real pending syncs.
+                all_attachments = all_attachments.filtered(
+                    lambda a: a.google_file_id or (a.datas or a.raw) and a.type != 'url'
+                )
 
                 # Apply the specific file-type filter (so XMLs don't get counted when configured for PDFs)
                 if record.file_type != 'all':
@@ -400,29 +405,39 @@ class AttachmentSyncConfig(models.Model):
         """Manually sync all unsynced attachments for this model and show notification."""
         self.ensure_one()
 
-        # 1. Block sync when storage mode is 'odoo only'
+        # 1. Validate that required configuration fields are set
+        if not self.storage_mode:
+            raise UserError(
+                "⚠️ Please select a Storage Mode (Drive only, Dual, or Odoo only) "
+                "before running the sync."
+            )
+
+        if not self.google_drive_id:
+            raise UserError(
+                "⚠️ No Google Drive selected. Please choose a Google Drive account "
+                "in Step 2 before syncing."
+            )
+
+        if not self.google_folder_id:
+            raise UserError(
+                "⚠️ No destination folder selected. Please choose a folder in Step 3 "
+                "before syncing."
+            )
+
+        # 2. Block sync when storage mode is 'Odoo Only'
         if self.storage_mode == 'odoo':
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
-                    'title': 'Sync Skipped',
-                    'message': 'Storage Mode is set to "Odoo Only". Change the Storage Mode to Drive or Dual to sync.',
-                    'type': 'info',
-                    'sticky': False,
-                }
-            }
-
-        # 2. Validate storage mode is selected
-        if not self.storage_mode:
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Sync Skipped',
-                    'message': 'Please select a valid Storage Mode (Drive or Dual) before syncing.',
+                    'title': '🗄️ Sync Skipped — Odoo Only Mode',
+                    'message': (
+                        'Storage Mode is set to "Odoo Only". '
+                        'No files will be uploaded to Google Drive. '
+                        'Change the Storage Mode to "Drive only" or "Dual" to enable sync.'
+                    ),
                     'type': 'warning',
-                    'sticky': False,
+                    'sticky': True,
                 }
             }
 
@@ -432,40 +447,60 @@ class AttachmentSyncConfig(models.Model):
         attachments = attachments.filtered(lambda a: a.datas or a.raw)
 
         # Apply the SAME file-type filter that auto-sync uses (_matches_file_type_filter).
-        # Previously used inconsistent MIME ilike domain queries that didn't match
-        # the auto-sync logic, causing the same file to sync via one path but not the other.
         if self.file_type != 'all':
             ir_att = self.env['ir.attachment']
             attachments = attachments.filtered(
                 lambda att: ir_att._matches_file_type_filter(att, self)
             )
 
+        if not attachments:
+            model_label = self.module_config_id.model_label or self.model_name
+            mode_label = dict(self._fields['storage_mode'].selection).get(
+                self.storage_mode, self.storage_mode
+            )
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': '✅ Nothing to Sync',
+                    'message': (
+                        f'All {model_label} files are already synced to Google Drive.\n'
+                        f'Storage Mode: {mode_label} | Drive: {self.google_drive_id.name}'
+                    ),
+                    'type': 'info',
+                    'sticky': False,
+                }
+            }
+
         synced_count = 0
         failed_count = 0
-        if attachments:
-            for attachment in attachments:
-                # Use a savepoint per file: a failure on one file
-                # rolls back ONLY that file's changes, not all previously synced files.
-                try:
-                    with self.env.cr.savepoint():
-                        attachment.with_context(sync_type='manual')._auto_sync_to_drive(self)
-                        synced_count += 1
-                except Exception:
-                    failed_count += 1
-                    continue
+        for attachment in attachments:
+            # Use a savepoint per file: a failure on one file
+            # rolls back ONLY that file's changes, not all previously synced files.
+            try:
+                with self.env.cr.savepoint():
+                    attachment.with_context(sync_type='manual')._auto_sync_to_drive(self)
+                    synced_count += 1
+            except Exception:
+                failed_count += 1
+                continue
 
-        # 4. Notification
+        # 4. Result notification
         model_label = self.module_config_id.model_label or self.model_name
+        mode_label = dict(self._fields['storage_mode'].selection).get(
+            self.storage_mode, self.storage_mode
+        )
         if synced_count > 0:
-            message = f"Synchronization complete! {synced_count} {model_label} file(s) moved to Google Drive."
+            message = (
+                f"✅ Synchronization complete!\n"
+                f"{synced_count} {model_label} file(s) synced to Google Drive.\n"
+                f"Storage Mode: {mode_label} | Drive: {self.google_drive_id.name}"
+            )
             if failed_count:
-                message += f" ({failed_count} file(s) failed — check sync logs.)"
+                message += f"\n⚠️ {failed_count} file(s) failed — check Activity Logs."
             notif_type = 'success'
-        elif not attachments:
-            message = f"No unsynced {model_label} files found for this configuration."
-            notif_type = 'info'
         else:
-            message = f"All {failed_count} file(s) failed to sync. Please check the sync logs."
+            message = f"❌ All {failed_count} file(s) failed to sync. Please check the Activity Logs."
             notif_type = 'warning'
 
         return {

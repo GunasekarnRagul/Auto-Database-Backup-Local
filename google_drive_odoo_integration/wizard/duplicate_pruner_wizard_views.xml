@@ -27,7 +27,6 @@
                             <field name="display_path"/>
                             <field name="file_size" string="Size (KB)"/>
                             <field name="create_date" string="Date"/>
-                            <button name="action_view_in_explorer" string="View" type="object" class="btn-secondary btn-sm" icon="fa-folder-open"/>
                         </tree>
                     </field>
                 </sheet>

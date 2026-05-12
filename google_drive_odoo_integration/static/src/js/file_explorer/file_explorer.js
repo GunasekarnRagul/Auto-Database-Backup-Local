@@ -425,7 +425,9 @@ export class FileExplorer extends Component {
                 }
             } else {
                 // Default: My Drive or specific folder
-                if (this.state.isDriveOverview) {
+                // If a specific folderId was requested (e.g. from a deep-link), always
+                // load that folder's contents regardless of isDriveOverview mode.
+                if (this.state.isDriveOverview && !folderId) {
                     this.state.loading = false;
                     this.state.allFiles = [];
                     this.state.files = [];

@@ -424,7 +424,7 @@ class IrAttachment(models.Model):
             return res
 
         # Catch attachments that get their data late (e.g. generated report PDFs)
-        trigger_fields = {'res_model', 'res_id', 'datas', 'raw', 'db_datas', 'store_fname'}
+        trigger_fields = {'res_model', 'res_id', 'datas', 'raw', 'db_datas', 'store_fname', 'type'}
         if any(f in vals for f in trigger_fields):
             for attachment in self:
                 if attachment.google_file_id:
@@ -663,13 +663,14 @@ class IrAttachment(models.Model):
                     'google_folder_id': config.google_folder_id.id,
                     'sync_type': 'external',
                 }
-                # Handle "Drive only" mode
+                # Handle "Drive only" mode — fully purge binary from Odoo storage
                 if storage_mode == 'drive':
                     att_vals.update({
                         'type': 'url',
                         'url': result['google_url'],
-                        'datas': False,  # Remove local binary
+                        'datas': False,      # Clears db_datas (DB blob)
                         'db_datas': False,
+                        'store_fname': False,  # Removes filestore path so disk file is GC'd
                     })
                 self.with_context(skip_gdrive_sync=True).write(att_vals)
 

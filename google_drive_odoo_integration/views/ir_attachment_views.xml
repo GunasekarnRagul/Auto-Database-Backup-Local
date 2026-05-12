@@ -40,23 +40,7 @@
                         </group>
                     </group>
 
-                    <separator string="Google Drive Integration"/>
-                    <group>
-                        <group>
-                            <field name="google_drive_id" string="Google Drive"/>
-                            <field name="google_folder_id" string="Folder" domain="[('file_type', '=', 'folder'), ('drive_config_id', '=', google_drive_id)]"/>
-                            <field name="google_folder_path" string="Folder Structure" readonly="1"/>
-                            <field name="storage_mode" widget="radio" string="Select Storage Mode" options="{'horizontal': true}"/>
-                        </group>
-                        <group>
-                            <field name="google_file_id" string="Google File ID" readonly="1"/>
-                            <div class="mt-2" colspan="2">
-                                <button name="action_sync_to_drive" type="object" string="⬆ Upload to Google Drive" 
-                                        class="btn btn-primary w-100" icon="fa-cloud-upload"
-                                        invisible="google_file_id"/>
-                            </div>
-                        </group>
-                    </group>
+
 
 
                 </sheet>

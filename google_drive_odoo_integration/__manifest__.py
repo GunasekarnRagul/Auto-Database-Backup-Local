@@ -49,6 +49,7 @@
             'google_drive_odoo_integration/static/src/js/file_explorer/trash_restricted_dialog.js',
             'google_drive_odoo_integration/static/src/js/sync_log_terminal.js',
             'google_drive_odoo_integration/static/src/js/dashboard/google_drive_dashboard.js',
+            'google_drive_odoo_integration/static/src/js/attachment_upload_button.js',
             # Module XML templates
             'google_drive_odoo_integration/static/src/xml/file_explorer.xml',
             'google_drive_odoo_integration/static/src/xml/trash_restricted_dialog.xml',

@@ -79,9 +79,11 @@ class DuplicatePrunerWizardLine(models.TransientModel):
             url += f"&gd_root_id={self.root_folder_id.id}"
         if self.parent_folder_id:
             url += f"&gd_parent_id={self.parent_folder_id.id}"
+        if self.file_id:
+            url += f"&gd_file_id={self.file_id.id}"
             
         return {
             'type': 'ir.actions.act_url',
             'url': url,
-            'target': 'new',
+            'target': 'self',
         }
