@@ -19,4 +19,7 @@
 
     <!-- 3.3 Logs -->
     <menuitem id="google_drive_menu_config_logs" name="Activity Log" parent="google_drive_menu_configuration" action="action_google_drive_sync_log_terminal" sequence="3"/>
+
+    <!-- 4. Documentation -->
+    <menuitem id="google_drive_menu_documentation" name="Documentation" parent="google_drive_menu_root" action="action_google_drive_documentation" sequence="4"/>
 </odoo>

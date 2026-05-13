@@ -27,6 +27,7 @@
         'views/ir_attachment_views.xml',
         'views/client_action_views.xml',
         'views/google_drive_sync_log_views.xml',
+        'views/google_drive_documentation_views.xml',
         'views/menu.xml',
     ],
     'installable': True,
@@ -43,6 +44,7 @@
             'google_drive_odoo_integration/static/src/css/file_manager.css',
             'google_drive_odoo_integration/static/src/css/sync_log_terminal.css',
             'google_drive_odoo_integration/static/src/css/google_drive_dashboard.css',
+            'google_drive_odoo_integration/static/src/css/google_drive_documentation.css',
             # Module JS
             'google_drive_odoo_integration/static/src/js/file_explorer/file_explorer.js',
             'google_drive_odoo_integration/static/src/js/google_drive_config_form.js',
@@ -50,11 +52,13 @@
             'google_drive_odoo_integration/static/src/js/sync_log_terminal.js',
             'google_drive_odoo_integration/static/src/js/dashboard/google_drive_dashboard.js',
             'google_drive_odoo_integration/static/src/js/attachment_upload_button.js',
+            'google_drive_odoo_integration/static/src/js/documentation/google_drive_documentation.js',
             # Module XML templates
             'google_drive_odoo_integration/static/src/xml/file_explorer.xml',
             'google_drive_odoo_integration/static/src/xml/trash_restricted_dialog.xml',
             'google_drive_odoo_integration/static/src/xml/sync_log_terminal.xml',
             'google_drive_odoo_integration/static/src/xml/google_drive_dashboard.xml',
+            'google_drive_odoo_integration/static/src/xml/google_drive_documentation.xml',
         ],
     },
 }
