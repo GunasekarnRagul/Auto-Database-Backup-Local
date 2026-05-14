@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Google Drive Model Configurations -->
+    <record id="gdrive_config_crm_lead" model="gdrive.model.config">
+        <field name="res_model">crm.lead</field>
+        <field name="model_label">CRM - Leads</field>
+        <field name="is_enabled">True</field>
+        <field name="drive_root_folder_name">CRM</field>
+    </record>
+
+    <record id="gdrive_config_sale_order" model="gdrive.model.config">
+        <field name="res_model">sale.order</field>
+        <field name="model_label">Sales - Orders</field>
+        <field name="is_enabled">True</field>
+        <field name="drive_root_folder_name">Sales</field>
+    </record>
+
+    <record id="gdrive_config_account_move" model="gdrive.model.config">
+        <field name="res_model">account.move</field>
+        <field name="model_label">Accounting - Invoices</field>
+        <field name="is_enabled">True</field>
+        <field name="drive_root_folder_name">Accounting</field>
+    </record>
+
+    <record id="gdrive_config_purchase_order" model="gdrive.model.config">
+        <field name="res_model">purchase.order</field>
+        <field name="model_label">Purchase - Orders</field>
+        <field name="is_enabled">True</field>
+        <field name="drive_root_folder_name">Purchase</field>
+    </record>
+
+    <record id="gdrive_config_hr_employee" model="gdrive.model.config">
+        <field name="res_model">hr.employee</field>
+        <field name="model_label">HR - Employees</field>
+        <field name="is_enabled">True</field>
+        <field name="drive_root_folder_name">HR</field>
+    </record>
+
+    <record id="gdrive_config_project_task" model="gdrive.model.config">
+        <field name="res_model">project.task</field>
+        <field name="model_label">Project - Tasks</field>
+        <field name="is_enabled">True</field>
+        <field name="drive_root_folder_name">Project</field>
+    </record>
+
+    <record id="gdrive_config_stock_picking" model="gdrive.model.config">
+        <field name="res_model">stock.picking</field>
+        <field name="model_label">Inventory - Transfers</field>
+        <field name="is_enabled">True</field>
+        <field name="drive_root_folder_name">Inventory</field>
+    </record>
+
+    <record id="gdrive_config_helpdesk_ticket" model="gdrive.model.config">
+        <field name="res_model">helpdesk.ticket</field>
+        <field name="model_label">Helpdesk - Tickets</field>
+        <field name="is_enabled">True</field>
+        <field name="drive_root_folder_name">Helpdesk</field>
+    </record>
+</odoo>

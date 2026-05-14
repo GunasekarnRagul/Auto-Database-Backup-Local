@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_google_drive_documentation" model="ir.actions.client">
+        <field name="name">Documentation</field>
+        <field name="tag">google_drive_odoo_integration.documentation</field>
+    </record>
+</odoo>

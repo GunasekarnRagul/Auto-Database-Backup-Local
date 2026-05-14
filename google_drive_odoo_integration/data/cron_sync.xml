@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="ir_cron_google_drive_sync" model="ir.cron">
+        <field name="name">Google Drive: Backward Sync</field>
+        <field name="model_id" ref="google_drive_odoo_integration.model_google_drive_sync"/>
+        <field name="state">code</field>
+        <field name="code">model.with_context(sync_type='cron').fetch_and_sync_files()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+    </record>
+</odoo>

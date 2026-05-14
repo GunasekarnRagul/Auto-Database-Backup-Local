@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <record id="action_chat_ai_main" model="ir.actions.client">
-        <field name="name">Chat AI</field>
-        <field name="tag">ChatAIComponent</field>
-        <field name="target">main</field>
-    </record>
-</odoo>
