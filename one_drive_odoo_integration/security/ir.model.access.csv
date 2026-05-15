@@ -1,0 +1,11 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_one_drive_config,one.drive.config,model_one_drive_config,base.group_system,1,1,1,1
+access_one_drive_file,one.drive.file,model_one_drive_file,base.group_system,1,1,1,1
+access_one_drive_root_folder,one.drive.root.folder,model_one_drive_root_folder,base.group_system,1,1,1,1
+access_one_drive_model_config,one_drive.model.config,model_one_drive_model_config,base.group_system,1,1,1,1
+access_attachment_sync_config,attachment.sync.config,model_attachment_sync_config,base.group_system,1,1,1,1
+access_one_drive_sync_log,one.drive.sync.log,model_one_drive_sync_log,base.group_system,1,1,1,1
+access_one_drive_file_delete_wizard,access_one_drive_file_delete_wizard,model_one_drive_file_delete_wizard,base.group_user,1,1,1,1
+access_one_drive_dashboard_layout,one_drive.dashboard.layout,model_one_drive_dashboard_layout,base.group_user,1,1,1,1
+access_duplicate_pruner_wizard,duplicate.pruner.wizard,model_duplicate_pruner_wizard,base.group_user,1,1,1,1
+access_duplicate_pruner_wizard_line,duplicate.pruner.wizard.line,model_duplicate_pruner_wizard_line,base.group_user,1,1,1,1

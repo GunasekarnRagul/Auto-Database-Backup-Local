@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <record id="action_google_drive_dashboard" model="ir.actions.client">
-        <field name="name">Sync Dashboard</field>
-        <field name="tag">google_drive_odoo_integration.dashboard</field>
-    </record>
-</odoo>
