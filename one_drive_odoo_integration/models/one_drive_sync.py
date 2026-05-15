@@ -464,7 +464,8 @@ class GoogleDriveSync(models.Model):
         url = f"https://graph.microsoft.com/v1.0/me/drive/{parent_path}/children"
 
         t0 = time.time()
-        response = http_requests.post(url, headers=headers, data=json.dumps(metadata))
+        # Added timeout to prevent hanging connections
+        response = http_requests.post(url, headers=headers, data=json.dumps(metadata), timeout=30)
         elapsed = time.time() - t0
         if response.status_code == 201:
             data = response.json()
@@ -532,9 +533,10 @@ class GoogleDriveSync(models.Model):
 
     def upload_file_to_drive(self, file_name, file_content, mime_type, config, parent_one_drive_id=None):
         """Upload a file to OneDrive with optional parent folder placement.
-        Automatically switches to resumable upload for large files (>= 5 MB).
+        Automatically switches to resumable upload for large files (>= 4 MB).
+        Microsoft Graph recommended threshold for resumable uploads is 4MB.
         """
-        RESUMABLE_THRESHOLD = 5 * 1024 * 1024  # 5 MB
+        RESUMABLE_THRESHOLD = 4 * 1024 * 1024  # 4 MB
         if isinstance(file_content, (bytes, bytearray)) and len(file_content) >= RESUMABLE_THRESHOLD:
             return self.upload_file_to_drive_resumable(
                 file_name, file_content, mime_type, config, parent_one_drive_id=parent_one_drive_id
@@ -544,47 +546,41 @@ class GoogleDriveSync(models.Model):
         if not access_token:
             return False
 
-        headers = {"Authorization": f"Bearer {access_token}"}
-        metadata = {"name": file_name}
-        if parent_one_drive_id:
-            metadata["parents"] = [parent_one_drive_id]
-
-        files = {
-            'data': ('metadata', json.dumps(metadata), 'application/json; charset=UTF-8'),
-            'file': (file_name, file_content, mime_type)
+        # Simple upload using PUT /content
+        # Ref: https://learn.microsoft.com/en-us/graph/api/driveitem-put-content
+        parent_path = f"items/{parent_one_drive_id}" if parent_one_drive_id and parent_one_drive_id != 'root' else "root"
+        url = f"https://graph.microsoft.com/v1.0/me/drive/{parent_path}:/{file_name}:/content"
+        
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": mime_type or 'application/octet-stream'
         }
-        response = http_requests.post(
-            "https://graph.microsoft.com/v1.0/me/drive/root/children,webViewLink,mimeType",
-            headers=headers, files=files,
-        )
-        if response.status_code == 200:
-            data = response.json()
-            return {
-                'one_drive_file_id': data.get('id'),
-                'one_drive_url': data.get('webViewLink', ''),
-                'mime_type': data.get('mimeType', ''),
-            }
-        _logger.warning("Failed to upload file to Drive: %s", response.text)
+        
+        try:
+            response = http_requests.put(url, headers=headers, data=file_content, timeout=60)
+            if response.status_code in (200, 201):
+                data = response.json()
+                return {
+                    'one_drive_file_id': data.get('id'),
+                    'one_drive_url': data.get('webUrl', ''), # webUrl is standard in Graph
+                    'mime_type': data.get('file', {}).get('mimeType', mime_type),
+                }
+            _logger.warning("Failed to upload file to Drive: %s", response.text)
+        except Exception as e:
+            _logger.error("Error during simple upload to Drive: %s", str(e))
         return False
 
     def upload_file_to_drive_resumable(self, file_name, file_content, mime_type, config, parent_one_drive_id=None):
         """Upload a large file to OneDrive using the resumable upload API.
-
-        The resumable upload API is designed for files >= 5 MB. It initiates an
-        upload session and streams the file in a single request, which avoids
-        HTTP timeouts that occur with the multipart upload for large files.
+        The resumable upload API is designed for larger files (Graph recommends > 4MB).
+        It initiates an upload session and streams the file.
         """
         access_token = self._get_access_token(config)
         if not access_token:
             return False
 
-        metadata = {"name": file_name, "mimeType": mime_type}
-        if parent_one_drive_id:
-            metadata["parents"] = [parent_one_drive_id]
-
         # Step 1: Initiate a resumable session
-        # Microsoft Graph uses /createUploadSession for resumable uploads
-        parent_path = f"items/{parent_one_drive_id}" if parent_one_drive_id else "root"
+        parent_path = f"items/{parent_one_drive_id}" if parent_one_drive_id and parent_one_drive_id != 'root' else "root"
         url = f"https://graph.microsoft.com/v1.0/me/drive/{parent_path}:/{file_name}:/createUploadSession"
         
         try:
@@ -600,17 +596,16 @@ class GoogleDriveSync(models.Model):
             
             upload_url = init_resp.json().get('uploadUrl')
             if not upload_url:
+                _logger.warning("No upload URL returned for resumable session of %s", file_name)
                 return False
                 
-            # Step 2: Stream the file
-            # For simplicity in this implementation, we stream the whole file in one chunk
-            # Graph supports chunks, but a single chunk works for most Odoo attachments
+            # Step 2: Stream the file in one chunk for simplicity
             size = len(file_content)
             stream_headers = {
                 "Content-Length": str(size),
                 "Content-Range": f"bytes 0-{size-1}/{size}"
             }
-            resp = http_requests.put(upload_url, data=file_content, headers=stream_headers, timeout=60)
+            resp = http_requests.put(upload_url, data=file_content, headers=stream_headers, timeout=300)
             
             if resp.status_code in (200, 201):
                 data = resp.json()
@@ -620,31 +615,9 @@ class GoogleDriveSync(models.Model):
                     'mime_type': data.get('file', {}).get('mimeType', mime_type),
                 }
             _logger.warning("Failed to stream resumable upload for %s: %s", file_name, resp.text)
-
-            upload_url = init_resp.headers.get("Location")
-            if not upload_url:
-                _logger.warning("No upload URL returned for resumable session of %s", file_name)
-                return False
-
-            # Step 2: Upload the file content in one PUT request
-            upload_headers = {
-                "Content-Length": str(len(file_content)),
-                "Content-Type": mime_type,
-            }
-            upload_resp = http_requests.put(
-                upload_url,
-                headers=upload_headers,
-                data=file_content,
-                timeout=300,  # 5-minute timeout for large files
-            )
-            if upload_resp.status_code in (200, 201):
-                data = upload_resp.json()
-                return {
-                    'one_drive_file_id': data.get('id'),
-                    'one_drive_url': data.get('webViewLink', ''),
-                    'mime_type': data.get('mimeType', ''),
-                }
-            _logger.warning("Resumable upload failed for %s: %s", file_name, upload_resp.text)
+            return False
+        except Exception as e:
+            _logger.error("Error during resumable upload of %s: %s", file_name, str(e))
             return False
         except Exception as e:
             _logger.error("Error during resumable upload of %s: %s", file_name, str(e))

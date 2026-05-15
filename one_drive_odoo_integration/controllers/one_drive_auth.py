@@ -47,7 +47,7 @@ class OneDriveController(http.Controller):
 
     @http.route('/one_drive/download/<int:file_id>', type='http', auth='user')
     def one_drive_download(self, file_id, **kw):
-        """Proxy and force download of a OneDrive file."""
+        """Force download of a OneDrive file by redirecting to a pre-authenticated URL."""
         file_record = request.env['one.drive.file'].sudo().browse(file_id)
         if not file_record.exists() or not file_record.one_drive_file_id:
             return request.not_found()
@@ -59,33 +59,40 @@ class OneDriveController(http.Controller):
 
         headers = {'Authorization': f'Bearer {access_token}'}
         o_id = file_record.one_drive_file_id
-        mimetype = file_record.mime_type or ''
-        filename = file_record.name
-
-        # Handle OneDrive formats if needed, or just download
-        is_export = False
-        target_mime = mimetype
-        url = f"https://graph.microsoft.com/v1.0/me/drive/items/{o_id}/content"
 
         try:
-            response = requests.get(url, headers=headers)
-            if response.status_code != 200:
+            # We call the content endpoint with allow_redirects=False to get the pre-authenticated
+            # download URL (302 Found). This avoids passing our Bearer token to the storage domain
+            # and offloads the download bandwidth to the client's browser.
+            response = requests.get(url=f"https://graph.microsoft.com/v1.0/me/drive/items/{o_id}/content", 
+                                    headers=headers, allow_redirects=False)
+            
+            if response.status_code == 302:
+                download_url = response.headers.get('Location')
+                if download_url:
+                    # Log successful download trigger
+                    request.env['one.drive.sync'].sudo()._log_file(
+                        config, file_record, file_record.name, 'download'
+                    )
+                    return request.redirect(download_url)
+            
+            # If it's 200 directly (unlikely for OneDrive content, but possible for some Graph items)
+            if response.status_code == 200:
                 request.env['one.drive.sync'].sudo()._log_file(
-                    config, file_record, file_record.name, 'download', 
-                    state='fail', error_message=f"HTTP {response.status_code}: {response.text}"
+                    config, file_record, file_record.name, 'download'
                 )
-                return f"Error downloading from OneDrive: {response.text}"
+                headers = [
+                    ('Content-Type', file_record.mime_type or 'application/octet-stream'),
+                    ('Content-Disposition', http.content_disposition(file_record.name))
+                ]
+                return request.make_response(response.content, headers=headers)
 
-            # Log successful download
+            # Error case
             request.env['one.drive.sync'].sudo()._log_file(
-                config, file_record, file_record.name, 'download'
+                config, file_record, file_record.name, 'download', 
+                state='fail', error_message=f"HTTP {response.status_code}: {response.text}"
             )
-
-            headers = [
-                ('Content-Type', target_mime),
-                ('Content-Disposition', http.content_disposition(filename))
-            ]
-            return request.make_response(response.content, headers=headers)
+            return f"Error downloading from OneDrive: {response.text}"
         except Exception as e:
             request.env['one.drive.sync'].sudo()._log_file(
                 config, file_record, file_record.name, 'download',

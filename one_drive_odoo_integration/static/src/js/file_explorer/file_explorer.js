@@ -310,6 +310,7 @@ export class FileExplorer extends Component {
         this.state.activeRootId = null;
         this.state.activeFolderTreeId = null;
         this.state.isRootTreeExpanded = false;
+        this.state.isDriveOverview = true;
         
         await this.loadRoots(driveId);
         
@@ -435,6 +436,8 @@ export class FileExplorer extends Component {
                 }
                 if (!this.state.activeRootId && !folderId) {
                     this.state.loading = false;
+                    this.state.allFiles = [];
+                    this.state.files = [];
                     return;
                 }
                 const domain = [
