@@ -99,6 +99,7 @@ class GoogleDriveSync(models.Model):
         _logger.warning("Failed to get access token: %s", response.text)
         return False
 
+    @api.model
     def get_preview_url(self, file_id, config_id):
         """Get a short-lived embeddable preview URL from Microsoft Graph."""
         config = self.env['one.drive.config'].sudo().browse(config_id)

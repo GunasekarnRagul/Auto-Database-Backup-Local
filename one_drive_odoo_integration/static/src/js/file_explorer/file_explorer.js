@@ -2392,29 +2392,34 @@ class FilePreviewDialog extends Component {
         this.state = useState({
             previewUrl: null,
             loading: true,
+            error: null,
         });
 
-        onWillStart(async () => {
-            const { file } = this.props;
-            if (file.one_drive_file_id) {
-                try {
-                    const configId = Array.isArray(file.drive_config_id) ? file.drive_config_id[0] : file.drive_config_id;
-                    const url = await this.orm.call("one.drive.sync", "get_preview_url", [
-                        file.one_drive_file_id, 
-                        configId
-                    ]);
-                    if (url) {
-                        this.state.previewUrl = url;
-                    } else {
-                        this.state.error = "Microsoft Graph could not generate a preview for this file type.";
-                    }
-                } catch (e) {
-                    console.error("Failed to get preview URL", e);
-                    this.state.error = "Connection error while fetching preview.";
-                }
-            }
-            this.state.loading = false;
+        onMounted(() => {
+            this.loadPreviewUrl();
         });
+    }
+
+    async loadPreviewUrl() {
+        const { file } = this.props;
+        if (file.one_drive_file_id) {
+            try {
+                const configId = Array.isArray(file.drive_config_id) ? file.drive_config_id[0] : file.drive_config_id;
+                const url = await this.orm.call("one.drive.sync", "get_preview_url", [
+                    file.one_drive_file_id, 
+                    configId
+                ]);
+                if (url) {
+                    this.state.previewUrl = url;
+                } else {
+                    this.state.error = "Microsoft Graph could not generate a preview for this file type.";
+                }
+            } catch (e) {
+                console.error("Failed to get preview URL", e);
+                this.state.error = "Connection error while fetching preview.";
+            }
+        }
+        this.state.loading = false;
     }
 
     get previewUrl() {

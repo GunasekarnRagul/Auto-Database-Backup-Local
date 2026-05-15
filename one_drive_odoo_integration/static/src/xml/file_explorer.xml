@@ -899,15 +899,6 @@
                     </div>
                 </t>
 
-                <!-- Fallback hint -->
-                <div t-if="!state.loading" style="text-align: center; padding: 7px 16px; background: #f8f9fa; border-top: 1px solid #e8eaed; font-size: 0.8rem; color: #5f6368; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                    <i class="fa fa-info-circle" style="color: #0078d4;"/>
-                    <span>If the preview is blank, you may need to sign in to your Microsoft account.</span>
-                    <a t-att-href="openInDriveUrl" target="_blank" rel="noopener noreferrer"
-                       style="color: #0078d4; font-weight: 600; text-decoration: none; white-space: nowrap;">
-                        <i class="fa fa-external-link" style="margin-right: 3px;"/>Open in OneDrive
-                    </a>
-                </div>
             </div>
             <t t-set-slot="footer">
                 <a t-att-href="openInDriveUrl" target="_blank" rel="noopener noreferrer"
