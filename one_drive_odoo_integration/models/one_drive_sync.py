@@ -261,8 +261,16 @@ class GoogleDriveSync(models.Model):
             return False
 
     def trash_file(self, file_record, trashed=True):
-        """Move a file or folder to the OneDrive Trash (or restore it)."""
+        """Move a file or folder to the OneDrive Recycle Bin.
+        Microsoft Graph uses the DELETE method to move an item to the recycle bin.
+        """
         if not file_record.one_drive_file_id:
+            return True
+
+        # Graph doesn't support a simple "untrash" via PATCH like Google Drive.
+        # Restoring from the recycle bin is a different operation (/restore).
+        # For now, we only support trashing (moving to recycle bin).
+        if not trashed:
             return True
 
         config = file_record.drive_config_id
@@ -273,26 +281,25 @@ class GoogleDriveSync(models.Model):
             return False
 
         headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
+            "Authorization": f"Bearer {access_token}"
         }
         url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}"
-        data = {"trashed": trashed}
 
         t0 = time.time()
         try:
-            response = http_requests.patch(url, headers=headers, data=json.dumps(data))
+            # Microsoft Graph DELETE moves the item to the Recycle Bin.
+            # Ref: https://learn.microsoft.com/en-us/graph/api/driveitem-delete
+            response = http_requests.delete(url, headers=headers, timeout=30)
             elapsed = time.time() - t0
-            if response.status_code == 200:
-                action = "Trashed" if trashed else "Restored from trash"
-                _logger.info("%s file %s on Drive", action, file_record.one_drive_file_id)
-                # Archive the Odoo record if trashed, restore it if untrashed
-                file_record.sudo().write({'active': not trashed})
+            
+            # Successful deletion returns 204 No Content
+            if response.status_code in (200, 204):
+                _logger.info("Deleted (moved to recycle bin) file %s on Drive", file_record.one_drive_file_id)
                 self._log_file(config, file_record, file_record.name, 'trash',
                                duration=elapsed)
                 return True
             else:
-                _logger.warning("Failed to trash/untrash file on Drive: %s", response.text)
+                _logger.warning("Failed to delete file on Drive: %s", response.text)
                 self._log_file(config, file_record, file_record.name, 'trash', state='fail',
                                error_message=f'HTTP {response.status_code}: {response.text}',
                                duration=elapsed)
