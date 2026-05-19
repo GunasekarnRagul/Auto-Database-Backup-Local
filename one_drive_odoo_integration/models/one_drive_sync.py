@@ -392,17 +392,19 @@ class GoogleDriveSync(models.Model):
         headers = {"Authorization": f"Bearer {access_token}"}
         url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}"
         
-        # Use addParents and removeParents to move the file in one request
-        params = {
-            'addParents': new_parent_id,
-            'fields': 'id, parents'
+        # Microsoft Graph moves items by PATCHing the parentReference property.
+        # Ref: https://learn.microsoft.com/en-us/graph/api/driveitem-move
+        headers["Content-Type"] = "application/json"
+        data = {
+            "parentReference": {
+                "id": new_parent_id
+            }
         }
-        if old_parent_id:
-            params['removeParents'] = old_parent_id
         
         t0 = time.time()
         try:
-            response = http_requests.patch(url, headers=headers, params=params)
+            # We use data instead of params for the move request body
+            response = http_requests.patch(url, headers=headers, data=json.dumps(data), timeout=60)
             elapsed = time.time() - t0
             if response.status_code == 200:
                 _logger.info("Successfully moved file %s on Drive", file_record.one_drive_file_id)
@@ -844,114 +846,157 @@ class GoogleDriveSync(models.Model):
             return {'error': 'Could not get access token'}
 
         headers = {"Authorization": f"Bearer {access_token}"}
-        url = (
-            f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}"
-            f"?fields=permissions(id,type,role,emailAddress,displayName,photoLink,domain),"
-            f"copyRequiresWriterPermission,writersCanShare"
-        )
+        # Microsoft Graph /permissions endpoint returns all permission objects
+        url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}/permissions"
 
         try:
             response = http_requests.get(url, headers=headers, timeout=15)
             if response.status_code == 200:
                 data = response.json()
-                permissions = data.get('permissions', [])
+                permissions = data.get('value', [])
 
                 general_access = 'restricted'
                 anyone_role = 'reader'
                 people_permissions = []
+                links_permissions = []
 
                 for perm in permissions:
-                    if perm.get('type') == 'anyone':
-                        general_access = 'anyone'
-                        anyone_role = perm.get('role', 'reader')
-                    elif perm.get('type') == 'user' and perm.get('role') != 'owner':
-                        people_permissions.append({
+                    roles = perm.get('roles', [])
+                    role_str = 'owner' if 'owner' in roles else ('writer' if 'write' in roles else 'reader')
+
+                    # ── Sharing Links ──────────────────────────────────────
+                    link_obj = perm.get('link')
+                    if link_obj and link_obj.get('webUrl'):
+                        scope = link_obj.get('scope', '')
+                        link_type = link_obj.get('type', 'view')
+
+                        if scope in ('anonymous', 'organization'):
+                            general_access = 'anyone' if scope == 'anonymous' else 'organization'
+                            anyone_role = 'writer' if link_type == 'edit' else 'reader'
+
+                        # Collect granted identities that this link works for
+                        link_recipients = []
+                        for identity in perm.get('grantedToIdentities', []):
+                            u = identity.get('user', {})
+                            email = u.get('email') or u.get('userPrincipalName', '')
+                            if email:
+                                link_recipients.append(email)
+                        for identity in perm.get('grantedToIdentitiesV2', []):
+                            u = identity.get('user', {}) or identity.get('siteUser', {})
+                            email = u.get('email') or u.get('loginName', '') or u.get('userPrincipalName', '')
+                            if email and email not in link_recipients:
+                                link_recipients.append(email)
+
+                        links_permissions.append({
                             'id': perm.get('id'),
-                            'type': perm.get('type'),
-                            'role': perm.get('role'),
-                            'emailAddress': perm.get('emailAddress', ''),
-                            'displayName': perm.get('displayName', ''),
-                            'photoLink': perm.get('photoLink', ''),
+                            'url': link_obj.get('webUrl', ''),
+                            'scope': scope,
+                            'type': link_type,
+                            'role': 'writer' if (link_type == 'edit' or 'write' in roles) else 'reader',
+                            'preventsDownload': link_obj.get('preventsDownload', False),
+                            'recipients': list(dict.fromkeys(link_recipients)),
+                            'description': (
+                                'Anyone can edit' if scope == 'anonymous' and link_type == 'edit'
+                                else 'Anyone can view' if scope == 'anonymous'
+                                else 'People in organization can edit' if scope == 'organization' and link_type == 'edit'
+                                else 'People in organization can view' if scope == 'organization'
+                                else 'People you specify can edit' if link_type == 'edit'
+                                else 'People you specify can view'
+                            ),
                         })
-                    elif perm.get('type') == 'user' and perm.get('role') == 'owner':
-                        people_permissions.insert(0, {
+                        continue  # link perms handled — skip to next
+
+                    # ── Direct People Permissions ─────────────────────────
+                    # Graph returns grantedTo (v1) or grantedToV2 (newer)
+                    def _extract_user(identity_obj):
+                        if not identity_obj:
+                            return None
+                        u = (identity_obj.get('user')
+                             or identity_obj.get('siteUser')
+                             or identity_obj.get('group')
+                             or identity_obj.get('remoteUser'))
+                        return u
+
+                    user_info = _extract_user(perm.get('grantedToV2')) or _extract_user(perm.get('grantedTo'))
+
+                    # Also handle grantedToIdentitiesV2 (returned by /invite for external users)
+                    if not user_info:
+                        identities = perm.get('grantedToIdentitiesV2') or perm.get('grantedToIdentities') or []
+                        if identities:
+                            user_info = _extract_user(identities[0])
+
+                    if user_info:
+                        email = (user_info.get('email')
+                                 or user_info.get('userPrincipalName')
+                                 or user_info.get('loginName', ''))
+                        display_name = user_info.get('displayName', email)
+
+                        person = {
                             'id': perm.get('id'),
-                            'type': perm.get('type'),
-                            'role': 'owner',
-                            'emailAddress': perm.get('emailAddress', ''),
-                            'displayName': perm.get('displayName', ''),
-                            'photoLink': perm.get('photoLink', ''),
-                        })
-                    elif perm.get('type') == 'domain':
-                        people_permissions.append({
-                            'id': perm.get('id'),
-                            'type': perm.get('type'),
-                            'role': perm.get('role'),
-                            'emailAddress': '',
-                            'displayName': perm.get('domain', 'Domain'),
+                            'type': 'user',
+                            'role': role_str,
+                            'emailAddress': email,
+                            'displayName': display_name,
                             'photoLink': '',
-                            'domain': perm.get('domain', ''),
-                        })
-                
+                        }
+                        if role_str == 'owner':
+                            people_permissions.insert(0, person)
+                        else:
+                            people_permissions.append(person)
+
                 # Update local record with synced state
                 file_record.sudo().write({
                     'permission_type': general_access,
-                    'anyone_role': anyone_role if general_access == 'anyone' else False,
-                    'writers_can_share': data.get('writersCanShare', True),
-                    'copy_requires_writer': data.get('copyRequiresWriterPermission', False),
-                    'shared_people_count': len([p for p in people_permissions if p['role'] != 'owner']),
+                    'anyone_role': anyone_role,
                 })
 
                 return {
                     'permissions': people_permissions,
+                    'links': links_permissions,
                     'generalAccess': general_access,
                     'anyoneRole': anyone_role,
-                    'copyRequiresWriterPermission': data.get('copyRequiresWriterPermission', False),
-                    'writersCanShare': data.get('writersCanShare', True),
+                    'writersCanShare': file_record.writers_can_share,
+                    'copyRequiresWriterPermission': file_record.copy_requires_writer,
                 }
-            else:
-                _logger.warning("Failed to get permissions: %s", response.text)
-                return {'error': f'API error: {response.status_code}'}
+            return {'error': f'HTTP {response.status_code}: {response.text}'}
         except Exception as e:
-            _logger.error("Error getting permissions: %s", str(e))
+            _logger.error("Error getting OneDrive permissions: %s", str(e))
             return {'error': str(e)}
 
+
+
     def create_permission(self, file_record, email, role='reader', send_notification=True):
-        """Add a permission (share with a person) on OneDrive."""
+        """Add a permission (share with a person) on OneDrive using /invite."""
         if not file_record.one_drive_file_id:
             return {'error': 'File not synced to OneDrive'}
 
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
-            self._log(config, file_record.name, 'share_add', state='fail',
-                      error_message='Could not get access token',
-                      file_type=file_record.file_type,
-                      one_drive_file_id=file_record.one_drive_file_id)
             return {'error': 'Could not get access token'}
 
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json"
         }
-        url = (
-            f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}/permissions"
-            f"?sendNotificationEmail={'true' if send_notification else 'false'}"
-            f"&fields=id,type,role,emailAddress,displayName,photoLink"
-        )
+        # Microsoft Graph uses /invite to share with people
+        url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}/invite"
 
+        # Map Odoo roles to Graph roles
+        graph_role = 'read' if role in ('reader', 'commenter') else 'write'
+        
         body = {
-            'type': 'user',
-            'role': role,
-            'emailAddress': email,
+            'recipients': [{'email': email}],
+            'roles': [graph_role],
+            'requireSignIn': True,
+            'sendInvitation': send_notification,
         }
 
         t0 = time.time()
         try:
             response = http_requests.post(url, headers=headers, data=json.dumps(body), timeout=15)
             elapsed = time.time() - t0
-            if response.status_code == 200:
-                perm = response.json()
+            if response.status_code in (200, 201):
                 self._log(config, f'{file_record.name} → shared with {email} ({role})',
                           'share_add',
                           file_type=file_record.file_type,
@@ -959,14 +1004,7 @@ class GoogleDriveSync(models.Model):
                           duration=elapsed)
                 return {
                     'success': True,
-                    'permission': {
-                        'id': perm.get('id'),
-                        'type': perm.get('type'),
-                        'role': perm.get('role'),
-                        'emailAddress': perm.get('emailAddress', email),
-                        'displayName': perm.get('displayName', email),
-                        'photoLink': perm.get('photoLink', ''),
-                    }
+                    'permissions': response.json().get('value', [])
                 }
             else:
                 error_data = response.json() if response.content else {}
@@ -997,55 +1035,113 @@ class GoogleDriveSync(models.Model):
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
-            self._log(config, file_record.name, 'share_update', state='fail',
-                      error_message='Could not get access token',
-                      file_type=file_record.file_type,
-                      one_drive_file_id=file_record.one_drive_file_id)
             return {'error': 'Could not get access token'}
 
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json"
         }
-        url = (
-            f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}"
-            f"/permissions/{permission_id}"
-            f"?fields=id,type,role,emailAddress,displayName"
-        )
-        body = {'role': role}
-
+        
         t0 = time.time()
         try:
-            response = http_requests.patch(url, headers=headers, data=json.dumps(body), timeout=15)
-            elapsed = time.time() - t0
-            if response.status_code == 200:
-                perm_data = response.json()
-                email = perm_data.get('emailAddress', '')
-                self._log(config, f'{file_record.name} → {email} role changed to {role}',
-                          'share_update',
-                          file_type=file_record.file_type,
-                          one_drive_file_id=file_record.one_drive_file_id,
-                          duration=elapsed)
-                return {'success': True, 'permission': perm_data}
+            # Get the existing permission details to inspect its type/scope
+            get_url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}/permissions/{permission_id}"
+            get_resp = http_requests.get(get_url, headers=headers, timeout=15)
+            
+            is_link = False
+            scope = None
+            recipients = []
+            
+            if get_resp.status_code == 200:
+                perm_data = get_resp.json()
+                link_obj = perm_data.get('link')
+                if link_obj:
+                    is_link = True
+                    scope = link_obj.get('scope')
+                    
+                    # Extract recipients
+                    for identity in perm_data.get('grantedToIdentities', []):
+                        u = identity.get('user', {})
+                        email = u.get('email') or u.get('userPrincipalName')
+                        if email:
+                            recipients.append(email)
+                    for identity in perm_data.get('grantedToIdentitiesV2', []):
+                        u = identity.get('user', {}) or identity.get('siteUser', {})
+                        email = u.get('email') or u.get('loginName') or u.get('userPrincipalName')
+                        if email and email not in recipients:
+                            recipients.append(email)
             else:
-                error_data = response.json() if response.content else {}
-                error_msg = error_data.get('error', {}).get('message', response.text)
-                self._log(config, f'{file_record.name} → update role to {role}',
-                          'share_update', state='fail',
-                          error_message=error_msg,
-                          file_type=file_record.file_type,
-                          one_drive_file_id=file_record.one_drive_file_id,
-                          duration=elapsed)
-                return {'error': error_msg}
+                error_data = get_resp.json() if get_resp.content else {}
+                error_msg = error_data.get('error', {}).get('message', get_resp.text)
+                return {'error': f'Failed to fetch permission details: {error_msg}'}
+                
+            if is_link:
+                # 1. Delete the old permission link
+                del_resp = http_requests.delete(get_url, headers=headers, timeout=15)
+                if del_resp.status_code not in (200, 204):
+                    error_data = del_resp.json() if del_resp.content else {}
+                    error_msg = error_data.get('error', {}).get('message', del_resp.text)
+                    return {'error': f'Failed to remove old sharing link: {error_msg}'}
+                    
+                # 2. Recreate link with the new role
+                if scope == 'users':
+                    # Use /invite endpoint
+                    invite_url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}/invite"
+                    invite_body = {
+                        'recipients': [{'email': r} for r in recipients],
+                        'roles': ['read' if role in ('reader', 'commenter') else 'write'],
+                        'requireSignIn': True,
+                        'sendInvitation': False
+                    }
+                    response = http_requests.post(invite_url, headers=headers, data=json.dumps(invite_body), timeout=15)
+                    if response.status_code in (200, 201):
+                        self._log(config, f'{file_record.name} → link role updated (users) to {role}',
+                                  'share_update', file_type=file_record.file_type,
+                                  one_drive_file_id=file_record.one_drive_file_id, duration=time.time() - t0)
+                        return {'success': True, 'permissions': response.json().get('value', [])}
+                    else:
+                        error_data = response.json() if response.content else {}
+                        error_msg = error_data.get('error', {}).get('message', response.text)
+                        return {'error': f'Failed to recreate users link: {error_msg}'}
+                else:
+                    # anonymous or organization -> use /createLink
+                    create_url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}/createLink"
+                    create_body = {
+                        'type': 'edit' if role == 'writer' else 'view',
+                        'scope': 'anonymous' if scope == 'anonymous' else 'organization'
+                    }
+                    response = http_requests.post(create_url, headers=headers, data=json.dumps(create_body), timeout=15)
+                    if response.status_code in (200, 201):
+                        self._log(config, f'{file_record.name} → link role updated ({scope}) to {role}',
+                                  'share_update', file_type=file_record.file_type,
+                                  one_drive_file_id=file_record.one_drive_file_id, duration=time.time() - t0)
+                        return {'success': True, 'permission': response.json()}
+                    else:
+                        error_data = response.json() if response.content else {}
+                        error_msg = error_data.get('error', {}).get('message', response.text)
+                        return {'error': f'Failed to recreate {scope} link: {error_msg}'}
+            else:
+                # Direct permission: PATCH roles
+                graph_role = 'read' if role in ('reader', 'commenter') else 'write'
+                body = {'roles': [graph_role]}
+                response = http_requests.patch(get_url, headers=headers, data=json.dumps(body), timeout=15)
+                if response.status_code == 200:
+                    perm_data = response.json()
+                    self._log(config, f'{file_record.name} → role changed to {role}',
+                              'share_update',
+                              file_type=file_record.file_type,
+                              one_drive_file_id=file_record.one_drive_file_id,
+                              duration=time.time() - t0)
+                    return {'success': True, 'permission': perm_data}
+                else:
+                    error_data = response.json() if response.content else {}
+                    error_msg = error_data.get('error', {}).get('message', response.text)
+                    return {'error': error_msg}
         except Exception as e:
             _logger.error("Error updating permission: %s", str(e))
-            self._log(config, f'{file_record.name} → update role to {role}',
-                      'share_update', state='fail',
-                      error_message=str(e),
-                      file_type=file_record.file_type,
-                      one_drive_file_id=file_record.one_drive_file_id,
-                      duration=time.time() - t0)
             return {'error': str(e)}
+
+
 
     def delete_permission(self, file_record, permission_id):
         """Delete a permission from a file on OneDrive."""
@@ -1098,22 +1194,14 @@ class GoogleDriveSync(models.Model):
                       duration=time.time() - t0)
             return {'error': str(e)}
 
-    def set_general_access(self, file_record, access_type, role='reader'):
-        """Set general access to 'anyone' or 'restricted'.
-        
-        access_type: 'anyone' or 'restricted'
-        role: 'reader', 'commenter', or 'writer' (only for 'anyone')
-        """
+    def set_general_access(self, file_record, access_type, role='reader', block_download=None, password=None, expirationDate=None):
+        """Set general access to 'anyone', 'organization' or 'restricted' using /createLink or by deleting links."""
         if not file_record.one_drive_file_id:
             return {'error': 'File not synced to OneDrive'}
 
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
-            self._log(config, file_record.name, 'share_general', state='fail',
-                      error_message='Could not get access token',
-                      file_type=file_record.file_type,
-                      one_drive_file_id=file_record.one_drive_file_id)
             return {'error': 'Could not get access token'}
 
         headers = {
@@ -1121,168 +1209,85 @@ class GoogleDriveSync(models.Model):
             "Content-Type": "application/json"
         }
 
-        if access_type == 'anyone':
-            # Create "anyone" permission
-            url = (
-                f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}/permissions"
-                f"?fields=id,type,role"
-            )
-            body = {
-                'type': 'anyone',
-                'role': role,
-            }
-            t0 = time.time()
-            try:
-                response = http_requests.post(url, headers=headers, data=json.dumps(body), timeout=15)
-                elapsed = time.time() - t0
-                if response.status_code == 200:
-                    perm = response.json()
-                    link = file_record.one_drive_url or f"https://onedrive.live.com/redir?resid={file_record.one_drive_file_id}"
-                    self._log(config, f'{file_record.name} → general access: anyone ({role})',
-                              'share_general',
-                              file_type=file_record.file_type,
-                              one_drive_file_id=file_record.one_drive_file_id,
-                              duration=elapsed)
-                    file_record.sudo().write({
-                        'permission_type': 'anyone',
-                        'anyone_role': role,
-                    })
-                    return {
-                        'success': True,
-                        'link': link,
-                        'permissionId': perm.get('id'),
-                    }
-                else:
-                    error_data = response.json() if response.content else {}
-                    error_msg = error_data.get('error', {}).get('message', response.text)
-                    self._log(config, f'{file_record.name} → general access: anyone',
-                              'share_general', state='fail',
-                              error_message=error_msg,
-                              file_type=file_record.file_type,
-                              one_drive_file_id=file_record.one_drive_file_id,
-                              duration=elapsed)
-                    return {'error': error_msg}
-            except Exception as e:
-                self._log(config, f'{file_record.name} → general access: anyone',
-                          'share_general', state='fail',
-                          error_message=str(e),
-                          file_type=file_record.file_type,
-                          one_drive_file_id=file_record.one_drive_file_id,
-                          duration=time.time() - t0)
-                return {'error': str(e)}
-
-        elif access_type == 'restricted':
-            # Find and remove the "anyone" permission
-            get_url = (
-                f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}"
-                f"?fields=permissions(id,type)"
-            )
-            t0 = time.time()
-            try:
-                get_resp = http_requests.get(get_url, headers=headers, timeout=15)
-                if get_resp.status_code != 200:
-                    self._log(config, f'{file_record.name} → general access: restricted',
-                              'share_general', state='fail',
-                              error_message='Could not fetch permissions',
-                              file_type=file_record.file_type,
-                              one_drive_file_id=file_record.one_drive_file_id,
-                              duration=time.time() - t0)
-                    return {'error': 'Could not fetch permissions'}
-
-                permissions = get_resp.json().get('permissions', [])
-                anyone_perms = [p for p in permissions if p.get('type') == 'anyone']
-
-                for perm in anyone_perms:
-                    del_url = (
-                        f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}"
-                        f"/permissions/{perm['id']}"
-                    )
-                    http_requests.delete(del_url, headers=headers, timeout=15)
-
-                file_record.sudo().write({
-                    'permission_type': 'restricted',
-                    'anyone_role': False,
-                })
-                return {'success': True}
-            except Exception as e:
-                self._log(config, f'{file_record.name} → general access: restricted',
-                          'share_general', state='fail',
-                          error_message=str(e),
-                          file_type=file_record.file_type,
-                          one_drive_file_id=file_record.one_drive_file_id,
-                          duration=time.time() - t0)
-                return {'error': str(e)}
-
-        return {'error': 'Invalid access type'}
-
-    def update_file_sharing_settings(self, file_record, writers_can_share=None, copy_requires_writer=None):
-        """Update file sharing settings on OneDrive.
-        
-        writers_can_share: Allow editors to change permissions and share
-        copy_requires_writer: Restrict download/copy/print for commenters/viewers
-        """
-        if not file_record.one_drive_file_id:
-            return {'error': 'File not synced to OneDrive'}
-
-        config = file_record.drive_config_id
-        access_token = self._get_access_token(config)
-        if not access_token:
-            self._log(config, file_record.name, 'share_settings', state='fail',
-                      error_message='Could not get access token',
-                      file_type=file_record.file_type,
-                      one_drive_file_id=file_record.one_drive_file_id)
-            return {'error': 'Could not get access token'}
-
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-        }
-        url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}"
-
-        body = {}
-        if writers_can_share is not None:
-            body['writersCanShare'] = writers_can_share
-        if copy_requires_writer is not None:
-            body['copyRequiresWriterPermission'] = copy_requires_writer
-
-        if not body:
-            return {'success': True}
-
-        # Build description of what changed
-        changes = []
-        if writers_can_share is not None:
-            changes.append(f"editors can share: {'yes' if writers_can_share else 'no'}")
-        if copy_requires_writer is not None:
-            changes.append(f"restrict download: {'yes' if copy_requires_writer else 'no'}")
-        change_desc = ', '.join(changes)
+        if block_download is None:
+            block_download = file_record.copy_requires_writer
 
         t0 = time.time()
         try:
-            response = http_requests.patch(url, headers=headers, data=json.dumps(body), timeout=15)
-            elapsed = time.time() - t0
-            if response.status_code == 200:
-                self._log(config, f'{file_record.name} → {change_desc}',
-                          'share_settings',
-                          file_type=file_record.file_type,
-                          one_drive_file_id=file_record.one_drive_file_id,
-                          duration=elapsed)
-                return {'success': True}
+            # 1. ALWAYS clean up existing 'anonymous' or 'organization' links first
+            url_perms = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}/permissions"
+            perm_resp = http_requests.get(url_perms, headers=headers, timeout=15)
+            if perm_resp.status_code == 200:
+                for perm in perm_resp.json().get('value', []):
+                    link_scope = perm.get('link', {}).get('scope')
+                    if link_scope in ('anonymous', 'organization'):
+                        del_url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}/permissions/{perm.get('id')}"
+                        del_resp = http_requests.delete(del_url, headers=headers, timeout=15)
+                        if del_resp.status_code not in (200, 204):
+                            return {'error': f'Failed to remove existing {link_scope} link: {del_resp.text}'}
             else:
-                error_data = response.json() if response.content else {}
-                error_msg = error_data.get('error', {}).get('message', response.text)
-                self._log(config, f'{file_record.name} → {change_desc}',
-                          'share_settings', state='fail',
-                          error_message=error_msg,
-                          file_type=file_record.file_type,
-                          one_drive_file_id=file_record.one_drive_file_id,
-                          duration=elapsed)
-                return {'error': error_msg}
+                return {'error': f'Failed to fetch permissions to clean up: {perm_resp.text}'}
+
+            if access_type in ('anyone', 'organization'):
+                # 2. Create the new link
+                scope = 'anonymous' if access_type == 'anyone' else 'organization'
+                url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_record.one_drive_file_id}/createLink"
+                body = {
+                    'type': 'edit' if role == 'writer' else 'view',
+                    'scope': scope
+                }
+                if role == 'reader':
+                    body['preventsDownload'] = bool(block_download)
+                else:
+                    body['preventsDownload'] = False
+                
+                if password:
+                    body['password'] = password
+                if expirationDate:
+                    body['expirationDateTime'] = expirationDate + "T23:59:59Z"
+
+                response = http_requests.post(url, headers=headers, data=json.dumps(body), timeout=15)
+                elapsed = time.time() - t0
+                if response.status_code in (200, 201):
+                    data = response.json()
+                    file_record.sudo().write({
+                        'permission_type': access_type,
+                        'anyone_role': role,
+                        'copy_requires_writer': bool(block_download) if role == 'reader' else False,
+                        'one_drive_url': data.get('link', {}).get('webUrl', file_record.one_drive_url)
+                    })
+                    self._log(config, f'{file_record.name} → general access: {access_type} ({role}, block_download={block_download})',
+                              'share_general', file_type=file_record.file_type,
+                              one_drive_file_id=file_record.one_drive_file_id, duration=elapsed)
+                    return data
+                else:
+                    err_msg = response.text
+                    self._log(config, f'Failed to set general access for {file_record.name}: {err_msg}',
+                              'share_general', file_type=file_record.file_type, duration=elapsed, state='failed')
+                    return {'error': f'Microsoft Graph Error: {err_msg}'}
+            else:
+                # restricted: we already deleted the broad links
+                file_record.sudo().write({
+                    'permission_type': 'restricted',
+                    'copy_requires_writer': False
+                })
+                self._log(config, f'{file_record.name} → general access: restricted',
+                          'share_general', file_type=file_record.file_type,
+                          one_drive_file_id=file_record.one_drive_file_id, duration=time.time() - t0)
+                return {'success': True}
+
         except Exception as e:
-            _logger.error("Error updating sharing settings: %s", str(e))
-            self._log(config, f'{file_record.name} → {change_desc}',
-                      'share_settings', state='fail',
-                      error_message=str(e),
-                      file_type=file_record.file_type,
-                      one_drive_file_id=file_record.one_drive_file_id,
-                      duration=time.time() - t0)
+            _logger.error("Error setting general access: %s", str(e))
             return {'error': str(e)}
+
+    def update_file_sharing_settings(self, file_record, writers_can_share=None, copy_requires_writer=None):
+        """Update file sharing settings on OneDrive. Persist locally since Graph permissions are link/role-based."""
+        vals = {}
+        if writers_can_share is not None:
+            vals['writers_can_share'] = writers_can_share
+        if copy_requires_writer is not None:
+            vals['copy_requires_writer'] = copy_requires_writer
+        if vals:
+            file_record.sudo().write(vals)
+        return {'success': True}
+

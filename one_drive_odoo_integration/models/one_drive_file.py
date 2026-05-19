@@ -52,6 +52,7 @@ class GoogleDriveFile(models.Model):
         ('restricted', 'Restricted'),
         ('anyone', 'Anyone with link'),
         ('domain', 'Domain'),
+        ('organization', 'Organization'),
     ], string='General Access', default='restricted', index=True)
     anyone_role = fields.Char('Link Role') # reader, commenter, writer
     writers_can_share = fields.Boolean('Editors can share', default=True)
@@ -665,11 +666,11 @@ class GoogleDriveFile(models.Model):
         sync = self.env['one.drive.sync'].sudo()
         return sync.delete_permission(self, permission_id)
 
-    def action_set_general_access(self, access_type, role='reader'):
-        """Set general access for a file (anyone / restricted)."""
+    def action_set_general_access(self, access_type, role='reader', block_download=None, password=None, expirationDate=None):
+        """Set general access for a file (anyone / organization / restricted)."""
         self.ensure_one()
         sync = self.env['one.drive.sync'].sudo()
-        return sync.set_general_access(self, access_type, role=role)
+        return sync.set_general_access(self, access_type, role=role, block_download=block_download, password=password, expirationDate=expirationDate)
 
     def action_update_sharing_settings(self, writers_can_share=None, copy_requires_writer=None):
         """Update sharing settings for a file."""

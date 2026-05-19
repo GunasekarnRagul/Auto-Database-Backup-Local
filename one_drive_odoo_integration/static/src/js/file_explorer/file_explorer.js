@@ -2453,15 +2453,19 @@ export class ShareDriveLinkDialog extends Component {
             loading: true,
             // Permissions
             permissions: [],
+            links: [],
             generalAccess: 'restricted',
             anyoneRole: 'reader',
+            expirationDate: '',
+            linkPassword: '',
             // Settings
             writersCanShare: true,
             copyRequiresWriterPermission: false,
             // Add people
             addEmail: '',
-            addRole: 'reader',
+            addRole: 'writer',
             addingPerson: false,
+            sendNotification: true,
             // Contact Picker
             showContactPicker: false,
             contactSearchResults: [],
@@ -2470,14 +2474,23 @@ export class ShareDriveLinkDialog extends Component {
             // Dropdowns
             showGeneralAccessDropdown: false,
             showAnyoneRoleDropdown: false,
+            showInviteRoleDropdown: false,
             showSettingsPanel: false,
             activePermRoleDropdown: null,
+            activeLinkPersonDropdown: null,
+            expandedLinks: {},
             // Loader
             showActionLoader: false,
             loaderMessage: 'Loading...',
             // Error
             error: null,
+            // Bidirectional sync
+            isSyncing: false,
+            justSynced: false,
+            lastSyncTime: null,
         });
+
+        this._syncTimer = null;
 
         onWillStart(async () => {
             if (this.props.files.length === 1 && this.props.files[0].one_drive_file_id) {
@@ -2487,6 +2500,54 @@ export class ShareDriveLinkDialog extends Component {
             }
             if (this.props.onReady) this.props.onReady();
         });
+
+        onWillDestroy(() => {
+            if (this._syncTimer) {
+                clearInterval(this._syncTimer);
+                this._syncTimer = null;
+            }
+        });
+    }
+
+    // ─── Bidirectional Sync ───
+
+    async refreshPermissions() {
+        if (this.state.isSyncing || !this.isSingleFile || !this.file.one_drive_file_id) return;
+        this.state.isSyncing = true;
+        this.state.justSynced = false;
+        try {
+            const result = await this.orm.call(
+                'one.drive.file',
+                'action_get_share_info',
+                [[this.file.id]]
+            );
+            if (result && !result.error) {
+                this.state.permissions = result.permissions || [];
+                this.state.links = result.links || [];
+                this.state.generalAccess = result.generalAccess || 'restricted';
+                this.state.anyoneRole = result.anyoneRole || 'reader';
+                this.state.writersCanShare = result.writersCanShare !== false;
+                this.state.copyRequiresWriterPermission = result.copyRequiresWriterPermission || false;
+                const now = new Date();
+                this.state.lastSyncTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                this.state.justSynced = true;
+                setTimeout(() => { this.state.justSynced = false; }, 3000);
+            }
+        } catch (e) {
+            console.warn('ShareDialog: refresh failed', e);
+        } finally {
+            this.state.isSyncing = false;
+        }
+    }
+
+    _startAutoSync() {
+        if (this._syncTimer) return;
+        // Poll OneDrive every 30s while the dialog is open
+        this._syncTimer = setInterval(async () => {
+            if (!this.state.showActionLoader && !this.state.loading) {
+                await this.refreshPermissions();
+            }
+        }, 30000);
     }
 
     // ─── Contact Picker ───
@@ -2572,10 +2633,15 @@ export class ShareDriveLinkDialog extends Component {
                 this.state.error = result.error;
             } else {
                 this.state.permissions = result.permissions || [];
+                this.state.links = result.links || [];
                 this.state.generalAccess = result.generalAccess || 'restricted';
                 this.state.anyoneRole = result.anyoneRole || 'reader';
                 this.state.writersCanShare = result.writersCanShare !== false;
                 this.state.copyRequiresWriterPermission = result.copyRequiresWriterPermission || false;
+                const now = new Date();
+                this.state.lastSyncTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                // Start auto-polling so OneDrive-side changes reflect here every 30s
+                this._startAutoSync();
             }
         } catch (e) {
             console.error("Failed to load share info", e);
@@ -2599,6 +2665,13 @@ export class ShareDriveLinkDialog extends Component {
 
     setAddRole(role) {
         this.state.addRole = role;
+        this.state.showInviteRoleDropdown = false;
+    }
+
+    toggleInviteRoleDropdown() {
+        const next = !this.state.showInviteRoleDropdown;
+        this.closeAllShareMenus();
+        this.state.showInviteRoleDropdown = next;
     }
 
     async addPerson() {
@@ -2619,12 +2692,12 @@ export class ShareDriveLinkDialog extends Component {
                 "one.drive.file",
                 "action_add_permission",
                 [[this.file.id]],
-                { email: email, role: this.state.addRole, send_notification: true }
+                { email: email, role: this.state.addRole, send_notification: this.state.sendNotification }
             );
             if (result.error) {
                 this.notificationService.add(result.error, { type: "danger" });
             } else if (result.success) {
-                // Reload share info to get complete permission data including photoLinks
+                // Reload share info to get complete permission data
                 await this.loadShareInfo();
                 this.state.addEmail = '';
                 this.notificationService.add(`Shared with ${email}`, { type: "success" });
@@ -2743,9 +2816,79 @@ export class ShareDriveLinkDialog extends Component {
     closeAllShareMenus() {
         this.state.showGeneralAccessDropdown = false;
         this.state.showAnyoneRoleDropdown = false;
+        this.state.showInviteRoleDropdown = false;
         // Note: showContactPicker is intentionally NOT closed here.
         // It is toggled independently by toggleContactPicker().
         this.state.activePermRoleDropdown = null;
+        this.state.activeLinkPersonDropdown = null;
+    }
+
+    toggleLinkPersonDropdown(key) {
+        this.state.activeLinkPersonDropdown =
+            this.state.activeLinkPersonDropdown === key ? null : key;
+    }
+
+    async updateLinkPersonRole(lnk, email, newRole) {
+        this.state.activeLinkPersonDropdown = null;
+        if (lnk.role === newRole) return;
+
+        this.state.loaderMessage = 'Updating link role…';
+        this.state.showActionLoader = true;
+        try {
+            const result = await this.orm.call(
+                "one.drive.file",
+                "action_update_permission",
+                [[this.file.id]],
+                {
+                    permission_id: lnk.id,
+                    role: newRole
+                }
+            );
+            if (result && result.error) {
+                this.notificationService.add(result.error, { type: 'danger' });
+            } else {
+                // Update local state for immediate feedback
+                this.state.links = this.state.links.map(l =>
+                    l.id === lnk.id ? { ...l, role: newRole } : l
+                );
+                this.notificationService.add("Link role updated.", { type: "success" });
+                await this.loadShareInfo();
+            }
+        } catch (e) {
+            this.notificationService.add("Failed to update link role.", { type: "danger" });
+        } finally {
+            this.state.showActionLoader = false;
+        }
+    }
+
+    async removeLinkPerson(lnk, email) {
+        this.state.activeLinkPersonDropdown = null;
+        this.state.loaderMessage = 'Revoking access for ' + email + '…';
+        this.state.showActionLoader = true;
+        try {
+            const result = await this.orm.call(
+                'one.drive.file',
+                'action_remove_permission',
+                [[this.file.id]],
+                { permission_id: lnk.id }
+            );
+            if (result && result.error) {
+                this.notificationService.add(result.error, { type: 'danger' });
+            } else {
+                // Remove just this email from the recipients
+                this.state.links = this.state.links.map(l => {
+                    if (l.id !== lnk.id) return l;
+                    const newRecipients = l.recipients.filter(e => e !== email);
+                    return { ...l, recipients: newRecipients };
+                }).filter(l => l.recipients.length > 0 || l.scope !== 'specific');
+                this.notificationService.add("Access removed for " + email, { type: "success" });
+                await this.loadShareInfo();
+            }
+        } catch (e) {
+            this.notificationService.add("Failed to remove access.", { type: "danger" });
+        } finally {
+            this.state.showActionLoader = false;
+        }
     }
 
     async setGeneralAccess(accessType) {
@@ -2760,23 +2903,39 @@ export class ShareDriveLinkDialog extends Component {
                 "one.drive.file",
                 "action_set_general_access",
                 [[this.file.id]],
-                { access_type: accessType, role: this.state.anyoneRole }
+                {
+                    access_type: accessType,
+                    role: this.state.anyoneRole,
+                    block_download: this.state.anyoneRole === 'reader' ? this.state.copyRequiresWriterPermission : false,
+                    password: this.state.linkPassword || null,
+                    expirationDate: this.state.expirationDate || null
+                }
             );
             if (result.error) {
                 this.notificationService.add(result.error, { type: "danger" });
             } else {
                 this.state.generalAccess = accessType;
+                if (result.link && result.link.webUrl) {
+                    this.file.one_drive_url = result.link.webUrl;
+                }
                 if (accessType === 'anyone') {
                     this.notificationService.add("Anyone with the link can now access this file.", { type: "success" });
+                } else if (accessType === 'organization') {
+                    this.notificationService.add("Anyone in your organization can now access this file.", { type: "success" });
                 } else {
                     this.notificationService.add("Access restricted to specific people only.", { type: "success" });
                 }
+                await this.loadShareInfo();
             }
         } catch (e) {
             this.notificationService.add("Failed to update general access.", { type: "danger" });
         } finally {
             this.state.showActionLoader = false;
         }
+    }
+
+    toggleLinkExpand(linkId) {
+        this.state.expandedLinks[linkId] = !this.state.expandedLinks[linkId];
     }
 
     async setAnyoneRole(role) {
@@ -2786,20 +2945,96 @@ export class ShareDriveLinkDialog extends Component {
         this.state.loaderMessage = 'Updating access role...';
         this.state.showActionLoader = true;
         try {
-            // Need to remove old anyone permission and create new one with new role
             const result = await this.orm.call(
                 "one.drive.file",
                 "action_set_general_access",
                 [[this.file.id]],
-                { access_type: 'anyone', role: role }
+                { 
+                    access_type: this.state.generalAccess, 
+                    role: role,
+                    block_download: role === 'reader' ? this.state.copyRequiresWriterPermission : false,
+                    password: this.state.linkPassword || null,
+                    expirationDate: this.state.expirationDate || null
+                }
             );
             if (result.error) {
                 this.notificationService.add(result.error, { type: "danger" });
             } else {
                 this.state.anyoneRole = role;
+                this.notificationService.add("Access role updated successfully.", { type: "success" });
+                await this.loadShareInfo();
             }
         } catch (e) {
             this.notificationService.add("Failed to update access role.", { type: "danger" });
+        } finally {
+            this.state.showActionLoader = false;
+        }
+    }
+
+    async applyPremiumSettings() {
+        if (this.state.generalAccess === 'restricted') {
+            this.notificationService.add("Please select 'Anyone with the link' or 'Organization' to apply these settings.", { type: "warning" });
+            return;
+        }
+        
+        this.state.loaderMessage = 'Applying premium settings...';
+        this.state.showActionLoader = true;
+        try {
+            const result = await this.orm.call(
+                "one.drive.file",
+                "action_set_general_access",
+                [[this.file.id]],
+                {
+                    access_type: this.state.generalAccess,
+                    role: this.state.anyoneRole,
+                    block_download: this.state.anyoneRole === 'reader' ? this.state.copyRequiresWriterPermission : false,
+                    password: this.state.linkPassword || null,
+                    expirationDate: this.state.expirationDate || null
+                }
+            );
+            if (result.error) {
+                this.notificationService.add("Premium features not supported on this account, or " + result.error, { type: "danger" });
+            } else {
+                this.notificationService.add("Premium settings applied successfully.", { type: "success" });
+                await this.loadShareInfo();
+            }
+        } catch (e) {
+            this.notificationService.add("Failed to apply premium settings.", { type: "danger" });
+        } finally {
+            this.state.showActionLoader = false;
+        }
+    }
+    async onToggleBlockDownloadLink(ev) {
+        const newVal = ev.target.checked;
+        this.state.loaderMessage = 'Updating download restrictions...';
+        this.state.showActionLoader = true;
+        try {
+            const result = await this.orm.call(
+                "one.drive.file",
+                "action_set_general_access",
+                [[this.file.id]],
+                { 
+                    access_type: this.state.generalAccess, 
+                    role: this.state.anyoneRole, 
+                    block_download: newVal,
+                    password: this.state.linkPassword || null,
+                    expirationDate: this.state.expirationDate || null
+                }
+            );
+            if (result.error) {
+                this.notificationService.add(result.error, { type: "danger" });
+                ev.target.checked = !newVal; // revert
+            } else {
+                this.state.copyRequiresWriterPermission = newVal;
+                if (result.link && result.link.webUrl) {
+                    this.file.one_drive_url = result.link.webUrl;
+                }
+                this.notificationService.add("Download restrictions updated", { type: "success" });
+                await this.loadShareInfo();
+            }
+        } catch (e) {
+            this.notificationService.add("Failed to update download restriction.", { type: "danger" });
+            ev.target.checked = !newVal;
         } finally {
             this.state.showActionLoader = false;
         }
@@ -2868,15 +3103,47 @@ export class ShareDriveLinkDialog extends Component {
     async onCopyLink() {
         const link = this.shareLink || this.shareableFiles.map(f => f.one_drive_url).join('\n');
         if (!link) return;
-
         try {
             await navigator.clipboard.writeText(link);
             this.state.copied = true;
-            setTimeout(() => {
-                this.state.copied = false;
-            }, 2000);
+            setTimeout(() => { this.state.copied = false; }, 2000);
         } catch {
             prompt("Copy link:", link);
+        }
+    }
+
+    async copyLinkUrl(url) {
+        if (!url) return;
+        try {
+            await navigator.clipboard.writeText(url);
+            this.notificationService.add("Link copied to clipboard", { type: "success" });
+        } catch {
+            prompt("Copy link:", url);
+        }
+    }
+
+    async revokeLink(lnk) {
+        if (!lnk || !lnk.id) return;
+        this.state.loaderMessage = 'Revoking link…';
+        this.state.showActionLoader = true;
+        try {
+            const result = await this.orm.call(
+                'one.drive.file',
+                'action_remove_permission',
+                [[this.file.id]],
+                { permission_id: lnk.id }
+            );
+            if (result && result.error) {
+                this.notificationService.add(result.error, { type: 'danger' });
+            } else {
+                this.state.links = this.state.links.filter(l => l.id !== lnk.id);
+                this.notificationService.add("Link revoked", { type: "success" });
+                await this.loadShareInfo();
+            }
+        } catch (e) {
+            this.notificationService.add("Failed to revoke link", { type: "danger" });
+        } finally {
+            this.state.showActionLoader = false;
         }
     }
 }

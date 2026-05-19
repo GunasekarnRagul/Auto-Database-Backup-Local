@@ -915,320 +915,353 @@
     <!-- ====== SHARE DRIVE LINK DIALOG ====== -->
     <t t-name="one_drive_odoo_integration.ShareDriveLinkDialog">
         <Dialog title="''" size="'md'">
-            <div class="gd_share_dialog" t-on-click="closeAllShareMenus">
-                <!-- Header with file name -->
-                <div class="gd_share_header">
-                    <div class="gd_share_header_icon">
-                        <i class="fa fa-share-alt"/>
-                    </div>
-                    <div class="gd_share_header_info">
-                        <h4 class="gd_share_title">
-                            <t t-if="props.files.length === 1">
-                                Share '<t t-esc="props.files[0].name"/>'
-                            </t>
-                            <t t-else="">
-                                Share <t t-esc="props.files.length"/> items
-                            </t>
-                        </h4>
-                    </div>
-                </div>
+            <div class="od_dialog" t-on-click="closeAllShareMenus">
 
-                <!-- Loading State -->
-                <t t-if="state.loading">
-                    <div class="gd_share_loading">
-                        <i class="fa fa-circle-o-notch fa-spin"/>
-                        <span>Loading sharing info...</span>
-                    </div>
-                </t>
-
-                <!-- Error State -->
-                <t t-elif="state.error">
-                    <div class="gd_share_error">
-                        <i class="fa fa-exclamation-triangle"/>
-                        <span t-esc="state.error"/>
-                    </div>
-                </t>
-
-                <!-- Multi-file: simple link copy -->
-                <t t-elif="!isSingleFile">
-                    <div class="gd_share_link_section">
-                        <t t-foreach="shareableFiles" t-as="file" t-key="file.id">
-                            <div class="gd_share_link_row">
-                                <div class="gd_share_link_icon">
-                                    <i class="fa fa-link"/>
-                                </div>
-                                <div class="gd_share_link_input_wrap">
-                                    <span class="gd_share_file_label" t-esc="file.name"/>
-                                    <input type="text" class="gd_share_link_input" t-att-value="file.one_drive_url" readonly="true"/>
-                                </div>
-                            </div>
-                        </t>
-                        <t t-if="shareableFiles.length === 0">
-                            <div class="gd_share_no_link">
-                                <i class="fa fa-exclamation-circle"/>
-                                <span>No shareable links available. Please sync the file(s) first.</span>
-                            </div>
-                        </t>
-                    </div>
-                </t>
-
-                <!-- Single file: full sharing UI -->
-                <t t-else="">
-                    <!-- Add People Section -->
-                    <div class="gd_share_add_section" t-if="file.one_drive_file_id">
-                        <div class="gd_share_add_row">
-                            <div class="gd_share_add_input_wrap">
-                                <i class="fa fa-user-plus gd_share_add_icon"/>
-                                 <input type="email" class="gd_share_add_input"
-                                        placeholder="Add people by email"
-                                        t-att-value="state.addEmail"
-                                        t-on-input="onEmailInput"
-                                        t-on-keydown="onEmailKeydown"
-                                        t-att-disabled="state.addingPerson"/>
-                                 <button class="gd_share_contact_btn" t-on-click.stop="toggleContactPicker" title="Pick from Odoo Contacts">
-                                     <i class="fa fa-address-book-o"/>
-                                 </button>
-                                 
-                                 <!-- Contact Picker Dropdown -->
-                                 <div class="gd_contact_picker" t-if="state.showContactPicker" t-on-click.stop="">
-                                     <div class="gd_contact_search">
-                                         <i class="fa fa-search"/>
-                                         <input type="text" placeholder="Search contacts..."
-                                                t-att-value="state.contactSearchQuery"
-                                                t-on-input="onContactSearchInput"
-                                                t-on-keydown="onContactKeydown"
-                                                autofocus="true"/>
-                                     </div>
-                                     <div class="gd_contact_list">
-                                         <t t-if="state.contactLoading">
-                                             <div class="gd_contact_status"><i class="fa fa-refresh fa-spin"/> Searching...</div>
-                                         </t>
-                                         <t t-elif="state.contactSearchResults.length === 0">
-                                             <div class="gd_contact_status">No contacts found</div>
-                                         </t>
-                                         <t t-else="">
-                                             <t t-foreach="state.contactSearchResults" t-as="contact" t-key="contact.id">
-                                                 <div class="gd_contact_row" t-on-click="() => this.selectContact(contact)">
-                                                     <div class="gd_contact_icon">
-                                                         <t t-if="contact.image_128">
-                                                             <img t-attf-src="data:image/png;base64,#{contact.image_128}"/>
-                                                         </t>
-                                                         <t t-else="">
-                                                             <span t-esc="contact.name.charAt(0).toUpperCase()"/>
-                                                         </t>
-                                                     </div>
-                                                     <div class="gd_contact_details">
-                                                         <div class="gd_contact_name" t-esc="contact.name"/>
-                                                         <div class="gd_contact_email" t-esc="contact.email"/>
-                                                     </div>
-                                                 </div>
-                                             </t>
-                                         </t>
-                                     </div>
-                                 </div>
-                             </div>
-                            <div class="gd_share_add_role_wrap" t-on-click.stop="">
-                                <select class="gd_share_add_role_select" t-on-change="(ev) => this.setAddRole(ev.target.value)">
-                                    <option value="reader" t-att-selected="state.addRole === 'reader'">Viewer</option>
-                                    <option value="commenter" t-att-selected="state.addRole === 'commenter'">Commenter</option>
-                                    <option value="writer" t-att-selected="state.addRole === 'writer'">Editor</option>
-                                </select>
-                            </div>
-                            <button class="gd_share_add_btn" t-on-click="addPerson"
-                                    t-att-disabled="!state.addEmail.trim() || state.addingPerson">
-                                <t t-if="state.addingPerson">
-                                    <i class="fa fa-spinner fa-spin"/>
-                                </t>
-                                <t t-else="">
-                                    <i class="fa fa-paper-plane"/>
-                                </t>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- People with Access -->
-                    <div class="gd_share_people_section" t-if="state.permissions.length > 0">
-                        <div class="gd_share_section_label">People with access</div>
-                        <div class="gd_share_people_list">
-                            <t t-foreach="state.permissions" t-as="perm" t-key="perm.id">
-                                <div class="gd_share_person_row">
-                                    <div class="gd_share_person_avatar">
-                                        <t t-if="perm.photoLink">
-                                            <img t-att-src="perm.photoLink" alt="avatar" class="gd_share_person_img" t-on-error="onImageError"/>
-                                        </t>
-                                        <span class="gd_share_person_initial" t-esc="getPermInitial(perm)" t-att-class="{ 'gd_hidden': perm.photoLink }"/>
-                                    </div>
-                                    <div class="gd_share_person_info">
-                                        <span class="gd_share_person_name" t-esc="perm.displayName || perm.emailAddress"/>
-                                        <span class="gd_share_person_email" t-if="perm.displayName and perm.emailAddress" t-esc="perm.emailAddress"/>
-                                    </div>
-                                    <div class="gd_share_person_role_wrap" t-on-click.stop="">
-                                        <t t-if="perm.role === 'owner'">
-                                            <span class="gd_share_role_badge gd_role_owner">Owner</span>
-                                        </t>
-                                        <t t-else="">
-                                            <div class="gd_share_role_selector" t-on-click="() => this.togglePermRoleDropdown(perm.id)">
-                                                <span t-esc="getRoleLabel(perm.role)"/>
-                                                <i class="fa fa-caret-down"/>
-                                            </div>
-                                            <div class="gd_share_person_role_dropdown" t-if="state.activePermRoleDropdown === perm.id">
-                                                <div class="gd_share_person_role_option" t-att-class="{ active: perm.role === 'reader' }"
-                                                     t-on-click="() => this.updatePermissionRole(perm, 'reader')">
-                                                    <i class="fa fa-eye"/> Viewer
-                                                </div>
-                                                <div class="gd_share_person_role_option" t-att-class="{ active: perm.role === 'commenter' }"
-                                                     t-on-click="() => this.updatePermissionRole(perm, 'commenter')">
-                                                    <i class="fa fa-comment-o"/> Commenter
-                                                </div>
-                                                <div class="gd_share_person_role_option" t-att-class="{ active: perm.role === 'writer' }"
-                                                     t-on-click="() => this.updatePermissionRole(perm, 'writer')">
-                                                    <i class="fa fa-pencil"/> Editor
-                                                </div>
-                                                <div class="gd_share_role_divider"/>
-                                                <div class="gd_share_person_role_option gd_role_remove"
-                                                     t-on-click="() => this.removePermission(perm)">
-                                                    <i class="fa fa-times-circle"/> Remove access
-                                                </div>
-                                            </div>
-                                        </t>
-                                    </div>
-                                </div>
-                            </t>
-                        </div>
-                    </div>
-
-                    <!-- General Access Section -->
-                    <div class="gd_share_access_section" t-if="file.one_drive_file_id">
-                        <div class="gd_share_section_label">General access</div>
-                        <div class="gd_share_access_row">
-                            <div class="gd_share_access_icon" t-att-class="{ 'gd_access_anyone': state.generalAccess === 'anyone' }">
-                                <i t-att-class="state.generalAccess === 'anyone' ? 'fa fa-globe' : 'fa fa-lock'"/>
-                            </div>
-                            <div class="gd_share_access_info">
-                                <div class="gd_share_access_selector_wrap" t-on-click.stop="">
-                                    <div class="gd_share_access_selector" t-on-click="toggleGeneralAccessDropdown">
-                                        <span class="gd_share_access_level" t-esc="state.generalAccess === 'anyone' ? 'Anyone with the link' : 'Restricted'"/>
-                                        <i class="fa fa-caret-down"/>
-                                    </div>
-                                    <div class="gd_share_ga_dropdown" t-if="state.showGeneralAccessDropdown">
-                                        <div class="gd_share_ga_option" t-att-class="{ active: state.generalAccess === 'restricted' }"
-                                             t-on-click="() => this.setGeneralAccess('restricted')">
-                                            <div class="gd_share_ga_option_icon"><i class="fa fa-lock"/></div>
-                                            <div class="gd_share_ga_option_info">
-                                                <span class="gd_share_ga_option_title">Restricted</span>
-                                                <span class="gd_share_ga_option_desc">Only people with access can open with the link</span>
-                                            </div>
-                                        </div>
-                                        <div class="gd_share_ga_option" t-att-class="{ active: state.generalAccess === 'anyone' }"
-                                             t-on-click="() => this.setGeneralAccess('anyone')">
-                                            <div class="gd_share_ga_option_icon gd_access_anyone"><i class="fa fa-globe"/></div>
-                                            <div class="gd_share_ga_option_info">
-                                                <span class="gd_share_ga_option_title">Anyone with the link</span>
-                                                <span class="gd_share_ga_option_desc">Anyone on the internet with the link can access</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <t t-if="state.generalAccess === 'anyone'">
-                                    <div class="gd_share_anyone_role_wrap" t-on-click.stop="">
-                                        <div class="gd_share_anyone_role" t-on-click="toggleAnyoneRoleDropdown">
-                                            <span t-esc="getRoleLabel(state.anyoneRole)"/>
-                                            <i class="fa fa-caret-down"/>
-                                        </div>
-                                    </div>
-                                    <div class="gd_share_anyone_role_dropdown" t-if="state.showAnyoneRoleDropdown">
-                                        <div class="gd_share_anyone_role_option" t-att-class="{ active: state.anyoneRole === 'reader' }"
-                                             t-on-click="() => this.setAnyoneRole('reader')">
-                                            <i class="fa fa-eye"/> Viewer
-                                        </div>
-                                        <div class="gd_share_anyone_role_option" t-att-class="{ active: state.anyoneRole === 'commenter' }"
-                                             t-on-click="() => this.setAnyoneRole('commenter')">
-                                            <i class="fa fa-comment-o"/> Commenter
-                                        </div>
-                                        <div class="gd_share_anyone_role_option" t-att-class="{ active: state.anyoneRole === 'writer' }"
-                                             t-on-click="() => this.setAnyoneRole('writer')">
-                                            <i class="fa fa-pencil"/> Editor
-                                        </div>
-                                    </div>
-                                </t>
-                                <t t-else="">
-                                    <span class="gd_share_access_desc">Only people with access can open with the link</span>
-                                </t>
+                <!-- ══ HEADER ══ -->
+                <div class="od_hdr">
+                    <div class="od_hdr_left">
+                        <div class="od_hdr_icon"><i class="fa fa-cloud"/></div>
+                        <div>
+                            <div class="od_hdr_title">Manage Access</div>
+                            <div class="od_hdr_sub">
+                                <t t-if="props.files.length === 1" t-esc="props.files[0].name"/>
+                                <t t-else=""><t t-esc="props.files.length"/> items</t>
                             </div>
                         </div>
                     </div>
-
-                    <!-- No Google ID warning -->
-                    <t t-if="!file.one_drive_file_id">
-                        <div class="gd_share_no_link">
-                            <i class="fa fa-exclamation-circle"/>
-                            <span>This file is not synced to OneDrive yet. Please sync first to enable sharing.</span>
-                        </div>
-                    </t>
-
-                    <!-- Settings Panel -->
-                    <div class="gd_share_settings_section" t-if="file.one_drive_file_id">
-                        <div class="gd_share_settings_toggle" t-on-click="toggleSettingsPanel">
-                            <i class="fa fa-cog"/>
-                            <span>Sharing settings</span>
-                            <i t-att-class="'fa ' + (state.showSettingsPanel ? 'fa-chevron-up' : 'fa-chevron-down')" style="margin-left: auto;"/>
-                        </div>
-                        <div class="gd_share_settings_panel" t-if="state.showSettingsPanel">
-                            <label class="gd_share_setting_row">
-                                <div class="gd_share_setting_info">
-                                    <span class="gd_share_setting_title">Editors can change permissions and share</span>
-                                    <span class="gd_share_setting_desc">Allow editors to add people and change access</span>
-                                </div>
-                                <div class="gd_share_toggle_switch">
-                                    <input type="checkbox" class="gd_share_toggle_input"
-                                           t-att-checked="state.writersCanShare"
-                                           t-on-change="onToggleWritersCanShare"/>
-                                    <span class="gd_share_toggle_slider"/>
-                                </div>
-                            </label>
-                            <label class="gd_share_setting_row">
-                                <div class="gd_share_setting_info">
-                                    <span class="gd_share_setting_title">Viewers and commenters can download, print, and copy</span>
-                                    <span class="gd_share_setting_desc">Disable to restrict viewers from downloading</span>
-                                </div>
-                                <div class="gd_share_toggle_switch">
-                                    <input type="checkbox" class="gd_share_toggle_input"
-                                           t-att-checked="!state.copyRequiresWriterPermission"
-                                           t-on-change="onToggleCopyRequiresWriter"/>
-                                    <span class="gd_share_toggle_slider"/>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-                </t>
-
-                <!-- Footer -->
-                <div class="gd_share_footer">
-                    <button class="gd_share_copy_btn" t-on-click="onCopyLink" t-att-class="{ 'gd_share_copied': state.copied }">
-                        <t t-if="state.copied">
-                            <i class="fa fa-check"/>
-                            <span>Copied!</span>
-                        </t>
-                        <t t-else="">
-                            <i class="fa fa-link"/>
-                            <span>Copy link</span>
-                        </t>
+                    <button class="od_hdr_sync_btn"
+                            t-att-class="{ 'is-syncing': state.isSyncing, 'is-synced': state.justSynced }"
+                            t-on-click.stop="refreshPermissions" title="Sync from OneDrive">
+                        <i t-att-class="state.isSyncing ? 'fa fa-refresh fa-spin' : 'fa fa-refresh'"/>
+                        <span t-if="state.justSynced">Updated</span>
+                        <span t-elif="state.isSyncing">Syncing&#x2026;</span>
+                        <span t-else="">Sync</span>
                     </button>
-                    <button class="gd_share_done_btn" t-on-click="props.close">Done</button>
                 </div>
-                <!-- Fullscreen Loader for background actions -->
-                <div class="gd_fullscreen_loader" t-if="state.showActionLoader">
-                    <div class="gd_fullscreen_loader_content">
-                        <div class="gd_fullscreen_spinner"/>
+
+                <!-- ══ LOADING ══ -->
+                <t t-if="state.loading">
+                    <div class="od_loading">
+                        <div class="od_spinner"/>
+                        <span>Loading&#x2026;</span>
+                    </div>
+                </t>
+
+                <!-- ══ ERROR ══ -->
+                <t t-elif="state.error">
+                    <div class="od_error_box">
+                        <i class="fa fa-exclamation-circle"/>
+                        <div>
+                            <strong>Error loading permissions</strong>
+                            <p t-esc="state.error"/>
+                        </div>
+                        <button class="od_retry_btn" t-on-click="loadShareInfo"><i class="fa fa-refresh"/> Retry</button>
+                    </div>
+                </t>
+
+                <!-- ══ MULTI FILE ══ -->
+                <t t-elif="!isSingleFile">
+                    <div class="od_section">
+                        <div class="od_section_head">Shareable Links</div>
+                        <t t-foreach="shareableFiles" t-as="sf" t-key="sf.id">
+                            <div class="od_link_row">
+                                <div class="od_link_row_icon"><i class="fa fa-link"/></div>
+                                <div class="od_link_row_body">
+                                    <div class="od_link_row_name" t-esc="sf.name"/>
+                                    <input class="od_link_input" type="text" t-att-value="sf.one_drive_url" readonly="true"/>
+                                </div>
+                            </div>
+                        </t>
+                        <div class="od_info_box" t-if="shareableFiles.length === 0">
+                            <i class="fa fa-info-circle"/> No shareable links. Sync items to OneDrive first.
+                        </div>
+                    </div>
+                </t>
+
+                <!-- ══ SINGLE FILE FULL UI ══ -->
+                <t t-else="">
+                    <div class="od_info_box" t-if="!this.file.one_drive_file_id">
+                        <i class="fa fa-cloud-upload"/> File not synced to OneDrive yet.
+                    </div>
+
+                    <t t-if="this.file.one_drive_file_id">
+
+                        <!-- ── INVITE PEOPLE ── -->
+                        <div class="od_section od_invite_section">
+                            <div class="od_invite_bar">
+                                <div class="od_invite_input_wrap" t-on-click.stop="">
+                                    <i class="fa fa-search od_search_ico"/>
+                                    <input type="email" id="od_invite_input"
+                                           class="od_invite_input"
+                                           placeholder="Add name or email address&#x2026;"
+                                           t-att-value="state.addEmail"
+                                           t-on-input="onEmailInput"
+                                           t-on-keydown="onEmailKeydown"
+                                           t-att-disabled="state.addingPerson"
+                                           autocomplete="off"/>
+                                    <button class="od_ab_btn" title="Pick from Contacts" t-on-click.stop="toggleContactPicker">
+                                        <i class="fa fa-address-book-o"/>
+                                    </button>
+                                    <!-- Contact Picker -->
+                                    <div class="od_contact_picker" t-if="state.showContactPicker" t-on-click.stop="">
+                                        <div class="od_cp_search">
+                                            <i class="fa fa-search"/>
+                                            <input type="text" placeholder="Search contacts&#x2026;"
+                                                   t-att-value="state.contactSearchQuery"
+                                                   t-on-input="onContactSearchInput"
+                                                   t-on-keydown="onContactKeydown"
+                                                   autofocus="true"/>
+                                        </div>
+                                        <div class="od_cp_list">
+                                            <t t-if="state.contactLoading"><div class="od_cp_status"><i class="fa fa-spin fa-refresh"/> Searching&#x2026;</div></t>
+                                            <t t-elif="state.contactSearchResults.length === 0"><div class="od_cp_status">No contacts found</div></t>
+                                            <t t-else="">
+                                                <t t-foreach="state.contactSearchResults" t-as="c" t-key="c.id">
+                                                    <div class="od_cp_row" t-on-click="() => this.selectContact(c)">
+                                                        <div class="od_avatar">
+                                                            <t t-if="c.image_128"><img t-attf-src="data:image/png;base64,#{c.image_128}" alt=""/></t>
+                                                            <t t-else=""><span t-esc="c.name.charAt(0).toUpperCase()"/></t>
+                                                        </div>
+                                                        <div class="od_cp_info">
+                                                            <span t-esc="c.name"/>
+                                                            <small t-esc="c.email"/>
+                                                        </div>
+                                                    </div>
+                                                </t>
+                                            </t>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Role pill -->
+                                <div class="od_role_wrap" t-on-click.stop="">
+                                    <div class="od_role_pill od_role_clickable" t-on-click="toggleInviteRoleDropdown">
+                                        <span t-esc="state.addRole === 'writer' ? 'Can edit' : 'Can view'"/>
+                                        <i class="fa fa-chevron-down"/>
+                                    </div>
+                                    <div class="od_dd" t-if="state.showInviteRoleDropdown">
+                                        <div class="od_dd_item" t-att-class="{ active: state.addRole === 'writer' }" t-on-click="() => this.setAddRole('writer')">
+                                            <i class="fa fa-pencil"/> <span>Can edit</span><small>Modify and share</small>
+                                            <i class="fa fa-check od_tick" t-if="state.addRole === 'writer'"/>
+                                        </div>
+                                        <div class="od_dd_item" t-att-class="{ active: state.addRole === 'reader' }" t-on-click="() => this.setAddRole('reader')">
+                                            <i class="fa fa-eye"/> <span>Can view</span><small>Read-only</small>
+                                            <i class="fa fa-check od_tick" t-if="state.addRole === 'reader'"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button class="od_send_btn" t-on-click="addPerson"
+                                        t-att-disabled="!state.addEmail.trim() || state.addingPerson">
+                                    <t t-if="state.addingPerson"><i class="fa fa-spinner fa-spin"/></t>
+                                    <t t-else=""><i class="fa fa-paper-plane"/> Send</t>
+                                </button>
+                            </div>
+
+                            <!-- Notify toggle -->
+                            <label class="od_notify_row">
+                                <div class="od_toggle">
+                                    <input type="checkbox" class="od_toggle_cb"
+                                           t-att-checked="state.sendNotification"
+                                           t-on-change="(ev) => { this.state.sendNotification = ev.target.checked; }"/>
+                                    <span class="od_toggle_track"/>
+                                </div>
+                                <span class="od_notify_lbl">Notify people</span>
+                                <small>Send an email invitation</small>
+                            </label>
+                        </div>
+
+                        <!-- ── PEOPLE WITH ACCESS ── -->
+                        <div class="od_section" t-if="state.permissions.length > 0">
+                            <div class="od_section_head">
+                                People <span class="od_count_badge" t-esc="state.permissions.length"/>
+                            </div>
+                            <div class="od_people_list">
+                                <t t-foreach="state.permissions" t-as="perm" t-key="perm.id">
+                                    <div class="od_person_row">
+                                        <div class="od_avatar od_avatar_lg">
+                                            <t t-if="perm.photoLink">
+                                                <img t-att-src="perm.photoLink" alt="" t-on-error="(ev) => this.onImageError(ev, perm)"/>
+                                            </t>
+                                            <t t-else="">
+                                                <span t-esc="getPermInitial(perm)" t-att-class="{ 'od_hidden': perm.photoLink }"/>
+                                            </t>
+                                        </div>
+                                        <div class="od_person_info">
+                                            <div class="od_person_name" t-esc="perm.displayName || perm.emailAddress"/>
+                                            <div class="od_person_email" t-if="perm.displayName and perm.emailAddress" t-esc="perm.emailAddress"/>
+                                        </div>
+                                        <div class="od_role_wrap" t-on-click.stop="">
+                                            <t t-if="perm.role === 'owner'">
+                                                <div class="od_role_pill od_role_owner"><i class="fa fa-star"/> Owner</div>
+                                            </t>
+                                            <t t-else="">
+                                                <div class="od_role_pill od_role_clickable" t-on-click="() => this.togglePermRoleDropdown(perm.id)">
+                                                    <span t-esc="perm.role === 'writer' ? 'Can edit' : 'Can view'"/>
+                                                    <i class="fa fa-chevron-down"/>
+                                                </div>
+                                                <div class="od_dd" t-if="state.activePermRoleDropdown === perm.id">
+                                                    <div class="od_dd_item" t-att-class="{ active: perm.role === 'writer' }" t-on-click="() => this.updatePermissionRole(perm, 'writer')">
+                                                        <i class="fa fa-pencil"/> <span>Can edit</span><small>Full access</small>
+                                                        <i class="fa fa-check od_tick" t-if="perm.role === 'writer'"/>
+                                                    </div>
+                                                    <div class="od_dd_item" t-att-class="{ active: perm.role === 'reader' }" t-on-click="() => this.updatePermissionRole(perm, 'reader')">
+                                                        <i class="fa fa-eye"/> <span>Can view</span><small>Read-only</small>
+                                                        <i class="fa fa-check od_tick" t-if="perm.role === 'reader'"/>
+                                                    </div>
+                                                    <div class="od_dd_sep"/>
+                                                    <div class="od_dd_item od_dd_danger" t-on-click="() => this.removePermission(perm)">
+                                                        <i class="fa fa-user-times"/> <span>Remove access</span>
+                                                    </div>
+                                                </div>
+                                            </t>
+                                        </div>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+
+                        <!-- ── LINKS ── -->
+                        <div class="od_section" t-if="state.links.length > 0">
+                            <div class="od_section_head">
+                                Links <span class="od_count_badge" t-esc="state.links.length"/>
+                            </div>
+                            <div class="od_links_list">
+                                <t t-foreach="state.links" t-as="lnk" t-key="lnk.id">
+                                    <div class="od_link_block">
+                                        <!-- Link header: clickable accordion -->
+                                        <div class="od_link_block_hdr" style="cursor: pointer;" t-on-click="() => this.toggleLinkExpand(lnk.id)">
+                                            <div class="od_link_block_ico"
+                                                 t-att-class="{ 'od_lc_edit': lnk.role === 'writer', 'od_lc_view': lnk.role === 'reader' }">
+                                                <i t-att-class="lnk.scope === 'anonymous' ? 'fa fa-globe' : (lnk.scope === 'organization' ? 'fa fa-users' : 'fa fa-lock')"/>
+                                            </div>
+                                            <div class="od_link_block_meta">
+                                                <!-- If it has specific recipients, show their emails -->
+                                                <t t-if="lnk.recipients.length > 0">
+                                                    <div class="od_link_block_desc" t-esc="lnk.recipients.join(', ')"/>
+                                                    <div style="font-size: 0.75rem; color: #6b7280; margin-top: 2px;" t-esc="lnk.description"/>
+                                                </t>
+                                                <!-- Otherwise just show 'Anyone with the link can view', etc. -->
+                                                <t t-else="">
+                                                    <div class="od_link_block_desc" t-esc="lnk.description"/>
+                                                </t>
+                                            </div>
+                                            <div class="od_link_exp_ico" style="display:flex; align-items:center; padding-left:10px;">
+                                                <i class="fa" t-att-class="state.expandedLinks[lnk.id] ? 'fa-chevron-up' : 'fa-chevron-down'"/>
+                                            </div>
+                                        </div>
+
+                                        <!-- Collapsible Body -->
+                                        <t t-if="state.expandedLinks[lnk.id]">
+                                            <div class="od_link_people" style="border-top: 1px solid #e8eaf6; padding-top: 10px;">
+                                                <div class="od_link_block_url_row" style="margin-bottom: 12px;">
+                                                    <input type="text" class="od_link_url_input"
+                                                           t-att-value="lnk.url" readonly="true"/>
+                                                    <button class="od_copy_mini_btn"
+                                                            t-on-click.stop="() => this.copyLinkUrl(lnk.url)"
+                                                            title="Copy link">
+                                                        <i class="fa fa-copy"/>
+                                                    </button>
+                                                </div>
+
+                                                <t t-if="lnk.recipients.length > 0">
+                                                    <div class="od_link_people_label" style="padding-top: 0;">
+                                                        <i class="fa fa-users"/> This link works for:
+                                                    </div>
+                                                    <t t-foreach="lnk.recipients" t-as="email" t-key="email">
+                                                        <div class="od_link_person_card">
+                                                            <div class="od_avatar od_avatar_sm">
+                                                                <span t-esc="email.charAt(0).toUpperCase()"/>
+                                                            </div>
+                                                            <div class="od_link_person_info">
+                                                                <span class="od_link_person_email" t-esc="email"/>
+                                                            </div>
+                                                            <!-- Role dropdown per recipient -->
+                                                            <div class="od_role_wrap" t-on-click.stop="">
+                                                                <div class="od_role_pill od_role_clickable"
+                                                                     t-on-click="() => this.toggleLinkPersonDropdown(lnk.id + '_' + email)">
+                                                                    <span t-esc="lnk.role === 'writer' ? 'Can edit' : 'Can view'"/>
+                                                                    <i class="fa fa-chevron-down"/>
+                                                                </div>
+                                                                <div class="od_dd" t-if="state.activeLinkPersonDropdown === lnk.id + '_' + email">
+                                                                    <div class="od_dd_item"
+                                                                         t-att-class="{ active: lnk.role === 'writer' }"
+                                                                         t-on-click="() => this.updateLinkPersonRole(lnk, email, 'writer')">
+                                                                        <i class="fa fa-pencil"/>
+                                                                        <div class="od_dd_text">
+                                                                            <span>Can edit</span>
+                                                                            <small>Modify and share</small>
+                                                                        </div>
+                                                                        <i class="fa fa-check od_tick" t-if="lnk.role === 'writer'"/>
+                                                                    </div>
+                                                                    <div class="od_dd_item"
+                                                                         t-att-class="{ active: lnk.role === 'reader' }"
+                                                                         t-on-click="() => this.updateLinkPersonRole(lnk, email, 'reader')">
+                                                                        <i class="fa fa-eye"/>
+                                                                        <div class="od_dd_text">
+                                                                            <span>Can view</span>
+                                                                            <small>Read-only</small>
+                                                                        </div>
+                                                                        <i class="fa fa-check od_tick" t-if="lnk.role === 'reader'"/>
+                                                                    </div>
+                                                                    <div class="od_dd_sep"/>
+                                                                    <div class="od_dd_item od_dd_danger"
+                                                                         t-on-click="() => this.removeLinkPerson(lnk, email)">
+                                                                        <i class="fa fa-user-times"/>
+                                                                        <div class="od_dd_text">
+                                                                            <span>Remove access</span>
+                                                                            <small>Revoke this person's link</small>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </t>
+                                                </t>
+                                                <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+                                                    <button class="od_btn od_btn_danger" style="padding: 4px 10px; font-size: 0.75rem;"
+                                                            t-on-click.stop="() => this.revokeLink(lnk)"
+                                                            title="Delete entire link">
+                                                        <i class="fa fa-trash"/> Delete link
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </t>
+                                    </div>
+
+                                </t>
+                            </div>
+                        </div>
+
+
+
+                    </t>
+                </t>
+
+                <!-- ══ FOOTER ══ -->
+                <div class="od_footer">
+                    <button class="od_btn od_btn_ghost" t-on-click="onCopyLink"
+                            t-att-class="{ copied: state.copied }">
+                        <i t-att-class="state.copied ? 'fa fa-check' : 'fa fa-chain'"/>
+                        <span t-esc="state.copied ? 'Copied!' : 'Copy link'"/>
+                    </button>
+                    <button class="od_btn od_btn_primary" t-on-click="props.close">Done</button>
+                </div>
+
+                <!-- ══ LOADER ══ -->
+                <div class="od_overlay" t-if="state.showActionLoader">
+                    <div class="od_overlay_card">
+                        <div class="od_spinner"/>
                         <span t-esc="state.loaderMessage"/>
                     </div>
                 </div>
+
             </div>
             <t t-set-slot="footer"/>
         </Dialog>
     </t>
 
-    <t t-name="one_drive_odoo_integration.FolderTreeNode">
+<t t-name="one_drive_odoo_integration.FolderTreeNode">
         <div class="gd_tree_node_wrap">
             <div class="gd_tree_node"
                  t-att-class="{ 'gd_tree_active': state.activeFolderTreeId === folder.id }"
