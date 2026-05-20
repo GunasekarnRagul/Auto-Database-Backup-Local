@@ -151,7 +151,7 @@
                                         <img src="/one_drive_odoo_integration/static/src/img/one-drive.png" alt="Drive" class="gd_drive_icon"/>
                                     </t>
                                     <t t-else="">
-                                        <i class="fa fa-google gd_drive_icon"/>
+                                        <i class="fa fa-cloud gd_drive_icon"/>
                                     </t>
                                     <div class="gd_drive_info">
                                         <span class="gd_drive_name" t-esc="drive.name"/>
