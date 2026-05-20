@@ -840,6 +840,15 @@ class GoogleDriveSync(models.Model):
         if not file_record.one_drive_file_id:
             return {'permissions': [], 'generalAccess': 'restricted', 'role': 'reader'}
 
+        def _extract_user(identity_obj):
+            if not identity_obj:
+                return None
+            u = (identity_obj.get('user')
+                 or identity_obj.get('siteUser')
+                 or identity_obj.get('group')
+                 or identity_obj.get('remoteUser'))
+            return u
+
         config = file_record.drive_config_id
         access_token = self._get_access_token(config)
         if not access_token:
@@ -887,6 +896,13 @@ class GoogleDriveSync(models.Model):
                             if email and email not in link_recipients:
                                 link_recipients.append(email)
 
+                        # Fallback: check if the permission itself has grantedTo / grantedToV2
+                        single_user = _extract_user(perm.get('grantedToV2')) or _extract_user(perm.get('grantedTo'))
+                        if single_user:
+                            single_email = single_user.get('email') or single_user.get('userPrincipalName') or single_user.get('loginName', '')
+                            if single_email and single_email not in link_recipients:
+                                link_recipients.append(single_email)
+
                         links_permissions.append({
                             'id': perm.get('id'),
                             'url': link_obj.get('webUrl', ''),
@@ -908,15 +924,6 @@ class GoogleDriveSync(models.Model):
 
                     # ── Direct People Permissions ─────────────────────────
                     # Graph returns grantedTo (v1) or grantedToV2 (newer)
-                    def _extract_user(identity_obj):
-                        if not identity_obj:
-                            return None
-                        u = (identity_obj.get('user')
-                             or identity_obj.get('siteUser')
-                             or identity_obj.get('group')
-                             or identity_obj.get('remoteUser'))
-                        return u
-
                     user_info = _extract_user(perm.get('grantedToV2')) or _extract_user(perm.get('grantedTo'))
 
                     # Also handle grantedToIdentitiesV2 (returned by /invite for external users)
@@ -944,10 +951,25 @@ class GoogleDriveSync(models.Model):
                         else:
                             people_permissions.append(person)
 
+                # Compute unique specific shared users excluding owner
+                shared_emails = set()
+                for p in people_permissions:
+                    if p.get('role') != 'owner' and p.get('emailAddress'):
+                        shared_emails.add(p['emailAddress'].lower())
+                    elif p.get('role') != 'owner' and p.get('displayName'):
+                        shared_emails.add(p['displayName'].lower())
+
+                for link in links_permissions:
+                    if link.get('scope') not in ('anonymous', 'organization'):
+                        for r in link.get('recipients', []):
+                            if r:
+                                shared_emails.add(r.lower())
+
                 # Update local record with synced state
                 file_record.sudo().write({
                     'permission_type': general_access,
                     'anyone_role': anyone_role,
+                    'shared_people_count': len(shared_emails),
                 })
 
                 return {
@@ -1002,6 +1024,7 @@ class GoogleDriveSync(models.Model):
                           file_type=file_record.file_type,
                           one_drive_file_id=file_record.one_drive_file_id,
                           duration=elapsed)
+                self.get_file_permissions(file_record)
                 return {
                     'success': True,
                     'permissions': response.json().get('value', [])
@@ -1098,6 +1121,7 @@ class GoogleDriveSync(models.Model):
                         self._log(config, f'{file_record.name} → link role updated (users) to {role}',
                                   'share_update', file_type=file_record.file_type,
                                   one_drive_file_id=file_record.one_drive_file_id, duration=time.time() - t0)
+                        self.get_file_permissions(file_record)
                         return {'success': True, 'permissions': response.json().get('value', [])}
                     else:
                         error_data = response.json() if response.content else {}
@@ -1115,6 +1139,7 @@ class GoogleDriveSync(models.Model):
                         self._log(config, f'{file_record.name} → link role updated ({scope}) to {role}',
                                   'share_update', file_type=file_record.file_type,
                                   one_drive_file_id=file_record.one_drive_file_id, duration=time.time() - t0)
+                        self.get_file_permissions(file_record)
                         return {'success': True, 'permission': response.json()}
                     else:
                         error_data = response.json() if response.content else {}
@@ -1132,6 +1157,7 @@ class GoogleDriveSync(models.Model):
                               file_type=file_record.file_type,
                               one_drive_file_id=file_record.one_drive_file_id,
                               duration=time.time() - t0)
+                    self.get_file_permissions(file_record)
                     return {'success': True, 'permission': perm_data}
                 else:
                     error_data = response.json() if response.content else {}
@@ -1173,6 +1199,7 @@ class GoogleDriveSync(models.Model):
                           file_type=file_record.file_type,
                           one_drive_file_id=file_record.one_drive_file_id,
                           duration=elapsed)
+                self.get_file_permissions(file_record)
                 return {'success': True}
             else:
                 error_data = response.json() if response.content else {}
@@ -1259,6 +1286,7 @@ class GoogleDriveSync(models.Model):
                     self._log(config, f'{file_record.name} → general access: {access_type} ({role}, block_download={block_download})',
                               'share_general', file_type=file_record.file_type,
                               one_drive_file_id=file_record.one_drive_file_id, duration=elapsed)
+                    self.get_file_permissions(file_record)
                     return data
                 else:
                     err_msg = response.text
@@ -1274,6 +1302,7 @@ class GoogleDriveSync(models.Model):
                 self._log(config, f'{file_record.name} → general access: restricted',
                           'share_general', file_type=file_record.file_type,
                           one_drive_file_id=file_record.one_drive_file_id, duration=time.time() - t0)
+                self.get_file_permissions(file_record)
                 return {'success': True}
 
         except Exception as e:

@@ -974,6 +974,7 @@ export class GoogleDriveDashboard extends Component {
                         <tr>
                           <th>File</th>
                           <th>Location</th>
+                          <th>Record</th>
                           <th>Access</th>
                           <th style="width: 80px; text-align: right;">Actions</th>
                         </tr>
@@ -983,6 +984,13 @@ export class GoogleDriveDashboard extends Component {
                         <tr>
                           <td class="gd-fn"><i class="fa ${fileIcon(f)}"></i> ${_esc(f.name)}</td>
                           <td class="text-muted" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${_esc(f.display_path || '—')}">${_esc(f.display_path || '—')}</td>
+                          <td>
+                            ${f.res_model && f.res_id && f.record_name ? `
+                              <a href="#" class="gd-record-link" data-model="${f.res_model}" data-id="${f.res_id}" style="color: var(--gd-blue); text-decoration: none; font-weight: 500;" title="Open Related Record">
+                                <i class="fa fa-external-link" style="margin-right: 4px;"></i>${_esc(f.res_model_label)}: ${_esc(f.record_name)}
+                              </a>
+                            ` : `<span class="text-muted">—</span>`}
+                          </td>
                           <td>
                             <span class="gd-sl-badge ${permClass(f.permission_type)}">
                               <i class="fa ${permIcon(f.permission_type)}"></i> ${permLabel(f)}
@@ -1011,6 +1019,24 @@ export class GoogleDriveDashboard extends Component {
                         const fileId = parseInt(btn.dataset.id);
                         const file = d.find(f => f.id === fileId);
                         if (file) this._openShareWizard(file);
+                    });
+                });
+
+                // Record link click → open the related Odoo record form view
+                el.querySelectorAll('.gd-record-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const model = link.dataset.model;
+                        const resId = parseInt(link.dataset.id);
+                        if (model && resId) {
+                            this.action.doAction({
+                                type: 'ir.actions.act_window',
+                                res_model: model,
+                                res_id: resId,
+                                views: [[false, 'form']],
+                                target: 'current',
+                            });
+                        }
                     });
                 });
 

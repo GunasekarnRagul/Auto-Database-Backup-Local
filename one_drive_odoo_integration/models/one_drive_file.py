@@ -44,8 +44,8 @@ class GoogleDriveFile(models.Model):
     active = fields.Boolean('Active', default=True)
     display_path = fields.Char('Location', compute='_compute_display_path')
     attachment_id = fields.Many2one('ir.attachment', string='Related Attachment', compute='_compute_attachment_id', store=True)
-    res_model = fields.Char('Resource Model', related='attachment_id.res_model', store=True, index=True)
-    res_id = fields.Many2oneReference('Resource ID', related='attachment_id.res_id', model_field='res_model', store=True, index=True)
+    res_model = fields.Char('Resource Model', compute='_compute_res_model_id', store=True, index=True, readonly=False)
+    res_id = fields.Many2oneReference('Resource ID', compute='_compute_res_model_id', model_field='res_model', store=True, index=True, readonly=False)
     
     # Sharing / Permissions tracking
     permission_type = fields.Selection([
@@ -68,6 +68,20 @@ class GoogleDriveFile(models.Model):
                 record.attachment_id = attachment.id if attachment else False
             else:
                 record.attachment_id = False
+
+    @api.depends('attachment_id', 'attachment_id.res_model', 'attachment_id.res_id', 'parent_folder_id', 'parent_folder_id.res_model', 'parent_folder_id.res_id')
+    def _compute_res_model_id(self):
+        for record in self:
+            if record.attachment_id:
+                record.res_model = record.attachment_id.res_model
+                record.res_id = record.attachment_id.res_id
+            elif record.parent_folder_id and record.parent_folder_id.res_model:
+                record.res_model = record.parent_folder_id.res_model
+                record.res_id = record.parent_folder_id.res_id
+            else:
+                record.res_model = record.res_model or False
+                record.res_id = record.res_id or False
+
 
     @api.depends('drive_config_id', 'root_folder_id', 'parent_folder_id')
     def _compute_display_path(self):

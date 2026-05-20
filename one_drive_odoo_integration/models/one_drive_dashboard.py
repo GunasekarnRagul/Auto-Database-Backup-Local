@@ -583,6 +583,19 @@ class GoogleDriveDashboard(models.AbstractModel):
                 if f.shared_people_count > 0:
                     access_label += f" + {f.shared_people_count} people"
 
+                model_rec = self.env['ir.model'].sudo().search(
+                    [('model', '=', f.res_model)], limit=1
+                ) if f.res_model else None
+                
+                record_name = False
+                if f.res_model and f.res_id:
+                    try:
+                        rec = self.env[f.res_model].sudo().browse(f.res_id)
+                        if rec.exists():
+                            record_name = rec.display_name
+                    except Exception:
+                        pass
+
                 result.append({
                     'id': f.id,
                     'name': f.name,
@@ -599,6 +612,10 @@ class GoogleDriveDashboard(models.AbstractModel):
                     'drive_config_id': f.drive_config_id.id,
                     'parent_folder_id': f.parent_folder_id.id if f.parent_folder_id else False,
                     'root_folder_id': f.root_folder_id.id if f.root_folder_id else False,
+                    'res_model': f.res_model or '',
+                    'res_model_label': model_rec.name if model_rec else (f.res_model or ''),
+                    'res_id': f.res_id or False,
+                    'record_name': record_name or '',
                 })
             return result
         except Exception as e:

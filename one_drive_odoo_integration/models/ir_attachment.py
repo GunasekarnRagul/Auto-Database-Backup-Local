@@ -583,7 +583,7 @@ class IrAttachment(models.Model):
         current_local_parent_id = config.google_folder_id.id
         current_drive_parent_id = parent_id
 
-        def get_or_create_local_folder(f_name, parent_local, config_drive_id, one_drive_id, one_drive_url):
+        def get_or_create_local_folder(f_name, parent_local, config_drive_id, one_drive_id, one_drive_url, folder_res_model=False, folder_res_id=False):
             search_domain = [
                 ('name', '=', f_name),
                 ('parent_folder_id', '=', parent_local),
@@ -604,6 +604,8 @@ class IrAttachment(models.Model):
                             'one_drive_url': one_drive_url,
                             'sync_state': 'synced',
                             'owner_name': self.env.user.name,
+                            'res_model': folder_res_model,
+                            'res_id': folder_res_id,
                         })
                 except Exception:
                     # Another process won the race; re-search to get that record.
@@ -616,7 +618,8 @@ class IrAttachment(models.Model):
             if root_res:
                 current_local_parent_id = get_or_create_local_folder(
                     model_root, current_local_parent_id, config.one_drive_id.id,
-                    root_res['one_drive_file_id'], root_res.get('one_drive_url')
+                    root_res['one_drive_file_id'], root_res.get('one_drive_url'),
+                    folder_res_model=res_model, folder_res_id=False
                 )
                 # Notify explorer that the root config folder has new contents (the model folder)
                 self.env['one.drive.sync'].sudo()._notify_folder_sync(config.google_folder_id.id)
@@ -634,7 +637,8 @@ class IrAttachment(models.Model):
                         folder_to_notify = current_local_parent_id
                         current_local_parent_id = get_or_create_local_folder(
                             part, current_local_parent_id, config.one_drive_id.id,
-                            part_res['one_drive_file_id'], part_res.get('one_drive_url')
+                            part_res['one_drive_file_id'], part_res.get('one_drive_url'),
+                            folder_res_model=res_model, folder_res_id=res_id
                         )
                         # Notify explorer that this parent folder now has a new sub-folder
                         self.env['one.drive.sync'].sudo()._notify_folder_sync(folder_to_notify)
@@ -757,6 +761,8 @@ class IrAttachment(models.Model):
                         'owner_name': self.env.user.name,
                         'sync_state': 'synced',
                         'last_synced': fields.Datetime.now(),
+                        'res_model': res_model,
+                        'res_id': res_id,
                     })
                 
                 # Trigger real-time File Explorer refresh for the target folder
