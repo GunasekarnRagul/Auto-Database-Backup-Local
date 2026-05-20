@@ -216,16 +216,25 @@ class AttachmentSyncConfig(models.Model):
 
         return mail_atts | direct_filtered
 
-    @api.depends('model_name')
+    @api.depends('model_name', 'sync_count', 'file_type', 'storage_mode', 'one_drive_id', 'google_folder_id')
     def _compute_model_attachment_count(self):
-        """Count total attachments in Odoo for the selected model. """
+        """Count total attachments in Odoo matching the configuration criteria."""
         for record in self:
             if record.model_name:
-                record.model_attachment_count = len(record._get_target_attachments())
+                all_attachments = record._get_target_attachments()
+                all_attachments = all_attachments.filtered(
+                    lambda a: a.one_drive_file_id or (a.datas or a.raw) and a.type != 'url'
+                )
+                if record.file_type != 'all':
+                    ir_att = self.env['ir.attachment']
+                    all_attachments = all_attachments.filtered(
+                        lambda att: ir_att._matches_file_type_filter(att, record)
+                    )
+                record.model_attachment_count = len(all_attachments)
             else:
                 record.model_attachment_count = 0
 
-    @api.depends('model_name', 'sync_count')
+    @api.depends('model_name', 'sync_count', 'file_type', 'storage_mode', 'one_drive_id', 'google_folder_id')
     def _compute_sync_statistics(self):
         """Compute detailed sync statistics for the dashboard.
         Fetches all attachments in a SINGLE call and filters in Python

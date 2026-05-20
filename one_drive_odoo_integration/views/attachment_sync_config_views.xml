@@ -248,20 +248,10 @@
 
                         <!-- Summary Cards Rows -->
                         <div class="row g-3 mb-4 px-2">
-                            <!-- Row 1: Primary Stats -->
-                            <div class="col-4">
-                                <button name="action_view_all_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); transition: all 0.2s;">
-                                    <div class="text-muted mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Total Files</div>
-                                    <div class="fw-bold" style="font-size: 2rem; color: #495057;">
-                                        <field name="model_attachment_count" class="p-0 m-0"/>
-                                    </div>
-                                    <small class="text-muted"><i class="fa fa-copy me-1"/>In Odoo Total</small>
-                                </button>
-                            </div>
-
+                            <!-- Row 1: Primary Stats (matching Kanban card values) -->
                             <div class="col-4">
                                 <button name="action_view_synced_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-color: #90caf9 !important; transition: all 0.2s;">
-                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #0d47a1;">Synced Total</div>
+                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #0d47a1;">Synced</div>
                                     <div class="fw-bold" style="font-size: 2rem; color: #0d47a1;">
                                         <field name="synced_attachment_count" class="p-0 m-0"/>
                                     </div>
@@ -270,19 +260,8 @@
                             </div>
 
                             <div class="col-4">
-                                <button name="action_view_unsynced_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%); border-color: #ffc107 !important; transition: all 0.2s;">
-                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #856404;">Not Synced</div>
-                                    <div class="fw-bold" style="font-size: 2rem; color: #856404;">
-                                        <field name="unsynced_attachment_count" class="p-0 m-0"/>
-                                    </div>
-                                    <small style="color: #856404;"><i class="fa fa-clock-o me-1"/>Pending Sync</small>
-                                </button>
-                            </div>
-
-                            <!-- Row 2: Storage Mode Details & Info -->
-                            <div class="col-4">
                                 <button name="action_view_dual_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border-color: #b1dfbb !important; transition: all 0.2s;">
-                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #155724;">Dual (Odoo + Drive)</div>
+                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #155724;">Dual</div>
                                     <div class="fw-bold" style="font-size: 2rem; color: #155724;">
                                         <field name="dual_attachment_count" class="p-0 m-0"/>
                                     </div>
@@ -291,8 +270,29 @@
                             </div>
 
                             <div class="col-4">
+                                <button name="action_view_unsynced_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%); border-color: #ffc107 !important; transition: all 0.2s;">
+                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #856404;">Pending</div>
+                                    <div class="fw-bold" style="font-size: 2rem; color: #856404;">
+                                        <field name="unsynced_attachment_count" class="p-0 m-0"/>
+                                    </div>
+                                    <small style="color: #856404;"><i class="fa fa-clock-o me-1"/>Pending Sync</small>
+                                </button>
+                            </div>
+
+                            <!-- Row 2: Secondary Stats -->
+                            <div class="col-4">
+                                <button name="action_view_all_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); transition: all 0.2s;">
+                                    <div class="text-muted mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Total Files</div>
+                                    <div class="fw-bold" style="font-size: 2rem; color: #495057;">
+                                        <field name="model_attachment_count" class="p-0 m-0"/>
+                                    </div>
+                                    <small class="text-muted"><i class="fa fa-copy me-1"/>Matching Rules</small>
+                                </button>
+                            </div>
+
+                            <div class="col-4">
                                 <button name="action_view_drive_only_files" type="object" class="btn border rounded-3 p-3 h-100 text-center w-100 d-block shadow-sm" style="background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); border-color: #ce93d8 !important; transition: all 0.2s;">
-                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #4a148c;">Drive Only (Link)</div>
+                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #4a148c;">Drive Only</div>
                                     <div class="fw-bold" style="font-size: 2rem; color: #4a148c;">
                                         <field name="drive_only_attachment_count" class="p-0 m-0"/>
                                     </div>
@@ -302,7 +302,7 @@
 
                             <div class="col-4">
                                 <div class="border rounded-3 p-3 h-100 text-center shadow-sm d-flex flex-column justify-content-center" style="background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%); border-color: #9fa8da !important;">
-                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #283593;">Last Synced Timestamp</div>
+                                    <div class="mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #283593;">Last Synced</div>
                                     <div class="fw-bold" style="font-size: 1.1rem; color: #283593;">
                                         <field name="last_synced" class="p-0 m-0" readonly="1"/>
                                     </div>

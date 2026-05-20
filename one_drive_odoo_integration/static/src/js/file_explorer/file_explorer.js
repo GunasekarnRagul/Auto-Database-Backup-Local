@@ -30,21 +30,26 @@ export class FileExplorer extends Component {
             });
         }
 
+        const savedFolderId = localStorage.getItem('gd_current_folder_id');
+        const savedActiveSection = localStorage.getItem('gd_active_section') || 'my_drive';
+        const savedActiveDriveId = localStorage.getItem('gd_active_drive_id');
+        const savedActiveRootId = localStorage.getItem('gd_active_root_id');
+
         this.state = useState({
             files: [],
             allFiles: [],
-            currentFolderId: null,
+            currentFolderId: savedFolderId ? (/^\d+$/.test(savedFolderId) ? parseInt(savedFolderId) : savedFolderId) : null,
             currentFolderName: '',
             loading: true,
             viewMode: 'list',
             searchQuery: '',
-            activeSection: 'my_drive',
+            activeSection: savedActiveSection,
             breadcrumbs: [],
             trashBreadcrumbs: [],
             trashCurrentFolderId: null,
             drives: [],
-            activeDriveId: null,
-            activeRootId: null,
+            activeDriveId: savedActiveDriveId ? parseInt(savedActiveDriveId) : null,
+            activeRootId: savedActiveRootId ? parseInt(savedActiveRootId) : null,
             rootFolders: [],
             showAccountMenu: false,
             // Inline folder creation
@@ -116,16 +121,34 @@ export class FileExplorer extends Component {
         });
 
         const params = this.props.action && this.props.action.params ? this.props.action.params : {};
-        if (params.drive_config_id) this.state.activeDriveId = params.drive_config_id;
-        if (params.parent_folder_id) this.state.currentFolderId = params.parent_folder_id;
-        if (params.root_folder_id) this.state.activeRootId = params.root_folder_id;
+        if (params.drive_config_id) {
+            this.state.activeDriveId = params.drive_config_id;
+            localStorage.setItem('gd_active_drive_id', params.drive_config_id);
+        }
+        if (params.parent_folder_id) {
+            this.state.currentFolderId = params.parent_folder_id;
+            localStorage.setItem('gd_current_folder_id', params.parent_folder_id);
+        }
+        if (params.root_folder_id) {
+            this.state.activeRootId = params.root_folder_id;
+            localStorage.setItem('gd_active_root_id', params.root_folder_id);
+        }
 
         // Also check URL hash for deep linking (when opened in new tab)
         const hashString = window.location.hash.substring(1);
         const urlParams = new URLSearchParams(hashString);
-        if (urlParams.get('gd_drive_id')) this.state.activeDriveId = parseInt(urlParams.get('gd_drive_id'));
-        if (urlParams.get('gd_parent_id')) this.state.currentFolderId = parseInt(urlParams.get('gd_parent_id'));
-        if (urlParams.get('gd_root_id')) this.state.activeRootId = parseInt(urlParams.get('gd_root_id'));
+        if (urlParams.get('gd_drive_id')) {
+            this.state.activeDriveId = parseInt(urlParams.get('gd_drive_id'));
+            localStorage.setItem('gd_active_drive_id', this.state.activeDriveId);
+        }
+        if (urlParams.get('gd_parent_id')) {
+            this.state.currentFolderId = parseInt(urlParams.get('gd_parent_id'));
+            localStorage.setItem('gd_current_folder_id', this.state.currentFolderId);
+        }
+        if (urlParams.get('gd_root_id')) {
+            this.state.activeRootId = parseInt(urlParams.get('gd_root_id'));
+            localStorage.setItem('gd_active_root_id', this.state.activeRootId);
+        }
         if (urlParams.get('gd_file_id')) this.state.selectedFiles = { [parseInt(urlParams.get('gd_file_id'))]: true };
 
         this.uploadProgressTimers = {};
@@ -143,30 +166,71 @@ export class FileExplorer extends Component {
             if (this.state.activeDriveId) {
                 await this.loadRoots(this.state.activeDriveId);
             }
-            if (this.state.currentFolderId) {
-                try {
-                    const breadcrumbs = await this.orm.call("one.drive.file", "get_folder_breadcrumbs", [this.state.currentFolderId]);
-                    this.state.breadcrumbs = breadcrumbs;
-                    this.state.currentFolderName = breadcrumbs.length ? breadcrumbs[breadcrumbs.length - 1].name : this.activeDriveName;
-                } catch (e) {
-                    // Fallback
-                    this.state.breadcrumbs = [{ id: 'section', name: this.activeDriveName }];
-                    this.state.currentFolderName = this.activeDriveName;
+
+            const section = this.state.activeSection;
+            if (section === 'trash') {
+                this.state.isDriveOverview = false;
+                this.state.trashCurrentFolderId = this.state.currentFolderId;
+                this.state.trashBreadcrumbs = [{ id: 'section', name: 'Trash' }];
+                if (this.state.currentFolderId && this.state.currentFolderId !== 'trash_root') {
+                    try {
+                        const fileInfo = await this.orm.searchRead(
+                            "one.drive.file",
+                            [["id", "=", this.state.currentFolderId]],
+                            ["name"],
+                            { context: { active_test: false } }
+                        );
+                        if (fileInfo.length > 0) {
+                            this.state.currentFolderName = fileInfo[0].name;
+                            this.state.trashBreadcrumbs.push({ id: this.state.currentFolderId, name: fileInfo[0].name });
+                        }
+                    } catch (e) {
+                        this.state.currentFolderId = null;
+                        this.state.trashCurrentFolderId = null;
+                        this.state.currentFolderName = 'Trash';
+                    }
+                } else {
+                    this.state.currentFolderName = 'Trash';
                 }
+                await this.loadFiles(this.state.currentFolderId || 'trash_root');
+            } else if (section === 'starred' || section === 'recent') {
+                this.state.isDriveOverview = false;
+                this.state.breadcrumbs = [{ id: 'section', name: this._sectionLabel(section) }];
+                this.state.currentFolderName = this._sectionLabel(section);
+                await this.loadFiles(null);
             } else {
-                const driveName = this.activeDriveName;
-                this.state.currentFolderName = driveName;
-                this.state.breadcrumbs = [{ id: 'section', name: driveName }];
-                if (this.state.activeRootId) {
-                    const root = this.state.rootFolders.find(r => r.id === this.state.activeRootId);
-                    if (root) {
-                        this.state.breadcrumbs.push({ id: null, name: root.name });
-                        this.state.currentFolderName = root.name;
+                // Section: My Drive
+                if (this.state.currentFolderId) {
+                    try {
+                        const breadcrumbs = await this.orm.call("one.drive.file", "get_folder_breadcrumbs", [this.state.currentFolderId]);
+                        this.state.breadcrumbs = breadcrumbs;
+                        this.state.currentFolderName = breadcrumbs.length ? breadcrumbs[breadcrumbs.length - 1].name : this.activeDriveName;
+                        this.state.isDriveOverview = false;
+                    } catch (e) {
+                        this.state.currentFolderId = null;
+                        this.state.isDriveOverview = true;
                     }
                 }
+
+                if (!this.state.currentFolderId) {
+                    if (this.state.activeRootId) {
+                        const root = this.state.rootFolders.find(r => r.id === this.state.activeRootId);
+                        const rootName = root ? root.name : 'Root';
+                        this.state.currentFolderName = rootName;
+                        this.state.breadcrumbs = [
+                            { id: 'section', name: this.activeDriveName },
+                            { id: null, name: rootName }
+                        ];
+                        this.state.isDriveOverview = false;
+                    } else {
+                        this.state.currentFolderName = this.activeDriveName;
+                        this.state.breadcrumbs = [{ id: 'section', name: this.activeDriveName }];
+                        this.state.isDriveOverview = this.state.rootFolders.length > 0;
+                    }
+                }
+                await this.loadFiles(this.state.currentFolderId);
             }
-            await this.loadFiles(this.state.currentFolderId);
-            
+
             // Apply deep-linked file selection after loadFiles clears it
             const hashString = window.location.hash.substring(1);
             const urlParams = new URLSearchParams(hashString);
@@ -203,10 +267,15 @@ export class FileExplorer extends Component {
         );
         this.state.rootFolders = roots;
 
-        // If there's only one root, auto-select it. Otherwise show overview.
-        if (roots.length === 1) {
+        // Restore activeRootId from state/localStorage if valid for these roots
+        const savedRootId = this.state.activeRootId;
+        if (savedRootId && roots.some(r => r.id === savedRootId)) {
+            this.state.activeRootId = savedRootId;
+            this.state.isDriveOverview = false;
+        } else if (roots.length === 1) {
             this.state.activeRootId = roots[0].id;
             this.state.isDriveOverview = false;
+            localStorage.setItem('gd_active_root_id', roots[0].id);
         } else {
             this.state.activeRootId = null;
             this.state.isDriveOverview = roots.length > 0;
@@ -376,6 +445,24 @@ export class FileExplorer extends Component {
         this.state.loading = true;
         this.state.currentFolderId = folderId;
         this.clearSelection();
+
+        // Save current navigation state to localStorage
+        localStorage.setItem('gd_active_section', section || '');
+        if (this.state.activeDriveId) {
+            localStorage.setItem('gd_active_drive_id', this.state.activeDriveId);
+        } else {
+            localStorage.removeItem('gd_active_drive_id');
+        }
+        if (this.state.activeRootId) {
+            localStorage.setItem('gd_active_root_id', this.state.activeRootId);
+        } else {
+            localStorage.removeItem('gd_active_root_id');
+        }
+        if (folderId) {
+            localStorage.setItem('gd_current_folder_id', folderId);
+        } else {
+            localStorage.removeItem('gd_current_folder_id');
+        }
 
         let files = [];
         const commonFields = [
