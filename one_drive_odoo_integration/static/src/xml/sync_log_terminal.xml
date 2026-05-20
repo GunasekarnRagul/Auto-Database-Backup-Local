@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<t t-name="one_drive_odoo_integration.SyncLogTerminal">
+    <div class="one_drive-terminal">
+        <!-- Terminal Title Bar -->
+        <div class="term-titlebar">
+            <div class="term-titlebar-title">
+                <i class="fa fa-cloud me-2"/>Activity Log — OneDrive Sync
+            </div>
+            <div class="term-titlebar-actions">
+                <button class="term-btn" t-on-click="onRefresh" title="Refresh">
+                    <i class="fa fa-refresh" t-att-class="{ 'fa-spin': state.loading }"/>
+                </button>
+                <button class="term-btn term-btn-danger" t-on-click="onClearLogs" title="Clear All Logs">
+                    <i class="fa fa-trash"/>
+                </button>
+            </div>
+        </div>
+
+        <!-- Stats Bar -->
+        <div class="term-stats-bar">
+            <div class="term-stat" t-on-click="() =&gt; this.setFilter('all')"
+                 t-att-class="{ 'active': state.filter === 'all' }">
+                <span class="term-stat-count"><t t-esc="state.stats.total"/></span>
+                <span class="term-stat-label">Total</span>
+            </div>
+            <div class="term-stat term-stat-success" t-on-click="() =&gt; this.setFilter('success')"
+                 t-att-class="{ 'active': state.filter === 'success' }">
+                <span class="term-stat-count"><t t-esc="state.stats.success"/></span>
+                <span class="term-stat-label">Success</span>
+            </div>
+            <div class="term-stat term-stat-fail" t-on-click="() =&gt; this.setFilter('fail')"
+                 t-att-class="{ 'active': state.filter === 'fail' }">
+                <span class="term-stat-count"><t t-esc="state.stats.fail"/></span>
+                <span class="term-stat-label">Failed</span>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="term-toolbar">
+            <div class="term-search term-user-select">
+                <i class="fa fa-user term-search-icon"/>
+                <select class="term-select" t-on-change="onUserFilterChange" t-att-value="state.userFilter">
+                    <option value="all">All Users</option>
+                    <t t-foreach="state.users" t-as="user" t-key="user.id">
+                        <option t-att-value="user.id"><t t-esc="user.name"/></option>
+                    </t>
+                </select>
+            </div>
+            <div class="term-search">
+                <i class="fa fa-search term-search-icon"/>
+                <input type="text" class="term-search-input"
+                       placeholder="Search files..."
+                       t-att-value="state.searchQuery"
+                       t-on-input="onSearchInput"
+                       t-on-keydown="onSearchKeydown"/>
+            </div>
+            <div class="term-filters">
+                <select class="term-select" t-on-change="setTypeFilter" t-att-value="state.typeFilter">
+                    <option value="all">All Types</option>
+                    <option value="manual">Manual</option>
+                    <option value="auto">Auto</option>
+                    <option value="cron">Cron</option>
+                    <option value="upload">Upload</option>
+                </select>
+                <select class="term-select" t-on-change="setOperationFilter" t-att-value="state.operationFilter">
+                    <t t-foreach="getOperationOptions()" t-as="opt" t-key="opt.value">
+                        <option t-att-value="opt.value"><t t-esc="opt.label"/></option>
+                    </t>
+                </select>
+            </div>
+            <div class="term-actions">
+                <div class="term-filter-container">
+                    <button class="term-btn term-btn-filter" 
+                            t-on-click="toggleDateMenu" 
+                            t-att-class="{ 'active': state.dateFilter !== 'all' }"
+                            title="Filter by Date">
+                        <i class="fa fa-filter"/>
+                        <span t-if="state.dateFilter !== 'all'" class="term-filter-dot"/>
+                    </button>
+                    <!-- Date Dropdown Menu -->
+                    <div class="term-filter-menu" t-if="state.showDateMenu">
+                        <div class="term-filter-item" t-on-click="() => this.setDateFilter('all')" t-att-class="{ 'active': state.dateFilter === 'all' }">All Time</div>
+                        <div class="term-filter-item" t-on-click="() => this.setDateFilter('today')" t-att-class="{ 'active': state.dateFilter === 'today' }">Today</div>
+                        <div class="term-filter-item" t-on-click="() => this.setDateFilter('3days')" t-att-class="{ 'active': state.dateFilter === '3days' }">Last 3 Days</div>
+                        <div class="term-filter-item" t-on-click="() => this.setDateFilter('week')" t-att-class="{ 'active': state.dateFilter === 'week' }">Last Week</div>
+                        <div class="term-filter-item" t-on-click="() => this.setDateFilter('2weeks')" t-att-class="{ 'active': state.dateFilter === '2weeks' }">Last 2 Weeks</div>
+                        <div class="term-filter-item" t-on-click="() => this.setDateFilter('month')" t-att-class="{ 'active': state.dateFilter === 'month' }">Last Month</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terminal Body -->
+        <div class="term-body" t-ref="terminalBody">
+            <!-- Boot message -->
+            <div class="term-boot">
+                <span class="term-dim">OneDrive Sync Logger v1.0</span>
+                <br/>
+                <span class="term-dim">Showing last <t t-esc="state.logs.length"/> of <t t-esc="state.totalCount"/> entries</span>
+                <br/>
+                <span class="term-dim">------------------------------------------------</span>
+            </div>
+
+            <!-- Loading -->
+            <t t-if="state.loading">
+                <div class="term-line">
+                    <span class="term-dim">[<i class="fa fa-spinner fa-spin"/>] Loading...</span>
+                </div>
+            </t>
+
+            <!-- Empty -->
+            <t t-if="!state.loading and state.logs.length === 0">
+                <div class="term-line">
+                    <span class="term-dim">$ No log entries found. Sync some files to see activity here.</span>
+                </div>
+            </t>
+
+            <!-- Log Lines -->
+            <t t-foreach="state.logs" t-as="log" t-key="log.id">
+                <div t-att-class="'term-line ' + (log.state === 'fail' ? 'term-line-fail' : '')">
+                    <!-- Timestamp -->
+                    <span class="term-ts"><t t-esc="formatTimestamp(log.create_date)"/></span>
+
+                    <!-- Status -->
+                    <span t-att-class="'term-status ' + getStateClass(log.state)">
+                        <t t-esc="getStateSymbol(log.state)"/>
+                    </span>
+
+                    <!-- Operation Badge -->
+                    <span t-att-class="'term-op term-op-' + (log.operation or 'sync')">
+                        <t t-esc="getOperationLabel(log.operation)"/>
+                    </span>
+
+                    <span class="term-type">
+                        [<t t-esc="getSyncTypeLabel(log.sync_type)"/>]
+                    </span>
+                    
+                    <!-- User -->
+                    <span class="term-user">
+                        <t t-if="log.user_name">
+                            <t t-esc="'@' + log.user_name"/>
+                        </t>
+                        <t t-else="">
+                            @System
+                        </t>
+                    </span>
+
+                    <!-- Drive / Root / Path / File -->
+                    <span class="term-path">
+                        <t t-if="log.operation === 'move'">
+                            <t t-foreach="getStyledMoveSegments(log.file_name)" t-as="seg" t-key="seg_index">
+                                <span t-att-class="seg.class"><t t-esc="seg.text"/></span>
+                            </t>
+                        </t>
+                        <t t-else="">
+                            <t t-if="log.drive_name">
+                                <span class="term-drive"><t t-esc="log.drive_name"/></span>
+                                <span class="term-sep">/</span>
+                            </t>
+                            <t t-if="log.root_folder_name">
+                                <span class="term-folder"><t t-esc="log.root_folder_name"/></span>
+                                <span class="term-sep">/</span>
+                            </t>
+                            <t t-if="log.folder_path">
+                                <span class="term-folder-path"><t t-esc="log.folder_path"/></span>
+                                <span class="term-sep">/</span>
+                            </t>
+                            <span class="term-file"><t t-esc="log.file_name or '—'"/></span>
+                        </t>
+                    </span>
+
+                    <!-- Duration -->
+                    <t t-if="log.duration">
+                        <span class="term-dur"><t t-esc="formatDuration(log.duration)"/></span>
+                    </t>
+
+                    <!-- Error message (for failed entries) -->
+                    <t t-if="log.state === 'fail' and log.error_message">
+                        <div class="term-error">
+                            <span class="term-error-label">ERROR:</span>
+                            <span class="term-error-msg"><t t-esc="log.error_message"/></span>
+                        </div>
+                    </t>
+                </div>
+            </t>
+
+            <!-- Cursor -->
+            <div class="term-line term-cursor-line">
+                <span class="term-prompt">$</span>
+                <span class="term-cursor">_</span>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="term-footer">
+            <span class="term-footer-info">
+                <i class="fa fa-database me-1"/>
+                <t t-esc="state.logs.length"/> / <t t-esc="state.totalCount"/> entries
+            </span>
+            <span class="term-footer-status">
+                <t t-if="state.loading">
+                    <i class="fa fa-circle-o-notch fa-spin me-1"/>Syncing...
+                </t>
+                <t t-else="">
+                    <i class="fa fa-check-circle me-1"/>Ready
+                </t>
+            </span>
+        </div>
+    </div>
+</t>
+
+</templates>
