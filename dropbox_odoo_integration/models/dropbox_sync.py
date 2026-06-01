@@ -572,16 +572,59 @@ class GoogleDriveSync(models.Model):
 
     # ─── Permissions / Sharing ───────────────────────────────────────────────────
 
+    def _get_owner_permission(self, access_token):
+        ac_r = http_requests.post(
+            f"{DROPBOX_API}/users/get_current_account",
+            headers=self._dbx_headers(access_token),
+        )
+        permissions = []
+        if ac_r.status_code == 200:
+            acc_data = ac_r.json()
+            permissions.append({
+                "id": acc_data.get("account_id", ""),
+                "type": "user",
+                "emailAddress": acc_data.get("email", ""),
+                "displayName": acc_data.get("name", {}).get("display_name", ""),
+                "role": "owner",
+            })
+        return permissions
+
     def get_file_permissions(self, file_id, config):
         access_token = self._get_access_token(config)
         if not access_token:
             return []
-        r = http_requests.post(
-            f"{DROPBOX_API}/sharing/list_file_members",
+
+        # Step 1: Detect if file or folder
+        meta_r = http_requests.post(
+            f"{DROPBOX_API}/files/get_metadata",
             headers=self._dbx_headers(access_token),
-            json={"file": f"id:{file_id}", "include_inherited": True, "limit": 100},
+            json={"path": f"id:{file_id}"},
         )
-        
+
+        is_folder = False
+        shared_folder_id = None
+        if meta_r.status_code == 200:
+            meta_data = meta_r.json()
+            is_folder = (meta_data.get(".tag") == "folder")
+            shared_folder_id = meta_data.get("shared_folder_id")
+
+        if is_folder:
+            if not shared_folder_id:
+                # Folder is not shared yet, return owner info
+                return self._get_owner_permission(access_token)
+
+            r = http_requests.post(
+                f"{DROPBOX_API}/sharing/list_folder_members",
+                headers=self._dbx_headers(access_token),
+                json={"shared_folder_id": shared_folder_id, "limit": 100},
+            )
+        else:
+            r = http_requests.post(
+                f"{DROPBOX_API}/sharing/list_file_members",
+                headers=self._dbx_headers(access_token),
+                json={"file": f"id:{file_id}", "include_inherited": True, "limit": 100},
+            )
+
         is_not_shared = False
         if r.status_code == 409:
             try:
@@ -592,26 +635,13 @@ class GoogleDriveSync(models.Model):
                 pass
 
         if r.status_code != 200 and not is_not_shared:
-            _logger.warning("list_file_members failed: %s", r.text[:300])
+            _logger.warning("list_members failed (HTTP %s): %s", r.status_code, r.text[:300])
             return []
 
         permissions = []
 
         if is_not_shared:
-            ac_r = http_requests.post(
-                f"{DROPBOX_API}/users/get_current_account",
-                headers=self._dbx_headers(access_token),
-            )
-            if ac_r.status_code == 200:
-                acc_data = ac_r.json()
-                permissions.append({
-                    "id": acc_data.get("account_id", ""),
-                    "type": "user",
-                    "emailAddress": acc_data.get("email", ""),
-                    "displayName": acc_data.get("name", {}).get("display_name", ""),
-                    "role": "owner",
-                })
-            return permissions
+            return self._get_owner_permission(access_token)
 
         data = r.json()
         for member in data.get("users", []):
@@ -695,39 +725,44 @@ class GoogleDriveSync(models.Model):
         return links
 
     def create_permission(self, file_id, email, role, config, send_notification=True):
-        """Add a Dropbox member to a shared file.
+        """Add a Dropbox member to a shared file or folder.
 
         Strategy:
-        1. First call sharing/share_file to ensure the file is in Dropbox's sharing system.
-        2. Then call sharing/add_file_member with the correct format.
-        3. If anything fails, fall back to shared link + Odoo email notification.
+        1. Detect if the item is a folder via files/get_metadata.
+        2. For FOLDERS: share_folder first (if needed), then add_folder_member.
+        3. For FILES: add_file_member directly.
+        4. On any failure, fall back to shared link + Odoo email notification.
         """
         access_token = self._get_access_token(config)
         if not access_token:
             return {'ok': False, 'error': 'Could not obtain Dropbox access token.'}
 
-        # access_level for add_file_member is a plain string, NOT a tagged union
         level = "editor" if role in ("writer", "editor") else "viewer"
 
-        # Step 1: Ensure the file is in Dropbox sharing system
-        share_resp = http_requests.post(
-            f"{DROPBOX_API}/sharing/share_file",
+        # Step 1: Detect file vs folder
+        meta_r = http_requests.post(
+            f"{DROPBOX_API}/files/get_metadata",
             headers=self._dbx_headers(access_token),
             json={"path": f"id:{file_id}"},
         )
-        _logger.info("share_file -> HTTP %s: %s", share_resp.status_code, share_resp.text[:300])
-        # 409 means already shared - that's OK. 200 = just shared. Other codes = problem.
-        if share_resp.status_code not in (200, 409):
-            _logger.warning("share_file failed (HTTP %s), will still try add_file_member", share_resp.status_code)
+        is_folder = False
+        if meta_r.status_code == 200:
+            item_tag = meta_r.json().get(".tag", "file")
+            is_folder = (item_tag == "folder")
+            _logger.info("Item type for id:%s -> .tag=%s is_folder=%s", file_id, item_tag, is_folder)
+        else:
+            _logger.warning("get_metadata failed (HTTP %s), assuming file", meta_r.status_code)
 
-        # Step 2: Add the member
-        # NOTE: members is a list of MemberSelector objects directly.
-        # NOTE: access_level is a tagged union, e.g. {".tag": "viewer"} or {".tag": "editor"}.
+        if is_folder:
+            return self._share_folder_member(file_id, email, level, role, config, access_token, send_notification)
+        else:
+            return self._share_file_member(file_id, email, level, role, config, access_token, send_notification)
+
+    def _share_file_member(self, file_id, email, level, role, config, access_token, send_notification):
+        """Add a member to a Dropbox file via sharing/add_file_member."""
         payload = {
             "file": f"id:{file_id}",
-            "members": [
-                {".tag": "email", "email": email}
-            ],
+            "members": [{".tag": "email", "email": email}],
             "access_level": {".tag": level},
             "quiet": not send_notification,
         }
@@ -736,19 +771,28 @@ class GoogleDriveSync(models.Model):
             headers=self._dbx_headers(access_token),
             json=payload,
         )
+        _logger.info("add_file_member -> HTTP %s | body: %s", r.status_code, r.text[:1000])
 
-        _logger.info("add_file_member -> HTTP %s | full body: %s", r.status_code, r.text[:1000])
+        if r.status_code in (403, 409) and level == "editor":
+            # If editor failed, automatically try to fall back to viewer role
+            _logger.info("add_file_member failed for editor, trying viewer fallback...")
+            payload["access_level"] = {".tag": "viewer"}
+            r = http_requests.post(
+                f"{DROPBOX_API}/sharing/add_file_member",
+                headers=self._dbx_headers(access_token),
+                json=payload,
+            )
+            _logger.info("add_file_member viewer fallback -> HTTP %s | body: %s", r.status_code, r.text[:1000])
 
         if r.status_code == 200:
             try:
                 body = r.json()
                 results = body if isinstance(body, list) else [body]
             except Exception:
-                return {'ok': True}  # got 200 with non-JSON body = treat as success
+                return {'ok': True}
 
             errors = []
             for item in results:
-                # item is FileMemberActionResult: contains 'member' and 'result'
                 res = item.get("result", {})
                 if not isinstance(res, dict):
                     continue
@@ -767,40 +811,120 @@ class GoogleDriveSync(models.Model):
                     errors.append(f"Dropbox result: {tag}")
 
             if errors:
+                _logger.warning("add_file_member errors: %s", errors)
                 return self._fallback_share_via_link(file_id, email, role, config, access_token, reason=errors[0])
-            # Empty results list = success (Dropbox sometimes returns [])
-            return {'ok': True}
+            return {'ok': True}  # empty results = success
 
-        if r.status_code == 400:
-            _logger.warning("add_file_member 400 (bad request): %s", r.text)
-            try:
-                msg = r.json().get("error_summary", r.text[:300])
-            except Exception:
-                msg = r.text[:300]
-            return self._fallback_share_via_link(file_id, email, role, config, access_token, reason=f"Dropbox API 400: {msg[:120]}")
-
-        if r.status_code == 409:
+        if r.status_code in (403, 409):
             try:
                 err_data = r.json()
-                err_tag = err_data.get("error", {}).get(".tag", "") if isinstance(err_data.get("error"), dict) else ""
-                msg = self._dbx_sharing_error_message(err_tag) or f"Dropbox error: {err_data.get('error_summary', 'unknown')}"
+                full_summary = err_data.get("error_summary", "")
+                _logger.warning("add_file_member %s: %s", r.status_code, full_summary)
             except Exception:
-                msg = f"Dropbox error (HTTP 409): {r.text[:200]}"
-            _logger.warning("add_file_member 409: %s", msg)
-            return self._fallback_share_via_link(file_id, email, role, config, access_token, reason=msg)
-
-        if r.status_code == 403:
-            _logger.warning("add_file_member 403 - missing sharing.write scope or insufficient token permissions")
-            return self._fallback_share_via_link(
-                file_id, email, role, config, access_token,
-                reason="The Dropbox app token lacks the 'sharing.write' permission scope."
-            )
+                full_summary = r.text[:200]
+            return self._fallback_share_via_link(file_id, email, role, config, access_token, reason=full_summary)
 
         _logger.warning("add_file_member HTTP %s: %s", r.status_code, r.text[:500])
         return self._fallback_share_via_link(
             file_id, email, role, config, access_token,
             reason=f"Dropbox HTTP {r.status_code}: {r.text[:200]}"
         )
+
+
+    def _share_folder_member(self, folder_id, email, level, role, config, access_token, send_notification):
+        """Share a Dropbox folder with a member via share_folder + add_folder_member."""
+
+        # Step 1: Get or create the shared folder ID (sharing_id).
+        # First try to get the folder's existing sharing_id via get_folder_metadata.
+        sharing_id = None
+        meta_r = http_requests.post(
+            f"{DROPBOX_API}/sharing/get_folder_metadata",
+            headers=self._dbx_headers(access_token),
+            json={"shared_folder_id": folder_id},
+        )
+        if meta_r.status_code == 200:
+            sharing_id = meta_r.json().get("shared_folder_id")
+            _logger.info("Folder already shared, sharing_id=%s", sharing_id)
+
+        if not sharing_id:
+            # Folder is not yet shared — call share_folder to create a shared folder
+            share_r = http_requests.post(
+                f"{DROPBOX_API}/sharing/share_folder",
+                headers=self._dbx_headers(access_token),
+                json={"path": f"id:{folder_id}", "force_async": False},
+            )
+            _logger.info("share_folder -> HTTP %s | body: %s", share_r.status_code, share_r.text[:500])
+            if share_r.status_code == 200:
+                body = share_r.json()
+                # Could be complete or async_job_id
+                if body.get(".tag") == "complete":
+                    sharing_id = body.get("shared_folder_id")
+                elif body.get(".tag") == "async_job_id":
+                    # Poll for completion
+                    job_id = body.get("async_job_id")
+                    for _ in range(6):
+                        time.sleep(2)
+                        poll_r = http_requests.post(
+                            f"{DROPBOX_API}/sharing/share_folder/check_job_status",
+                            headers=self._dbx_headers(access_token),
+                            json={"async_job_id": job_id},
+                        )
+                        if poll_r.status_code == 200:
+                            poll_body = poll_r.json()
+                            if poll_body.get(".tag") == "complete":
+                                sharing_id = poll_body.get("shared_folder_id")
+                                break
+                            elif poll_body.get(".tag") == "failed":
+                                break
+                else:
+                    sharing_id = body.get("shared_folder_id")
+            elif share_r.status_code == 409:
+                # Already shared — extract sharing_id from error body
+                err_body = share_r.json() if share_r.headers.get("content-type", "").startswith("application/json") else {}
+                existing = err_body.get("error", {}).get("already_shared", {})
+                sharing_id = existing.get("shared_folder_id") if isinstance(existing, dict) else None
+                _logger.info("share_folder 409 (already shared), sharing_id=%s", sharing_id)
+
+        if not sharing_id:
+            _logger.warning("Could not get sharing_id for folder %s, falling back to link", folder_id)
+            return self._fallback_share_via_link(folder_id, email, role, config, access_token, reason="Could not share folder")
+
+        # Step 2: Add the member to the shared folder
+        member_payload = {
+            "shared_folder_id": sharing_id,
+            "members": [
+                {
+                    "member": {".tag": "email", "email": email},
+                    "access_level": {".tag": level},
+                }
+            ],
+            "quiet": not send_notification,
+        }
+        r = http_requests.post(
+            f"{DROPBOX_API}/sharing/add_folder_member",
+            headers=self._dbx_headers(access_token),
+            json=member_payload,
+        )
+        _logger.info("add_folder_member -> HTTP %s | body: %s", r.status_code, r.text[:500])
+
+        if r.status_code == 200:
+            return {'ok': True}
+
+        if r.status_code in (403, 409):
+            try:
+                err_summary = r.json().get("error_summary", r.text[:200])
+            except Exception:
+                err_summary = r.text[:200]
+            _logger.warning("add_folder_member %s: %s", r.status_code, err_summary)
+            return self._fallback_share_via_link(folder_id, email, role, config, access_token, reason=err_summary)
+
+        _logger.warning("add_folder_member HTTP %s: %s", r.status_code, r.text[:500])
+        return self._fallback_share_via_link(
+            folder_id, email, role, config, access_token,
+            reason=f"Dropbox HTTP {r.status_code}: {r.text[:200]}"
+        )
+
+
 
     def _dbx_sharing_error_message(self, err_tag):
         """Map Dropbox error tags to human-readable messages."""

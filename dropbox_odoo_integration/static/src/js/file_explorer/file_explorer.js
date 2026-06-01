@@ -2577,8 +2577,6 @@ export class ShareDriveLinkDialog extends Component {
             loaderMessage: 'Loading...',
             // Error
             error: null,
-            // Fallback invite info (when direct Dropbox invite fails)
-            fallbackInfo: null,  // {link, email, warning} when fallback link was used
             // Bidirectional sync
             isSyncing: false,
             justSynced: false,
@@ -2792,26 +2790,22 @@ export class ShareDriveLinkDialog extends Component {
             if (result.error) {
                 this.notificationService.add(result.error, { type: "danger", title: "Share Failed" });
             } else if (result.success) {
-                await this.loadShareInfo();
                 this.state.addEmail = '';
-                if (result.warning && result.fallback_link) {
-                    // Direct Dropbox invite not available — show link banner in dialog
-                    this.state.fallbackInfo = {
-                        email: email,
-                        link: result.fallback_link,
-                        warning: result.warning,
-                        copied: false,
-                    };
-                    this.notificationService.add(
-                        `Invitation email sent to ${email}. The shareable link is shown below.`,
-                        { type: "warning", title: "Shared via Link" }
-                    );
-                } else if (result.warning) {
-                    this.notificationService.add(result.warning, { type: "warning", title: "Shared via Link" });
-                } else {
-                    this.state.fallbackInfo = null;
-                    this.notificationService.add(`Shared with ${email}`, { type: "success" });
+                this.state.fallbackInfo = null;
+
+                // If Dropbox used a shared link instead of a direct invite,
+                // update the file URL so "Copy link" always reflects the new link.
+                if (result.fallback_link) {
+                    this.file.one_drive_url = result.fallback_link;
                 }
+
+                // Refresh permissions and links in the dialog.
+                await this.loadShareInfo();
+
+                this.notificationService.add(
+                    `Link shared with ${email}`,
+                    { type: "success", title: "Shared" }
+                );
             }
         } catch (e) {
             this.notificationService.add("Failed to add person: " + (e.message || "Unknown error"), { type: "danger" });
@@ -3233,25 +3227,6 @@ export class ShareDriveLinkDialog extends Component {
         }
     }
 
-    async copyFallbackLink() {
-        const info = this.state.fallbackInfo;
-        if (!info || !info.link) return;
-        try {
-            await navigator.clipboard.writeText(info.link);
-            this.state.fallbackInfo = { ...info, copied: true };
-            setTimeout(() => {
-                if (this.state.fallbackInfo) {
-                    this.state.fallbackInfo = { ...this.state.fallbackInfo, copied: false };
-                }
-            }, 2500);
-        } catch {
-            prompt("Copy link:", info.link);
-        }
-    }
-
-    dismissFallbackInfo() {
-        this.state.fallbackInfo = null;
-    }
 
     async revokeLink(lnk) {
         if (!lnk || !lnk.id) return;

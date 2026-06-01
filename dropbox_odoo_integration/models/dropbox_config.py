@@ -107,11 +107,24 @@ class GoogleDriveConfig(models.Model):
         self.ensure_one()
         if not self.client_id:
             return False
+        # Request all required scopes including sharing.write for member invite support.
+        # Note: Dropbox Personal accounts may still restrict add_file_member even with
+        # sharing.write scope — in that case the fallback (shared link via email) is used.
+        required_scopes = " ".join([
+            "account_info.read",
+            "files.content.read",
+            "files.content.write",
+            "files.metadata.read",
+            "files.metadata.write",
+            "sharing.read",
+            "sharing.write",
+        ])
         params = {
             "client_id": self.client_id,
             "redirect_uri": self.redirect_uri,
             "response_type": "code",
             "token_access_type": "offline",
+            "scope": required_scopes,
             "state": str(self.id),
         }
         url = DROPBOX_AUTH_URL + "?" + "&".join([f"{k}={v}" for k, v in params.items()])

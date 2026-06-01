@@ -1079,28 +1079,6 @@
                             </label>
                         </div>
 
-                        <!-- ── FALLBACK LINK BANNER (shown when direct Dropbox invite not available) ── -->
-                        <div class="od_fallback_banner" t-if="state.fallbackInfo">
-                            <div class="od_fallback_banner_head">
-                                <i class="fa fa-info-circle"/>
-                                <span>Link shared with <strong t-esc="state.fallbackInfo.email"/></span>
-                                <button class="od_fallback_dismiss" t-on-click="dismissFallbackInfo" title="Dismiss">
-                                    <i class="fa fa-times"/>
-                                </button>
-                            </div>
-                            <div class="od_fallback_banner_body">
-                                <p class="od_fallback_note">Direct Dropbox invite is not available for this account. A shareable link was sent by email. You can also copy and share the link manually:</p>
-                                <div class="od_fallback_link_row">
-                                    <input type="text" class="od_link_url_input od_fallback_link_input"
-                                           t-att-value="state.fallbackInfo.link" readonly="true"/>
-                                    <button class="od_btn od_btn_primary od_fallback_copy_btn"
-                                            t-on-click="copyFallbackLink">
-                                        <i t-att-class="state.fallbackInfo.copied ? 'fa fa-check' : 'fa fa-copy'"/>
-                                        <span t-esc="state.fallbackInfo.copied ? 'Copied!' : 'Copy'"/>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
 
                         <!-- ── PEOPLE WITH ACCESS ── -->
                         <div class="od_section" t-if="state.permissions.length > 0">
@@ -1260,62 +1238,7 @@
                             </div>
                         </div>
 
-                        <!-- ── GENERAL ACCESS ── -->
                         <div class="od_section">
-                            <div class="od_section_head">General Access</div>
-                            <div class="od_general_access_row" t-on-click.stop="">
-                                <div class="od_ga_icon" t-att-class="state.generalAccess === 'restricted' ? 'od_ga_restricted' : 'od_ga_open'">
-                                    <i t-att-class="state.generalAccess === 'restricted' ? 'fa fa-lock' : 'fa fa-globe'"/>
-                                </div>
-                                <div class="od_ga_body">
-                                    <div class="od_role_pill od_role_clickable od_ga_trigger" t-on-click="toggleGeneralAccessDropdown">
-                                        <span t-esc="state.generalAccess === 'restricted' ? 'Restricted' : 'Anyone with the link'"/>
-                                        <i class="fa fa-chevron-down"/>
-                                    </div>
-                                    <div class="od_dd" t-if="state.showGeneralAccessDropdown">
-                                        <div class="od_dd_item" t-att-class="{ active: state.generalAccess === 'restricted' }" t-on-click="() => this.setGeneralAccess('restricted')">
-                                            <i class="fa fa-lock"/>
-                                            <div class="od_dd_text">
-                                                <span>Restricted</span>
-                                                <small>Only people with access can open</small>
-                                            </div>
-                                            <i class="fa fa-check od_tick" t-if="state.generalAccess === 'restricted'"/>
-                                        </div>
-                                        <div class="od_dd_item" t-att-class="{ active: state.generalAccess === 'anyone' }" t-on-click="() => this.setGeneralAccess('anyone')">
-                                            <i class="fa fa-globe"/>
-                                            <div class="od_dd_text">
-                                                <span>Anyone with the link</span>
-                                                <small>Anyone on the internet can open</small>
-                                            </div>
-                                            <i class="fa fa-check od_tick" t-if="state.generalAccess === 'anyone'"/>
-                                        </div>
-                                    </div>
-                                    <t t-if="state.generalAccess !== 'restricted'">
-                                        <div class="od_ga_role_row" t-on-click.stop="">
-                                            <div class="od_role_pill od_role_clickable" t-on-click="toggleAnyoneRoleDropdown">
-                                                <span t-esc="state.anyoneRole === 'writer' ? 'Can edit' : 'Can view'"/>
-                                                <i class="fa fa-chevron-down"/>
-                                            </div>
-                                            <div class="od_dd" t-if="state.showAnyoneRoleDropdown">
-                                                <div class="od_dd_item" t-att-class="{ active: state.anyoneRole === 'reader' }" t-on-click="() => this.setAnyoneRole('reader')">
-                                                    <i class="fa fa-eye"/> <span>Can view</span><small>Read-only</small>
-                                                    <i class="fa fa-check od_tick" t-if="state.anyoneRole === 'reader'"/>
-                                                </div>
-                                                <div class="od_dd_item" t-att-class="{ active: state.anyoneRole === 'writer' }" t-on-click="() => this.setAnyoneRole('writer')">
-                                                    <i class="fa fa-pencil"/> <span>Can edit</span><small>Full access</small>
-                                                    <i class="fa fa-check od_tick" t-if="state.anyoneRole === 'writer'"/>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </t>
-                                </div>
-                                <t t-if="state.generalAccess !== 'restricted' and state.links.length === 0">
-                                    <button class="od_btn od_btn_secondary od_ga_create_btn"
-                                            t-on-click.stop="() => this.setGeneralAccess(state.generalAccess)">
-                                        <i class="fa fa-link"/> Create link
-                                    </button>
-                                </t>
-                            </div>
                             <div class="od_last_sync" t-if="state.lastSyncTime">
                                 <i class="fa fa-clock-o"/> Last synced at <t t-esc="state.lastSyncTime"/>
                             </div>
