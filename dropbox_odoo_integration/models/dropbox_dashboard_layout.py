@@ -3,14 +3,14 @@ from odoo import models, fields, api
 
 
 class GdriveDashboardLayout(models.Model):
-    """Stores per-user widget layout for the OneDrive dashboard.
+    """Stores per-user widget layout for the Dropbox dashboard.
 
     Each user has at most one row.  The layout is serialised as a JSON string
     produced by GridStack's ``grid.save()`` method and restored via
     ``grid.load()``.
     """
     _name = 'one_drive.dashboard.layout'
-    _description = 'OneDrive Dashboard Layout (per user)'
+    _description = 'Dropbox Dashboard Layout (per user)'
     _rec_name = 'user_id'
 
     user_id = fields.Many2one(

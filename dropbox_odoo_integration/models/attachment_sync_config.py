@@ -19,7 +19,7 @@ class AttachmentSyncConfig(models.Model):
     model_name = fields.Char('Model', compute='_compute_model_name', store=True, readonly=True, index=True)
 
     # Step 2: Driver Selection
-    one_drive_id = fields.Many2one('one.drive.config', string='OneDrive', required=True, ondelete='cascade')
+    one_drive_id = fields.Many2one('one.drive.config', string='Dropbox', required=True, ondelete='cascade')
 
     # Step 3: Folder Selection (filtered by driver)
     google_folder_id = fields.Many2one('one.drive.file',
@@ -68,7 +68,7 @@ class AttachmentSyncConfig(models.Model):
 
     @api.model
     def _get_model_selection(self):
-        """Dynamic selection of models from one_drive.model.config."""
+        """Dynamic selection of models from the Dropbox model config."""
         configs = self.env['one_drive.model.config'].sudo().search([])
         return [(c.res_model, c.model_label) for c in configs]
 
@@ -381,7 +381,7 @@ class AttachmentSyncConfig(models.Model):
         }
 
     def _create_attachment_categories(self):
-        """Create folder structure for attachment categorization in OneDrive."""
+        """Create folder structure for attachment categorization in Dropbox."""
         self.ensure_one()
         
         if not self.state == 'active':
@@ -394,7 +394,7 @@ class AttachmentSyncConfig(models.Model):
             ('📧 Email Attachments', 'Automatically created from incoming emails'),
         ]
         
-        # In a real implementation, this would create subfolders in OneDrive
+        # In a real implementation, this would create subfolders in Dropbox
         # For now, we log the structure that would be created
         folder_structure = f"""
         📂 {self.google_folder_id.name}
@@ -423,7 +423,7 @@ class AttachmentSyncConfig(models.Model):
 
         if not self.one_drive_id:
             raise UserError(
-                "⚠️ No OneDrive selected. Please choose a OneDrive account "
+                "⚠️ No Dropbox selected. Please choose a Dropbox account "
                 "in Step 2 before syncing."
             )
 
@@ -442,7 +442,7 @@ class AttachmentSyncConfig(models.Model):
                     'title': '🗄️ Sync Skipped — Odoo Only Mode',
                     'message': (
                         'Storage Mode is set to "Odoo Only". '
-                        'No files will be uploaded to OneDrive. '
+                        'No files will be uploaded to Dropbox. '
                         'Change the Storage Mode to "Drive only" or "Dual" to enable sync.'
                     ),
                     'type': 'warning',
@@ -473,7 +473,7 @@ class AttachmentSyncConfig(models.Model):
                 'params': {
                     'title': '✅ Nothing to Sync',
                     'message': (
-                        f'All {model_label} files are already synced to OneDrive.\n'
+                        f'All {model_label} files are already synced to Dropbox.\n'
                         f'Storage Mode: {mode_label} | Drive: {self.one_drive_id.name}'
                     ),
                     'type': 'info',
@@ -502,7 +502,7 @@ class AttachmentSyncConfig(models.Model):
         if synced_count > 0:
             message = (
                 f"✅ Synchronization complete!\n"
-                f"{synced_count} {model_label} file(s) synced to OneDrive.\n"
+                f"{synced_count} {model_label} file(s) synced to Dropbox.\n"
                 f"Storage Mode: {mode_label} | Drive: {self.one_drive_id.name}"
             )
             if failed_count:
@@ -525,7 +525,7 @@ class AttachmentSyncConfig(models.Model):
         }
 
     def action_setup_auto_sync(self):
-        """Setup auto-sync: push all unsynced historical attachments to OneDrive.
+        """Setup auto-sync: push all unsynced historical attachments to Dropbox.
         Uses _get_target_attachments() to correctly include chatter (mail.message) copies
         and uses per-file savepoints so a single failure doesn't roll back all others.
         """
@@ -569,7 +569,7 @@ class AttachmentSyncConfig(models.Model):
 
         folder_structure = self._create_attachment_categories()
         model_label = self.module_config_id.model_label or self.model_name
-        message = f'Auto-sync setup complete. {synced_count} historical file(s) moved to OneDrive for {model_label}.'
+        message = f'Auto-sync setup complete. {synced_count} historical file(s) moved to Dropbox for {model_label}.'
         if failed_count:
             message += f' ({failed_count} file(s) failed — check sync logs.)'
         if self.state == 'active' and folder_structure:
@@ -588,7 +588,7 @@ class AttachmentSyncConfig(models.Model):
         }
 
     def action_apply_sync(self):
-        """Push all unsynced historical attachments to OneDrive.
+        """Push all unsynced historical attachments to Dropbox.
         Always triggers a batch sync regardless of the auto_sync_mode toggle.
         (Auto-sync for NEW files is handled automatically by ir.attachment.create/write hooks.)
         """

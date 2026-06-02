@@ -21,7 +21,7 @@ def _format_size(size_bytes):
 
 class GoogleDriveDashboard(models.AbstractModel):
     _name = 'one.drive.dashboard'
-    _description = 'OneDrive Sync Dashboard Data'
+    _description = 'Dropbox Sync Dashboard Data'
 
     # ──────────────────────────────────────────────
     # 1. Fast KPIs & Health (loads first)
@@ -421,7 +421,7 @@ class GoogleDriveDashboard(models.AbstractModel):
 
     @api.model
     def get_drive_quota(self, config_id=False):
-        """Fetch OneDrive storage quota via the about.get API."""
+        """Fetch Dropbox storage quota via the about.get API."""
         try:
             if config_id:
                 cid = int(config_id)

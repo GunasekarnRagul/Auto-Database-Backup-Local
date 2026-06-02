@@ -1,5 +1,5 @@
 /* =============================================
-   OneDrive File Explorer — Premium Styles
+   Dropbox File Explorer — Premium Styles
    ============================================= */
 
 /* ─── Utility Classes ─── */
@@ -3195,7 +3195,7 @@ img.gd_drive_icon {
     }
 }
 
-/* OneDrive Organization Access Styling */
+/* Dropbox Organization Access Styling */
 .gd_share_access_icon.gd_access_org {
     background: #e8f0fe;
     color: #1a73e8;
@@ -3206,7 +3206,7 @@ img.gd_drive_icon {
     color: #1a73e8;
 }
 
-/* OneDrive Block Download Styling */
+/* Dropbox Block Download Styling */
 .gd_share_block_download_row {
     display: flex;
     align-items: center;
@@ -3238,7 +3238,7 @@ img.gd_drive_icon {
 }
 
 /* ═══════════════════════════════════════════════
-   ONEDRIVE MANAGE ACCESS DIALOG  (od_* classes)
+   DROPBOX MANAGE ACCESS DIALOG  (od_* classes)
    ═══════════════════════════════════════════════ */
 
 

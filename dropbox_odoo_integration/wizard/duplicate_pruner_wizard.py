@@ -5,7 +5,7 @@ class DuplicatePrunerWizard(models.TransientModel):
     _name = 'duplicate.pruner.wizard'
     _description = 'Duplicate File Pruner Wizard'
 
-    drive_config_id = fields.Many2one('one.drive.config', string='OneDrive', 
+    drive_config_id = fields.Many2one('one.drive.config', string='Dropbox', 
                                       help="Select a specific drive to find duplicates within, or leave empty for all.")
     duplicate_groups_count = fields.Integer('Number of Groups', readonly=True)
     duplicate_count = fields.Integer('Total Files to Delete', readonly=True)

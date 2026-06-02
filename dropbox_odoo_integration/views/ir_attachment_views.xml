@@ -60,7 +60,7 @@
                 <field name="google_folder_id" string="Folder"/>
                 
                 <separator/>
-                <filter name="filter_synced" string="OneDrive Synced" domain="[('is_one_drive_synced', '=', True)]"/>
+                <filter name="filter_synced" string="Dropbox Synced" domain="[('is_one_drive_synced', '=', True)]"/>
                 <filter name="filter_not_synced" string="Not Synced" domain="[('is_one_drive_synced', '=', False)]"/>
 
                 <separator/>

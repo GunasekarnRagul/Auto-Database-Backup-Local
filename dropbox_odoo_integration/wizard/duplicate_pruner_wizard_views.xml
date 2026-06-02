@@ -10,7 +10,7 @@
                         Found <b><field name="duplicate_groups_count" nolabel="1"/></b> duplicate groups containing <b><field name="duplicate_count" nolabel="1"/></b> redundant files.
                     </div>
                     <div class="alert alert-info" role="alert" invisible="duplicate_groups_count != 0">
-                        No duplicate files were detected in OneDrive sync.
+                        No duplicate files were detected in Dropbox sync.
                     </div>
                     <group>
                         <field name="drive_config_id" options="{'no_create': True, 'no_open': True}" placeholder="All Drives..."/>

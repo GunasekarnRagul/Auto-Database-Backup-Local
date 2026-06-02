@@ -8,7 +8,7 @@ import io, zipfile, json
 DROPBOX_TOKEN_URL = "https://api.dropboxapi.com/oauth2/token"
 DROPBOX_CONTENT_URL = "https://content.dropboxapi.com/2/files/download"
 
-class OneDriveController(http.Controller):
+class DropboxController(http.Controller):
 
     @http.route("/dropbox/authentication", type="http", auth="user")
     def one_drive_oauth2callback(self, **kw):

@@ -3,7 +3,7 @@ from odoo import models, fields, api
 
 class GDriveModelConfig(models.Model):
     _name = 'one_drive.model.config'
-    _description = 'OneDrive Model Configuration'
+    _description = 'Dropbox Model Configuration'
     _rec_name = 'model_label'
 
     res_model = fields.Char('Technical Model Name', required=True, index=True)
