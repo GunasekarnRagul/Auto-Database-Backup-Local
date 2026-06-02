@@ -2,11 +2,11 @@
 <templates xml:space="preserve">
 
   <t t-name="dropbox_odoo_integration.Dashboard" owl="1">
-    <div class="one_drive-dash gd-one_drive-dash">
+    <div class="dropbox-dash gd-dropbox-dash">
 
       <!-- ════ LOADING ════ -->
       <t t-if="state.isLoading">
-        <div class="one_drive-loading">
+        <div class="dropbox-loading">
           <div class="gd-spinner-ring"/>
           <h2>Loading Dashboard…</h2>
           <p>Connecting to Dropbox</p>

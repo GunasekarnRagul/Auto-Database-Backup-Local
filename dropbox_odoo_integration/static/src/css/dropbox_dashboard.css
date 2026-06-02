@@ -37,7 +37,7 @@
 }
 
 /* ── Base ── */
-.one_drive-dash {
+.dropbox-dash {
     font-family: var(--gd-font);
     background: var(--gd-page-bg);
     color: var(--gd-tx);
@@ -52,23 +52,23 @@
     -webkit-font-smoothing: antialiased;
 }
 
-.one_drive-dash *,
-.one_drive-dash *::before,
-.one_drive-dash *::after {
+.dropbox-dash *,
+.dropbox-dash *::before,
+.dropbox-dash *::after {
     box-sizing: border-box;
     margin: 0;
 }
 
 /* Ensure Odoo's parent action wrapper also has the right height so our container fills it */
-.o_action:has(.one_drive-dash),
-.o_action_manager>.o_action:has(.one_drive-dash) {
+.o_action:has(.dropbox-dash),
+.o_action_manager>.o_action:has(.dropbox-dash) {
     height: 100%;
     overflow: hidden;
-    /* let .one_drive-dash handle its own scroll */
+    /* let .dropbox-dash handle its own scroll */
 }
 
 /* ═══════════════ LOADING ═══════════════ */
-.one_drive-loading {
+.dropbox-loading {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -78,12 +78,12 @@
     color: var(--gd-blue);
 }
 
-.one_drive-loading h2 {
+.dropbox-loading h2 {
     font-size: 20px;
     font-weight: 700;
 }
 
-.one_drive-loading p {
+.dropbox-loading p {
     font-size: 13px;
     color: var(--gd-txm);
 }
@@ -847,7 +847,7 @@
     width: fit-content;
 }
 
-.gd-one_drive-dash .gd-fpill,
+.gd-dropbox-dash .gd-fpill,
 .gd-fpill {
     all: unset !important;
     display: inline-block !important;
@@ -867,7 +867,7 @@
     -webkit-user-select: none !important;
 }
 
-.gd-one_drive-dash .gd-fpill:hover,
+.gd-dropbox-dash .gd-fpill:hover,
 .gd-fpill:hover {
     background: rgba(26, 115, 232, 0.12) !important;
     color: var(--gd-blue) !important;
@@ -876,7 +876,7 @@
     box-shadow: none !important;
 }
 
-.gd-one_drive-dash .gd-fpill.active,
+.gd-dropbox-dash .gd-fpill.active,
 .gd-fpill.active {
     background: var(--gd-blue) !important;
     color: #fff !important;
@@ -885,9 +885,9 @@
     box-shadow: 0 2px 8px rgba(26, 115, 232, 0.4) !important;
 }
 
-.gd-one_drive-dash .gd-fpill:active,
-.gd-one_drive-dash .gd-fpill:focus,
-.gd-one_drive-dash .gd-fpill:focus-visible,
+.gd-dropbox-dash .gd-fpill:active,
+.gd-dropbox-dash .gd-fpill:focus,
+.gd-dropbox-dash .gd-fpill:focus-visible,
 .gd-fpill:active,
 .gd-fpill:focus,
 .gd-fpill:focus-visible {
@@ -2092,7 +2092,7 @@
 }
 
 @media (max-width:640px) {
-    .one_drive-dash {
+    .dropbox-dash {
         padding: 12px;
     }
 

@@ -9,7 +9,7 @@ _logger = logging.getLogger(__name__)
 class IrAttachment(models.Model):
     _inherit = 'ir.attachment'
 
-    one_drive_file_id = fields.Char('OneDrive File ID', index=True)
+    one_drive_file_id = fields.Char('Dropbox File ID', index=True)
     one_drive_id = fields.Many2one('one.drive.config', string='Drive', compute='_compute_one_drive_id', store=True, readonly=False)
     google_folder_id = fields.Many2one('one.drive.file', string='Folder', domain="[('file_type', '=', 'folder')]", compute='_compute_google_folder_id', store=True, readonly=False)
     model_name = fields.Selection(selection='_get_model_selection', string='Model Name', index=True, help="Technical name of the Odoo model")
@@ -25,7 +25,7 @@ class IrAttachment(models.Model):
         ('dual', 'Dual (Drive + Odoo)'),
         ('odoo', 'Odoo only (no sync)'),
     ], string='Storage Mode', compute='_compute_storage_mode', store=True, readonly=False)
-    is_one_drive_synced = fields.Boolean('OneDrive Synced', compute='_compute_is_one_drive_synced', store=True)
+    is_one_drive_synced = fields.Boolean('Dropbox Synced', compute='_compute_is_one_drive_synced', store=True)
     is_model_enabled_for_sync = fields.Boolean('Model Enabled for Sync', compute='_compute_is_model_enabled_for_sync', store=True)
 
     @api.depends('one_drive_file_id', 'res_model', 'res_id')
@@ -120,13 +120,13 @@ class IrAttachment(models.Model):
 
     @api.depends('one_drive_file_id')
     def _compute_is_one_drive_synced(self):
-        """Check if attachment is synced with OneDrive."""
+        """Check if attachment is synced with Dropbox."""
         for attachment in self:
             attachment.is_one_drive_synced = bool(attachment.one_drive_file_id)
 
     @api.depends('res_model')
     def _compute_is_model_enabled_for_sync(self):
-        """Check if the attachment's model is enabled for OneDrive sync."""
+        """Check if the attachment's model is enabled for Dropbox sync."""
         # Get all enabled model configurations
         enabled_configs = self.env['one_drive.model.config'].sudo().search([
             ('is_enabled', '=', True)
@@ -137,7 +137,7 @@ class IrAttachment(models.Model):
             attachment.is_model_enabled_for_sync = attachment.res_model in enabled_models
 
     def get_model_config(self):
-        """Get the OneDrive model configuration for this attachment."""
+        """Get the Dropbox model configuration for this attachment."""
         self.ensure_one()
         if not self.res_model:
             return False
@@ -181,9 +181,9 @@ class IrAttachment(models.Model):
                 # INHERIT the Drive link from the direct attachment instead of re-uploading.
                 if not attachment.datas and not attachment.raw:
                     import re
-                    # Auto-recover if Odoo already copied the OneDrive URL into the type='url' field
+                    # Auto-recover if Odoo already copied the Dropbox URL into the type='url' field
                     if attachment.type == 'url' and attachment.url and ('dropbox.com' in attachment.url or 'dropbox.com' in attachment.url):
-                        # For OneDrive, the ID is often in the resid parameter
+                        # For Dropbox, the ID is often in the resid parameter
                         import urllib.parse as urlparse
                         # For Dropbox, extract the stable ID from the URL if stored
                         # The one_drive_file_id should already be set; use URL as fallback key
@@ -360,7 +360,7 @@ class IrAttachment(models.Model):
         After this attachment is set to type='url' (either via inheritance from
         a direct synced attachment or after upload), this method:
           1. Finds every mail.message that has this attachment linked.
-          2. Appends a clickable OneDrive button to the message body.
+          2. Appends a clickable Dropbox button to the message body.
           3. Unlinks the 0kb file card from the message so only the button shows.
 
         Works for both:
@@ -387,7 +387,7 @@ class IrAttachment(models.Model):
 
         btn_html = (
             "<div class='mt-3 mb-2 p-2 border rounded bg-light drive-attachment-links'>"
-            "<b><i class='fa fa-dropbox'></i> OneDrive Documents:</b>"
+            "<b><i class='fa fa-dropbox'></i> Dropbox Documents:</b>"
             "<ul class='list-unstyled mb-0 mt-2'>"
             f"<li><a href='{drive_url}' target='_blank' rel='noopener noreferrer' "
             f"class='btn btn-sm btn-primary mt-1 mb-1'>"
@@ -451,7 +451,7 @@ class IrAttachment(models.Model):
                     # No local data: try inheriting Drive link from direct attachment
                     if not attachment.datas and not attachment.raw:
                         import re
-                        # Auto-recover if Odoo already copied the OneDrive URL into type='url'
+                        # Auto-recover if Odoo already copied the Dropbox URL into type='url'
                         if attachment.type == 'url' and attachment.url and ('dropbox.com' in attachment.url or 'dropbox.com' in attachment.url):
                             import urllib.parse as urlparse
                             parsed = urlparse.urlparse(attachment.url)
@@ -685,7 +685,7 @@ class IrAttachment(models.Model):
                 self.with_context(skip_one_drive_sync=True).write(att_vals)
 
                 # ── Step 2: Chatter Drive-button injection via helper ────────────────────
-                # Inject the OneDrive link button into the chatter for both Drive and Dual modes.
+                # Inject the Dropbox link button into the chatter for both Drive and Dual modes.
                 # Only unlink the local attachment card if we are in "Drive only" mode.
                 self._inject_chatter_drive_button(
                     result['one_drive_url'], 
@@ -856,7 +856,7 @@ class IrAttachment(models.Model):
 
     @api.model
     def _get_sync_subfolder_name(self, model, res_id):
-        """Determine the 2-level folder structure for OneDrive sync.
+        """Determine the 2-level folder structure for Dropbox sync.
 
         Root folder name is read from one_drive.model.config.drive_root_folder_name
         so that adding new models to the config automatically gives them the right
@@ -878,7 +878,7 @@ class IrAttachment(models.Model):
         if not model:
             return 'General', ['general']
 
-        # ── Root folder: live lookup from one_drive.model.config ──
+        # ── Root folder: live lookup from dropbox.model.config ──
         model_config = self.env['one_drive.model.config'].sudo().search(
             [('res_model', '=', model)], limit=1
         )
@@ -923,7 +923,7 @@ class IrAttachment(models.Model):
         return root_name, record_path
 
     def action_sync_to_drive(self):
-        """Manually sync an attachment to OneDrive using the model's sync configuration.
+        """Manually sync an attachment to Dropbox using the model's sync configuration.
         Reuses _auto_sync_to_drive to ensure consistent hierarchical folder structures.
         """
         self.ensure_one()
@@ -953,7 +953,7 @@ class IrAttachment(models.Model):
                 'tag': 'display_notification',
                 'params': {
                     'title': _('Success'),
-                    'message': _('File "%s" uploaded to OneDrive using the %s configuration.') % (self.name, config.name),
+                    'message': _('File "%s" uploaded to Dropbox using the %s configuration.') % (self.name, config.name),
                     'type': 'success',
                     'sticky': False,
                     'next': {'type': 'ir.actions.client', 'tag': 'reload'},
@@ -967,7 +967,7 @@ class IrAttachment(models.Model):
                 if active_drives:
                     self.one_drive_id = active_drives.id
                 else:
-                    raise UserError(_("Please select a OneDrive first or ensure at least one OneDrive is configured and active."))
+                    raise UserError(_("Please select a Dropbox first or ensure at least one Dropbox is configured and active."))
 
             sync = self.env['one.drive.sync'].sudo()
             import datetime as _dt
@@ -1018,12 +1018,12 @@ class IrAttachment(models.Model):
                         'tag': 'display_notification',
                         'params': {
                             'title': _('Success'),
-                            'message': _('File "%s" uploaded to OneDrive successfully.') % self.name,
+                            'message': _('File "%s" uploaded to Dropbox successfully.') % self.name,
                             'type': 'success',
                             'sticky': False,
                         }
                     }
                 else:
-                    raise UserError(_("Failed to upload file to OneDrive."))
+                    raise UserError(_("Failed to upload file to Dropbox."))
             except Exception as e:
                 raise UserError(_("Error during upload: %s") % str(e))

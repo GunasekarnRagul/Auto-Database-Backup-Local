@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Tree View for OneDrive Model Configuration -->
+    <!-- Tree View for Dropbox Model Configuration -->
     <record id="view_one_drive_model_config_tree" model="ir.ui.view">
-        <field name="name">OneDrive Model Config - Tree</field>
+        <field name="name">Dropbox Model Config - Tree</field>
         <field name="model">one_drive.model.config</field>
         <field name="arch" type="xml">
             <tree string="Model Configurations">
@@ -14,9 +14,9 @@
         </field>
     </record>
 
-    <!-- Form View for OneDrive Model Configuration -->
+    <!-- Form View for Dropbox Model Configuration -->
     <record id="view_one_drive_model_config_form" model="ir.ui.view">
-        <field name="name">OneDrive Model Config - Form</field>
+        <field name="name">Dropbox Model Config - Form</field>
         <field name="model">one_drive.model.config</field>
         <field name="arch" type="xml">
             <form string="Model Configuration">
@@ -36,7 +36,7 @@
         </field>
     </record>
 
-    <!-- Action for OneDrive Model Configuration -->
+    <!-- Action for Dropbox Model Configuration -->
     <record id="action_one_drive_model_config" model="ir.actions.act_window">
         <field name="name">Model Configurations</field>
         <field name="res_model">one_drive.model.config</field>

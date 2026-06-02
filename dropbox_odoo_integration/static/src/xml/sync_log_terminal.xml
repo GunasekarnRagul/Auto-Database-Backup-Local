@@ -2,7 +2,7 @@
 <templates xml:space="preserve">
 
 <t t-name="dropbox_odoo_integration.SyncLogTerminal">
-    <div class="one_drive-terminal">
+    <div class="dropbox-terminal">
         <!-- Terminal Title Bar -->
         <div class="term-titlebar">
             <div class="term-titlebar-title">

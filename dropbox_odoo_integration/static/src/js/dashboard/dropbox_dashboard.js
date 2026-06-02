@@ -196,9 +196,9 @@ export class GoogleDriveDashboard extends Component {
     // ── Scroll fix ────────────────────────────────────────────────────────────
     // Odoo's .o_action_manager clips overflow. Walk up the DOM and ensure every
     // ancestor up to .o_action_manager has height:100% and overflow:auto/hidden
-    // so our own .one_drive-dash can scroll internally.
+    // so our own .dropbox-dash can scroll internally.
     _fixParentScroll() {
-        let el = this.__owl__?.bdom?.el || document.querySelector(".one_drive-dash");
+        let el = this.__owl__?.bdom?.el || document.querySelector(".dropbox-dash");
         if (!el) return;
         // Walk up through ancestors until we hit body or o_action_manager
         let current = el.parentElement;

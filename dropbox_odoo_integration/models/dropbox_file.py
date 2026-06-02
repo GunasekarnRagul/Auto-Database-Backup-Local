@@ -6,7 +6,7 @@ import base64
 
 class GoogleDriveFile(models.Model):
     _name = 'one.drive.file'
-    _description = 'OneDrive File'
+    _description = 'Dropbox File'
     _order = 'file_type desc, name asc'
 
     _sql_constraints = [
@@ -23,12 +23,12 @@ class GoogleDriveFile(models.Model):
     ], string='Type', default='file', required=True)
     mime_type = fields.Char('MIME Type')
     file_size = fields.Float('Size (KB)')
-    md5_checksum = fields.Char('MD5 Checksum', index=True, help="OneDrive MD5 hash for exact content matching")
+    md5_checksum = fields.Char('MD5 Checksum', index=True, help="Dropbox MD5 hash for exact content matching")
     owner_name = fields.Char('Owner', default='Me')
     last_modified = fields.Datetime('Last Modified')
     starred = fields.Boolean('Starred', default=False)
-    one_drive_file_id = fields.Char('OneDrive File ID')
-    one_drive_url = fields.Char('OneDrive URL')
+    one_drive_file_id = fields.Char('Dropbox File ID')
+    one_drive_url = fields.Char('Dropbox URL')
     parent_folder_id = fields.Many2one('one.drive.file', string='Parent Folder',
                                        domain="[('file_type', '=', 'folder')]")
     child_ids = fields.One2many('one.drive.file', 'parent_folder_id', string='Contents')
@@ -105,7 +105,7 @@ class GoogleDriveFile(models.Model):
             record.display_path = " / ".join(path_parts) if path_parts else ""
 
     def _resolve_parent_one_drive_id(self, parent_folder_id=False, root_folder_id=False):
-        """Resolve the OneDrive parent folder ID from Odoo records."""
+        """Resolve the Dropbox parent folder ID from Odoo records."""
         if parent_folder_id:
             parent_rec = self.browse(parent_folder_id)
             if parent_rec.exists() and parent_rec.one_drive_file_id:
@@ -162,7 +162,7 @@ class GoogleDriveFile(models.Model):
         }
 
     def action_archive_recursive(self):
-        """Archive records locally only. No changes made to OneDrive."""
+        """Archive records locally only. No changes made to Dropbox."""
         for record in self:
             record.child_ids.action_archive_recursive()
             record.write({
@@ -171,7 +171,7 @@ class GoogleDriveFile(models.Model):
         return True
 
     def action_unarchive(self):
-        """Restore archived records locally. No changes made to OneDrive."""
+        """Restore archived records locally. No changes made to Dropbox."""
         for record in self.with_context(active_test=False):
             record.write({
                 'active': True,
@@ -182,7 +182,7 @@ class GoogleDriveFile(models.Model):
 
     @api.model
     def delete_on_drive_and_unlink(self, record_ids):
-        """Move records to OneDrive Trash and then unlink them from Odoo.
+        """Move records to Dropbox Trash and then unlink them from Odoo.
         Called from Odoo's Trash Tab (Manual selection).
         """
         records = self.browse(record_ids).with_context(active_test=False)
@@ -327,7 +327,7 @@ class GoogleDriveFile(models.Model):
 
     @api.model
     def rename_on_drive_by_id(self, record_id, new_name, old_name=None):
-        """Rename a file/folder on OneDrive. 
+        """Rename a file/folder on Dropbox. 
         Called asynchronously from JS after Odoo UI updates instantly.
         """
         record = self.browse(record_id)
@@ -351,7 +351,7 @@ class GoogleDriveFile(models.Model):
         return success
 
     def action_open_in_drive(self):
-        """Open the file in OneDrive."""
+        """Open the file in Dropbox."""
         self.ensure_one()
         if self.one_drive_url:
             return {
@@ -366,7 +366,7 @@ class GoogleDriveFile(models.Model):
         """Upload a file from the file explorer UI.
 
         Creates a local one.drive.file record with 'pending' status.
-        The actual upload to OneDrive happens when the user clicks Sync.
+        The actual upload to Dropbox happens when the user clicks Sync.
         """
         config = self.env['one.drive.config'].browse(drive_config_id)
         if not config.exists():
@@ -807,7 +807,7 @@ class GoogleDriveFile(models.Model):
     @api.model
     def get_duplicate_groups(self, config_id=None):
         """Find duplicate files using a production-grade strategy.
-        Allows filtering by a specific OneDrive config.
+        Allows filtering by a specific Dropbox config.
         """
         domain = [('file_type', '=', 'file'), ('active', '=', True)]
         if config_id:

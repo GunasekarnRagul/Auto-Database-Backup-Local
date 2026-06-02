@@ -45,7 +45,7 @@ class MailMessage(models.Model):
             if drive_links:
                 body_parts = []
                 body_parts.append("<div class='mt-3 mb-2 p-2 border rounded bg-light drive-attachment-links'>")
-                body_parts.append("<b><i class='fa fa-dropbox'></i> OneDrive Documents:</b>")
+                body_parts.append("<b><i class='fa fa-dropbox'></i> Dropbox Documents:</b>")
                 body_parts.append("<ul class='list-unstyled mb-0 mt-2'>")
                 
                 links_added = 0

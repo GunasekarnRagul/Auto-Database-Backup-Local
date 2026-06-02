@@ -5,10 +5,10 @@
     'category': 'Document Management',
     'summary': 'Seamless bi-directional sync between Odoo and Dropbox.',
     'description': """
-        This module provides integration between Odoo and OneDrive.
+        This module provides integration between Odoo and Dropbox.
         - OAuth 2.0 Authentication.
-        - Automatic upload of Odoo attachments to OneDrive.
-        - Sync files from OneDrive back to Odoo.
+        - Automatic upload of Odoo attachments to Dropbox.
+        - Sync files from Dropbox back to Odoo.
     """,
     'author': 'CloudAddons Technologies',
     'depends': ['base', 'mail', 'bus'],

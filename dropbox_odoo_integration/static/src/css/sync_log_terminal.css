@@ -28,7 +28,7 @@
 
 /* ─── Container ─── */
 
-.one_drive-terminal {
+.dropbox-terminal {
     font-family: 'Google Sans', 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
     background: var(--term-bg);
     border-radius: 0;

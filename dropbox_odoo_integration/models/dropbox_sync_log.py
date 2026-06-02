@@ -5,7 +5,7 @@ from odoo import models, fields, api
 
 class GoogleDriveSyncLog(models.Model):
     _name = 'one.drive.sync.log'
-    _description = 'OneDrive Sync Log'
+    _description = 'Dropbox Sync Log'
     _order = 'create_date desc, id desc'
     _rec_name = 'display_name'
 
@@ -55,7 +55,7 @@ class GoogleDriveSyncLog(models.Model):
 
     error_message = fields.Text('Error Details')
     sync_details = fields.Text('Sync Details')
-    one_drive_file_id = fields.Char('OneDrive File ID')
+    one_drive_file_id = fields.Char('Dropbox File ID')
     file_size = fields.Float('File Size (bytes)')
     duration = fields.Float('Duration (s)', digits=(10, 3), help='Time taken for the operation in seconds')
     user_id = fields.Many2one('res.users', string='User', default=lambda self: self.env.user, index=True)
