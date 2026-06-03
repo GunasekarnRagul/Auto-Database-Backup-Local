@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_duplicate_pruner_wizard_form" model="ir.ui.view">
+        <field name="name">duplicate.pruner.wizard.form</field>
+        <field name="model">duplicate.pruner.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Duplicate File Pruner">
+                <sheet>
+                    <div class="alert alert-warning" role="alert" invisible="duplicate_groups_count == 0">
+                        Found <b><field name="duplicate_groups_count" nolabel="1"/></b> duplicate groups containing <b><field name="duplicate_count" nolabel="1"/></b> redundant files.
+                    </div>
+                    <div class="alert alert-info" role="alert" invisible="duplicate_groups_count != 0">
+                        No duplicate files were detected in Dropbox sync.
+                    </div>
+                    <group>
+                        <field name="drive_config_id" options="{'no_create': True, 'no_open': True}" placeholder="All Drives..."/>
+                    </group>
+                    <div class="alert alert-secondary" role="alert" invisible="duplicate_groups_count == 0">
+                        <div><i class="fa fa-info-circle text-success" style="margin-right: 5px;"></i> <b>Exact Match:</b> Identical name and identical content. Usually safe to delete.</div>
+                        <div class="mt-1"><i class="fa fa-info-circle text-warning" style="margin-right: 5px;"></i> <b>Name Conflict:</b> Identical name but different content (e.g. two different images named 'flower.png'). Please review before deleting.</div>
+                    </div>
+                    <field name="line_ids" nolabel="1" invisible="duplicate_groups_count == 0">
+                        <list create="0" edit="0" delete="0" default_order="group_name, create_date desc" limit="15">
+                            <field name="group_name" column_invisible="1"/>
+                            <field name="name"/>
+                            <field name="duplicate_type" widget="badge" decoration-success="duplicate_type == 'exact'" decoration-warning="duplicate_type == 'conflict'"/>
+                            <field name="display_path"/>
+                            <field name="file_size" string="Size (KB)"/>
+                            <field name="create_date" string="Date"/>
+                        </list>
+                    </field>
+                </sheet>
+                <footer>
+                    <button string="Close" class="btn-primary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_duplicate_pruner_wizard" model="ir.actions.act_window">
+        <field name="name">Prune Duplicates</field>
+        <field name="res_model">duplicate.pruner.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>
