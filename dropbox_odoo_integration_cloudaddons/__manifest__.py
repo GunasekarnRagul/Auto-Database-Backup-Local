@@ -3,7 +3,7 @@
     'name': 'Cloud Storage | Dropbox',
     'version': '17.0.1.0.0',
     'category': 'Document Management',
-    'summary': 'Seamless bi-directional sync between Odoo and Dropbox.',
+    'summary': 'Connect Odoo with DropBox to automatically upload, sync, organize, and manage documents across both platforms.',
     'description': """
         This module provides integration between Odoo and Dropbox.
         - OAuth 2.0 Authentication.
