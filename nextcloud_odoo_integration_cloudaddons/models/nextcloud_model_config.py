@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
 
-class GDriveModelConfig(models.Model):
+class NextcloudModelConfig(models.Model):
     _name = 'nextcloud.model.config'
     _description = 'Nextcloud Model Configuration'
     _rec_name = 'model_label'

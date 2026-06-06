@@ -263,12 +263,16 @@ class NextcloudFile(models.Model):
         new_parent_nextcloud_id = False
         if target_parent_id:
             target_parent = self.browse(target_parent_id)
+            # Force sync the target folder if it's pending, so it exists on Nextcloud
+            if target_parent.exists() and target_parent.file_type == 'folder' and not target_parent.nextcloud_file_id:
+                target_parent._sync_single_record()
             new_parent_nextcloud_id = target_parent.nextcloud_file_id
         elif target_root_id:
             target_root = self.env['nextcloud.root.folder'].browse(target_root_id)
             new_parent_nextcloud_id = target_root.root_id
             
         sync_service = self.env['nextcloud.sync'].sudo()
+        log_model = self.env['nextcloud.sync.log'].sudo()
             
         for item in items:
             if not item.nextcloud_file_id or not new_parent_nextcloud_id:
@@ -282,20 +286,45 @@ class NextcloudFile(models.Model):
                 continue
 
             # Sync to Drive
-            success = sync_service.move_file(
-                item.nextcloud_file_id, new_parent_nextcloud_id, item.drive_config_id, file_name=item.name
-            )
-            
-            if success:
-                # Update Odoo record
-                item.write({
-                    'parent_folder_id': target_parent_id,
-                    'root_folder_id': target_root_id if not target_parent_id else False,
-                    'sync_state': 'synced',
-                    'last_synced': fields.Datetime.now(),
-                })
-            else:
+            try:
+                success = sync_service.move_file(
+                    item.nextcloud_file_id, new_parent_nextcloud_id, item.drive_config_id, file_name=item.name
+                )
+                
+                if success:
+                    write_vals = {
+                        'parent_folder_id': target_parent_id,
+                        'root_folder_id': target_root_id if not target_parent_id else False,
+                        'sync_state': 'synced',
+                        'last_synced': fields.Datetime.now(),
+                    }
+                    # ONLY update the ID if it is a WebDAV path
+                    if str(item.nextcloud_file_id).startswith('/'):
+                        write_vals['nextcloud_file_id'] = success
+                    # Update Odoo record
+                    item.write(write_vals)
+                else:
+                    item.write({'sync_state': 'error'})
+                    log_model.log_operation(
+                        config=item.drive_config_id,
+                        file_name=item.name,
+                        operation='move',
+                        state='fail',
+                        error_message='Move operation failed on Nextcloud.',
+                        sync_type='manual',
+                        file_type=item.file_type or 'file',
+                    )
+            except Exception as e:
                 item.write({'sync_state': 'error'})
+                log_model.log_operation(
+                    config=item.drive_config_id,
+                    file_name=item.name,
+                    operation='move',
+                    state='fail',
+                    error_message=str(e),
+                    sync_type='manual',
+                    file_type=item.file_type or 'file',
+                )
                 
         return True
 
@@ -336,19 +365,50 @@ class NextcloudFile(models.Model):
 
         # Use old_name from JS (captured before the write), fall back to record.name
         rename_old = old_name or record.name
-        success = self.env['nextcloud.sync'].sudo().with_context(
-            rename_old_name=rename_old
-        ).rename_file(record.nextcloud_file_id, new_name, record.drive_config_id)
-        if success:
-            super(NextcloudFile, record).write({
-                'sync_state': 'synced',
-                'last_synced': fields.Datetime.now(),
-            })
-        else:
+        log_model = self.env['nextcloud.sync.log'].sudo()
+        
+        try:
+            success = self.env['nextcloud.sync'].sudo().with_context(
+                rename_old_name=rename_old
+            ).rename_file(record.nextcloud_file_id, new_name, record.drive_config_id)
+            
+            if success:
+                write_vals = {
+                    'sync_state': 'synced',
+                    'last_synced': fields.Datetime.now(),
+                }
+                # ONLY update the ID if it is a WebDAV path (to protect numeric attachment IDs)
+                if str(record.nextcloud_file_id).startswith('/'):
+                    write_vals['nextcloud_file_id'] = success
+                super(NextcloudFile, record).write(write_vals)
+            else:
+                super(NextcloudFile, record).write({
+                    'sync_state': 'error',
+                })
+                log_model.log_operation(
+                    config=record.drive_config_id,
+                    file_name=new_name,
+                    operation='rename',
+                    state='fail',
+                    error_message='Rename operation failed on Nextcloud.',
+                    sync_type='manual',
+                    file_type=record.file_type or 'file',
+                )
+            return success
+        except Exception as e:
             super(NextcloudFile, record).write({
                 'sync_state': 'error',
             })
-        return success
+            log_model.log_operation(
+                config=record.drive_config_id,
+                file_name=new_name,
+                operation='rename',
+                state='fail',
+                error_message=str(e),
+                sync_type='manual',
+                file_type=record.file_type or 'file',
+            )
+            return False
 
     def action_open_in_drive(self):
         """Open the file in Nextcloud."""
@@ -480,12 +540,19 @@ class NextcloudFile(models.Model):
                 result = sync.with_context(sync_type=sync_type).create_folder_in_drive(
                     record.name, record.drive_config_id, parent_nextcloud_id=parent_nextcloud_id, file_record=record)
                 if result:
-                    record.write({
-                        'nextcloud_file_id': result['nextcloud_file_id'],
-                        'nextcloud_url': result['nextcloud_url'],
-                        'sync_state': 'synced',
-                        'last_synced': fields.Datetime.now(),
-                    })
+                    if isinstance(result, str):
+                        record.write({
+                            'nextcloud_file_id': result,
+                            'sync_state': 'synced',
+                            'last_synced': fields.Datetime.now(),
+                        })
+                    else:
+                        record.write({
+                            'nextcloud_file_id': result.get('nextcloud_file_id', ''),
+                            'nextcloud_url': result.get('nextcloud_url', ''),
+                            'sync_state': 'synced',
+                            'last_synced': fields.Datetime.now(),
+                        })
                     # Notify explorer about the new folder in its parent
                     self.env['nextcloud.sync'].sudo()._notify_folder_sync(record.parent_folder_id.id)
                     return True

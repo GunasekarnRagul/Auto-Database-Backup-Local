@@ -1,5 +1,6 @@
 from . import nextcloud_config
 from . import nextcloud_sync
+from . import nextcloud_migration
 from . import ir_attachment
 from . import nextcloud_file
 from . import nextcloud_model_config

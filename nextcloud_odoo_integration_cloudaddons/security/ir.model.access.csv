@@ -9,3 +9,4 @@ access_nextcloud_file_delete_wizard,access_nextcloud_file_delete_wizard,model_ne
 access_nextcloud_dashboard_layout,nextcloud.dashboard.layout,model_nextcloud_dashboard_layout,base.group_user,1,1,1,1
 access_duplicate_pruner_wizard,duplicate.pruner.wizard,model_duplicate_pruner_wizard,base.group_user,1,1,1,1
 access_duplicate_pruner_wizard_line,duplicate.pruner.wizard.line,model_duplicate_pruner_wizard_line,base.group_user,1,1,1,1
+access_nextcloud_migration,nextcloud.migration,model_nextcloud_migration,base.group_system,1,1,1,1

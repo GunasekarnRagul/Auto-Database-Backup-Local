@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import models, api
-from odoo.tools import Markup
+from markupsafe import Markup
 
 class MailMessage(models.Model):
     _inherit = 'mail.message'

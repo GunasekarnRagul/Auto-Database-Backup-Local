@@ -314,6 +314,34 @@ class IrAttachment(models.Model):
         base = os.path.splitext(name or '')[0]
         return base.replace('/', '_').replace('\\', '_').lower()
 
+    @staticmethod
+    def _sanitize_folder_name(name):
+        """Strip/replace characters that are invalid or problematic in Nextcloud
+        WebDAV folder paths so that MKCOL / PROPFIND requests succeed.
+
+        Characters removed or replaced:
+          '  (apostrophe)     → removed  (causes HTTP 400 on some Nextcloud versions)
+          "  (double-quote)   → removed
+          :  (colon)          → replaced with -
+          *  (asterisk)       → replaced with -
+          ?  (question mark)  → removed
+          <  >  |  (misc)    → removed
+          \\  (backslash)    → replaced with -
+          Multiple spaces     → collapsed to single space
+          Leading/trailing whitespace → stripped
+        """
+        import re
+        if not name:
+            return 'unnamed'
+        # Replace known-bad chars
+        name = name.replace("'", '').replace('"', '')
+        name = name.replace(':', '-').replace('\\', '-')
+        # Remove remaining chars invalid on most filesystems / WebDAV
+        name = re.sub(r'[*?<>|]', '', name)
+        # Collapse multiple spaces and strip
+        name = re.sub(r' {2,}', ' ', name).strip()
+        return name or 'unnamed'
+
     def _find_direct_synced_attachment(self, parent_model, parent_res_id, att_name):
         """Find a synced direct attachment on the parent record that matches att_name.
 
@@ -902,9 +930,12 @@ class IrAttachment(models.Model):
             root_name        – top-level folder (e.g. 'Sales')
             record_path_list – list of path segments for the record subfolder.
                                Names containing '/' are split into nested segments.
+                               Folder names are sanitized (apostrophes, quotes, colons
+                               and other WebDAV-unsafe chars are stripped/replaced).
                                Examples:
-                                 S00001        → ['order_idS00001']
-                                 INV/2025/0001 → ['move_idINV', '2025', '0001']
+                                 S00001                       → ['order_id_S00001']
+                                 INV/2025/0001                → ['move_id_INV', '2025', '0001']
+                                 Administrator's opportunity  → ['lead_id_Administrators opportunity']
         """
         if not model:
             return 'General', ['general']
@@ -937,17 +968,19 @@ class IrAttachment(models.Model):
                 display_name = str(res_id)
 
             # Split names containing '/' into nested sub-folders.
-            # e.g.  INV/2025/0001  →  ['move_idINV', '2025', '0001']
-            # e.g.  WH/OUT/00001   →  ['picking_idWH', 'OUT', '00001']
+            # e.g.  INV/2025/0001  →  ['move_id_INV', '2025', '0001']
+            # e.g.  WH/OUT/00001   →  ['picking_id_WH', 'OUT', '00001']
+            # e.g.  Administrator's opportunity → ['lead_id_Administrators opportunity']
             if '/' in display_name:
-                parts = [p.strip() for p in display_name.split('/') if p.strip()]
+                parts = [self._sanitize_folder_name(p.strip()) for p in display_name.split('/') if p.strip()]
                 if parts:
-                    parts[0] = f"{prefix}{parts[0]}"
+                    parts[0] = f"{prefix}_{parts[0]}"
                     record_path = parts
                 else:
-                    record_path = [f"{prefix}Draft_{res_id}"]
+                    record_path = [f"{prefix}_Draft_{res_id}"]
             else:
-                record_path = [f"{prefix}{display_name}"]
+                safe_name = self._sanitize_folder_name(display_name)
+                record_path = [f"{prefix}_{safe_name}"]
         else:
             record_path = [f"{prefix}General"]
 

@@ -12,7 +12,7 @@ class AttachmentSyncConfig(models.Model):
     name = fields.Char('Configuration Name', required=True)
 
     # Step 1: Module/Model Selection
-    module_config_id = fields.Many2one('nextcloud.model.config', string='Module', required=True,
+    module_config_id = fields.Many2one('nextcloud.model.config', string='Module', required=True, ondelete='cascade',
         domain="[('id', 'not in', existing_module_ids)]",
         help="Select the module for which you want to configure attachment synchronization.")
     
@@ -24,7 +24,7 @@ class AttachmentSyncConfig(models.Model):
     # Step 3: Folder Selection (filtered by driver)
     nextcloud_folder_id = fields.Many2one('nextcloud.file',
         string='Folder',
-        domain="[('file_type', '=', 'folder'), ('drive_config_id', '=', nextcloud_id)]",
+        domain="[('file_type', '=', 'folder'), ('drive_config_id', '=', nextcloud_id), ('parent_folder_id', '=', False)]",
         required=True,
         ondelete='cascade')
 
@@ -139,7 +139,7 @@ class AttachmentSyncConfig(models.Model):
         return {
             'type': 'ir.actions.act_window',
             'res_model': self._name,
-            'view_mode': 'kanban,tree,form',
+            'view_mode': 'kanban,list,form',
             'view_type': 'kanban',
             'target': 'current',
         }
@@ -322,7 +322,7 @@ class AttachmentSyncConfig(models.Model):
             'name': f'Synced Files — {self.name}',
             'type': 'ir.actions.act_window',
             'res_model': 'ir.attachment',
-            'view_mode': 'tree,form',
+            'view_mode': 'list,form',
             'domain': self._get_action_domain([('nextcloud_file_id', '!=', False)]),
             'context': {'create': False},
             'target': 'current',
@@ -335,7 +335,7 @@ class AttachmentSyncConfig(models.Model):
             'name': f'Not Synced Files — {self.name}',
             'type': 'ir.actions.act_window',
             'res_model': 'ir.attachment',
-            'view_mode': 'tree,form',
+            'view_mode': 'list,form',
             'domain': self._get_action_domain([('nextcloud_file_id', '=', False), ('type', '!=', 'url')]),
             'context': {'create': False},
             'target': 'current',
@@ -348,7 +348,7 @@ class AttachmentSyncConfig(models.Model):
             'name': f'Dual Sync Files (Odoo + Drive) — {self.name}',
             'type': 'ir.actions.act_window',
             'res_model': 'ir.attachment',
-            'view_mode': 'tree,form',
+            'view_mode': 'list,form',
             'domain': self._get_action_domain([('nextcloud_file_id', '!=', False), ('type', '!=', 'url')]),
             'context': {'create': False},
             'target': 'current',
@@ -361,7 +361,7 @@ class AttachmentSyncConfig(models.Model):
             'name': f'Drive-Only Files (Cloud Links) — {self.name}',
             'type': 'ir.actions.act_window',
             'res_model': 'ir.attachment',
-            'view_mode': 'tree,form',
+            'view_mode': 'list,form',
             'domain': self._get_action_domain([('nextcloud_file_id', '!=', False), ('type', '=', 'url')]),
             'context': {'create': False},
             'target': 'current',
@@ -374,7 +374,7 @@ class AttachmentSyncConfig(models.Model):
             'name': f'All Files — {self.name}',
             'type': 'ir.actions.act_window',
             'res_model': 'ir.attachment',
-            'view_mode': 'tree,form',
+            'view_mode': 'list,form',
             'domain': self._get_action_domain(),
             'context': {'create': False},
             'target': 'current',

@@ -6,6 +6,7 @@ _logger = logging.getLogger(__name__)
 class NextcloudFolderWizard(models.TransientModel):
     _name = 'nextcloud.folder.wizard'
     _description = 'Nextcloud Folder Bulk Add Wizard'
+    
 
     config_id = fields.Many2one('nextcloud.config', string='Drive Configuration', required=True)
     folder_ids_raw = fields.Text('Folder IDs', help='Paste Google Folder IDs here, one per line.')

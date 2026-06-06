@@ -209,7 +209,7 @@
     <record id="nextcloud_config_action" model="ir.actions.act_window">
         <field name="name">Drives</field>
         <field name="res_model">nextcloud.config</field>
-        <field name="view_mode">kanban,tree,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="search_view_id" ref="nextcloud_config_view_search"/>
         <field name="context">{'active_test': False}</field>
         <field name="help" type="html">

@@ -220,7 +220,7 @@ class NextcloudConfig(models.Model):
             "name": _("Manage Root Folders"),
             "type": "ir.actions.act_window",
             "res_model": "nextcloud.root.folder",
-            "view_mode": "tree",
+            "view_mode": "list",
             "domain": [("config_id", "=", self.id)],
             "context": {"default_config_id": self.id},
             "target": "new",

@@ -99,15 +99,39 @@ class NextcloudSync(models.Model):
         base = (config.nextcloud_url or "").rstrip("/")
         return f"{base}/remote.php/webdav"
 
+    def _safe_webdav_url(self, config, decoded_path):
+        """
+        Build a fully-encoded WebDAV URL from a *decoded* path string.
+        This is the single place where URL-encoding is applied, preventing
+        double-encoding when paths are retrieved from the Odoo database.
+
+        decoded_path must be a plain string like:
+            /attach/CRM/lead_id_Administrators opportunity/file.png
+        (i.e. NO %20 — real spaces are fine).
+        """
+        import urllib.parse
+        base = self._webdav_base(config).rstrip("/")
+        # Strip any accidental %xx sequences that may have been stored historically
+        # so we always start from a true decoded string before re-encoding.
+        try:
+            clean = urllib.parse.unquote(decoded_path)
+        except Exception:
+            clean = decoded_path
+        encoded = urllib.parse.quote(clean.lstrip("/"), safe="/")
+        return f"{base}/{encoded}"
+
     def _webdav_list(self, config, remote_path="/"):
         """
         PROPFIND a Nextcloud WebDAV path (Depth: 1).
         Returns a list of dicts: {name, path, is_folder, size, last_modified, etag}
         The first entry is the folder itself — it is skipped in results.
+
+        IMPORTANT: remote_path stored in nextcloud_file_id is always a *decoded*
+        string (spaces, not %20).  We encode it once here for the HTTP request.
         """
         import xml.etree.ElementTree as ET
-        base = self._webdav_base(config)
-        url  = base.rstrip("/") + "/" + remote_path.lstrip("/")
+        import urllib.parse
+        url  = self._safe_webdav_url(config, remote_path)
         auth = self._webdav_auth(config)
         try:
             r = http_requests.request(
@@ -149,19 +173,25 @@ class NextcloudSync(models.Model):
                     continue
                 resourcetype = prop.find("{DAV:}resourcetype")
                 is_folder = resourcetype is not None and resourcetype.find("{DAV:}collection") is not None
-                name     = prop.findtext("{DAV:}displayname") or href.rstrip("/").split("/")[-1]
+                # displayname is already a decoded string; use it as the authoritative name
+                name     = prop.findtext("{DAV:}displayname") or \
+                           urllib.parse.unquote(href.rstrip("/").split("/")[-1])
                 size     = int(prop.findtext("{DAV:}getcontentlength") or 0)
                 modified = prop.findtext("{DAV:}getlastmodified") or ""
                 etag     = (prop.findtext("{DAV:}getetag") or "").strip('"')
                 fileid   = prop.findtext("{http://owncloud.org/ns}fileid") or etag or href
+                # remote_path must always be a DECODED path (no %xx).  Join with decoded
+                # parent path so spaces remain as spaces — encoding happens only at HTTP layer.
+                decoded_parent = urllib.parse.unquote(remote_path.rstrip("/"))
+                decoded_remote = decoded_parent + "/" + name
                 entries.append({
                     "name":          name,
-                    "path":          href,          # full href path on server
-                    "remote_path":   remote_path.rstrip("/") + "/" + name,
+                    "path":          href,           # original encoded href from server
+                    "remote_path":   decoded_remote, # decoded path stored in Odoo DB
                     "is_folder":     is_folder,
                     "size":          size,
                     "last_modified": modified,
-                    "fileid":        fileid,
+                    "fileid":        decoded_remote, # use decoded path as stable ID
                     "etag":          etag,
                 })
         except Exception as e:
@@ -170,21 +200,36 @@ class NextcloudSync(models.Model):
 
     def _webdav_mkdir(self, config, remote_path):
         """
-        MKCOL to create a folder on Nextcloud.
-        Returns True on success (201 created or 405 already exists).
+        MKCOL to create a folder on Nextcloud, creating all missing parent
+        segments first (recursive mkdir).  Returns True on success.
+        remote_path must be a DECODED string — encoding is applied here.
         """
-        base = self._webdav_base(config)
-        url  = base.rstrip("/") + "/" + remote_path.lstrip("/")
+        import urllib.parse
         auth = self._webdav_auth(config)
+
+        # Normalise: strip any stray %xx that might have been stored historically
         try:
-            r = http_requests.request("MKCOL", url, auth=auth, timeout=15)
-            if r.status_code in (201, 405):   # 201 Created, 405 = already exists
-                return True
-            _logger.warning("WebDAV MKCOL %s → HTTP %s: %s", url, r.status_code, r.text[:200])
-            return False
-        except Exception as e:
-            _logger.error("WebDAV MKCOL error at %s: %s", url, e)
-            return False
+            remote_path = urllib.parse.unquote(remote_path)
+        except Exception:
+            pass
+
+        # Build list of every ancestor path that needs to exist
+        segments = [s for s in remote_path.strip("/").split("/") if s]
+        for depth in range(1, len(segments) + 1):
+            partial = "/".join(segments[:depth])
+            url = self._safe_webdav_url(config, "/" + partial)
+            try:
+                r = http_requests.request("MKCOL", url, auth=auth, timeout=15)
+                if r.status_code in (201, 405):   # 201 Created, 405 = already exists
+                    continue
+                _logger.warning("WebDAV MKCOL %s → HTTP %s: %s", url, r.status_code, r.text[:200])
+                if depth == len(segments):
+                    # Only fail on the leaf folder
+                    return False
+            except Exception as e:
+                _logger.error("WebDAV MKCOL error at %s: %s", url, e)
+                return False
+        return True
 
     # ─── Preview URL ────────────────────────────────────────────────────────────
 
@@ -276,7 +321,7 @@ class NextcloudSync(models.Model):
                              parent_nextcloud_id=None, conflict_behavior="rename", file_record=None):
         """Upload a file to Nextcloud via WebDAV PUT."""
         import urllib.parse
-        
+
         # Build the correct Nextcloud path using the Odoo record hierarchy
         remote_parent = ""
         if file_record:
@@ -300,34 +345,29 @@ class NextcloudSync(models.Model):
             else:
                 remote_parent = parent_nextcloud_id or "/"
 
-        remote_parent = remote_parent.rstrip("/")
-        if not str(remote_parent).startswith('/'):
+        # Always work with decoded paths (unquote strips any legacy %20 stored in DB)
+        remote_parent = urllib.parse.unquote(str(remote_parent)).rstrip("/")
+        if not remote_parent.startswith('/'):
             remote_parent = f'/{remote_parent}'
         remote_path = f"{remote_parent}/{file_name}"
         
-        base_url = self._webdav_base(config)
-        # Ensure trailing slash on base_url to prevent merging with path
-        if not base_url.endswith('/'):
-            base_url += '/'
-            
-        safe_path = urllib.parse.quote(remote_path.lstrip("/"))
-        url = f"{base_url}{safe_path}"
+        # _safe_webdav_url encodes exactly once (handles any legacy %20 in remote_parent)
+        url  = self._safe_webdav_url(config, remote_path)
         auth = self._webdav_auth(config)
-        
+
         r = http_requests.put(url, auth=auth, data=file_content, timeout=120)
-        
+
         if r.status_code in (200, 201, 204):
-            # Try to fetch properties to get the fileid
+            # Prefer the decoded remote_path as fileid; _webdav_list returns decoded paths too
             fileid = remote_path
             try:
                 entries = self._webdav_list(config, remote_path=remote_parent or "/")
                 for entry in entries:
                     if entry["name"] == file_name:
-                        fileid = entry["fileid"]
+                        fileid = entry["fileid"]  # already decoded
                         break
             except Exception:
                 pass
-            
             web_url = (config.nextcloud_url or "").rstrip("/") + "/apps/files/?dir=" + urllib.parse.quote(remote_parent)
             return {"nextcloud_file_id": fileid, "nextcloud_url": web_url, "mime_type": mime_type}
             
@@ -348,81 +388,161 @@ class NextcloudSync(models.Model):
 
     def _get_remote_path_from_id(self, file_id, override_name=None):
         """Resolve a nextcloud_file_id to its absolute WebDAV path on Nextcloud.
-        With /remote.php/webdav the user's home directory is the implicit root,
-        so we do NOT include root_folder.root_id (e.g. /ragul) in the path.
-        We only walk the parent chain and append the folder/file name.
+
+        If file_id is already a full WebDAV path (starts with /), use it directly.
+        Otherwise walk the Odoo record's parent chain to reconstruct the path.
+
+        Always returns a DECODED string (spaces, not %20). Callers must use
+        _safe_webdav_url() before placing this in an HTTP request.
         """
+        import urllib.parse
+        # Normalise: decode any legacy %20 that old code stored in the DB
+        file_id = urllib.parse.unquote(str(file_id)) if file_id else ""
+
+        # Fast path: file_id IS the WebDAV path (set by _process_drive_entry)
+        if file_id.startswith("/"):
+            if override_name:
+                # Replace only the filename component, keep the directory
+                parent_dir = file_id.rsplit("/", 1)[0] or "/"
+                return (parent_dir.rstrip("/") + "/" + override_name).replace("//", "/")
+            return file_id
+
+        # Slow path: reconstruct path from Odoo record hierarchy
         record = self.env["nextcloud.file"].sudo().search([("nextcloud_file_id", "=", file_id)], limit=1)
         if record:
-            # Walk up the parent chain collecting folder names (closest parent first)
             parts = []
             parent = record.parent_folder_id
             while parent:
                 parts.append(parent.name)
                 parent = parent.parent_folder_id
 
-            # With /remote.php/webdav the root is already the user's home — do NOT
-            # prepend root_folder.root_id (e.g. "/ragul") as that would double the prefix.
+            # Prepend root folder path (use root_id if set, else name)
+            if record.root_folder_id:
+                root_path = record.root_folder_id.root_id or record.root_folder_id.name
+                parts.append(root_path.strip("/"))
+
             segments = list(reversed(parts))
             remote_parent = "/".join(s.strip("/") for s in segments if s)
-            if not remote_parent.startswith("/"):
-                remote_parent = "/" + remote_parent if remote_parent else "/"
+            remote_parent = "/" + remote_parent if remote_parent else "/"
 
             file_name = override_name or record.name
             return (remote_parent.rstrip("/") + "/" + file_name).replace("//", "/")
 
         # Fallback: treat the id itself as a literal path
-        return file_id if str(file_id).startswith("/") else f"/{file_id}"
+        return f"/{file_id}"
 
     def rename_file(self, file_id, new_name, config, current_path=None):
-        import urllib.parse, posixpath
-        base_url = self._webdav_base(config)
-        if not base_url.endswith('/'): base_url += '/'
+        """
+        Rename a file/folder on Nextcloud using WebDAV MOVE.
+
+        Fix for HTTP 409 "destination node is not found":
+          The Nextcloud SabreDAV server returns 409 when the *parent directory*
+          of the destination does not exist.  This is a server-side cache/lock
+          artefact: the folder is really there, but SabreDAV still rejects the
+          request if the parent URL is not pre-confirmed.  We guard against this
+          by issuing a silent MKCOL on the parent directory first (MKCOL on an
+          existing dir returns 405, which we treat as success).  This is safe
+          and idempotent.
+
+        Fix for double-encoding:
+          All paths stored in nextcloud_file_id are decoded strings (spaces, not
+          %20).  We use _safe_webdav_url() which encodes exactly once.
+        """
+        import posixpath
+        import urllib.parse
         auth = self._webdav_auth(config)
-        
+
         rename_old_name = self.env.context.get("rename_old_name")
         if not current_path:
             current_path = self._get_remote_path_from_id(file_id, override_name=rename_old_name)
-            
-        new_path = posixpath.join(posixpath.dirname(current_path), new_name)
-        src_url = f"{base_url}{urllib.parse.quote(current_path.lstrip('/'))}"
-        dst_url = f"{base_url}{urllib.parse.quote(new_path.lstrip('/'))}"
-        
-        r = http_requests.request("MOVE", src_url, auth=auth, headers={"Destination": dst_url}, timeout=60)
-        return r.status_code in (201, 204, 207)
+
+        # Ensure current_path is fully decoded (no stray %xx)
+        current_path = urllib.parse.unquote(current_path)
+
+        parent_dir = posixpath.dirname(current_path)
+        new_path   = (parent_dir.rstrip("/") + "/" + new_name).replace("//", "/")
+
+        src_url = self._safe_webdav_url(config, current_path)
+        dst_url = self._safe_webdav_url(config, new_path)
+
+        # Pre-confirm the destination parent directory exists (avoids 409)
+        if parent_dir and parent_dir != "/":
+            self._webdav_mkdir(config, parent_dir)
+
+        r = http_requests.request(
+            "MOVE", src_url, auth=auth,
+            headers={"Destination": dst_url, "Overwrite": "F"},
+            timeout=60,
+        )
+        if r.status_code in (201, 204, 207):
+            return new_path
+        raise Exception(
+            f"Nextcloud RENAME failed (HTTP {r.status_code}). "
+            f"SRC: {src_url} | DST: {dst_url} | ERR: {r.text[:300]}"
+        )
 
     def trash_file(self, file_id, config):
         return self.delete_file_from_drive(file_id, config)
 
     def delete_file_from_drive(self, file_id, config):
         import urllib.parse
-        base_url = self._webdav_base(config)
-        if not base_url.endswith('/'): base_url += '/'
         auth = self._webdav_auth(config)
-        
-        current_path = self._get_remote_path_from_id(file_id)
-        src_url = f"{base_url}{urllib.parse.quote(current_path.lstrip('/'))}"
-        
+
+        current_path = urllib.parse.unquote(self._get_remote_path_from_id(file_id))
+        src_url = self._safe_webdav_url(config, current_path)
+
         r = http_requests.request("DELETE", src_url, auth=auth, timeout=60)
         return r.status_code in (200, 204)
 
     def move_file(self, file_id, new_parent_id, config, file_name=None):
+        """
+        Move a file/folder to a new parent directory on Nextcloud.
+
+        Fix for HTTP 404 "could not be located":
+          The stored nextcloud_file_id may contain spaces (decoded path) or
+          legacy %20-encoded strings.  We normalise both the source and
+          destination to decoded strings and encode them exactly once via
+          _safe_webdav_url().
+
+          Additionally we pre-create the destination parent directory so that
+          SabreDAV does not reject the request with 409/404 when the folder
+          exists on disk but is missing from its internal cache.
+        """
         import urllib.parse
-        base_url = self._webdav_base(config)
-        if not base_url.endswith('/'): base_url += '/'
         auth = self._webdav_auth(config)
-        
-        current_path = self._get_remote_path_from_id(file_id)
-        file_name = file_name or current_path.split("/")[-1]
-        
-        parent_path = self._get_remote_path_from_id(new_parent_id) if new_parent_id and new_parent_id != "root" else ""
-        new_path = f"{parent_path}/{file_name}".replace("//", "/")
-        
-        src_url = f"{base_url}{urllib.parse.quote(current_path.lstrip('/'))}"
-        dst_url = f"{base_url}{urllib.parse.quote(new_path.lstrip('/'))}"
-        
-        r = http_requests.request("MOVE", src_url, auth=auth, headers={"Destination": dst_url}, timeout=60)
-        return r.status_code in (201, 204, 207)
+
+        current_path = urllib.parse.unquote(self._get_remote_path_from_id(file_id))
+        file_name = file_name or current_path.rstrip("/").split("/")[-1]
+
+        if new_parent_id and new_parent_id != "root":
+            parent_path = urllib.parse.unquote(self._get_remote_path_from_id(new_parent_id))
+        else:
+            parent_path = ""
+
+        # Strip filename from parent_path if _get_remote_path_from_id returned a file path
+        if parent_path and not parent_path.endswith("/") and "." in parent_path.split("/")[-1]:
+            parent_path = "/".join(parent_path.split("/")[:-1])
+
+        new_path = (parent_path.rstrip("/") + "/" + file_name).replace("//", "/")
+
+        src_url = self._safe_webdav_url(config, current_path)
+        dst_url = self._safe_webdav_url(config, new_path)
+
+        # Pre-create the destination parent directory (idempotent — 405 = already exists)
+        dest_parent = "/".join(new_path.rstrip("/").split("/")[:-1])
+        if dest_parent and dest_parent != "/":
+            self._webdav_mkdir(config, dest_parent)
+
+        r = http_requests.request(
+            "MOVE", src_url, auth=auth,
+            headers={"Destination": dst_url, "Overwrite": "T"},
+            timeout=60,
+        )
+        if r.status_code in (201, 204, 207):
+            return new_path
+        raise Exception(
+            f"Nextcloud MOVE failed (HTTP {r.status_code}): {r.text[:300]}"
+        )
 
     def create_folder_in_drive(self, folder_name, parent_id_or_config=None, config=None, parent_nextcloud_id=None, file_record=None, parent_path=None):
         """Create a folder on Nextcloud via WebDAV MKCOL.
@@ -457,16 +577,23 @@ class NextcloudSync(models.Model):
         raise Exception(f"Nextcloud folder creation failed for path: {remote_path}")
 
     def find_folder_by_name(self, folder_name, parent_path, config):
-        """List parent path on Nextcloud via WebDAV and find a folder matching folder_name."""
+        """List parent path on Nextcloud via WebDAV and find a folder matching folder_name.
+
+        Returns nextcloud_file_id as the clean WebDAV *path* (e.g. '/atttach/CRM')
+        rather than the numeric oc:fileid.  This ensures the value can be used
+        directly as a parent path in subsequent find_or_create_folder calls
+        without a database round-trip to resolve the ID.
+        """
         entries = self._webdav_list(config, remote_path=parent_path or "/")
         for entry in entries:
             if entry["is_folder"] and entry["name"].lower() == folder_name.lower():
+                remote_path = entry["remote_path"]  # always a clean path like /atttach/CRM
                 return {
-                    "nextcloud_file_id": entry["fileid"],
+                    "nextcloud_file_id": remote_path,
                     "name":              entry["name"],
-                    "remote_path":       entry["remote_path"],
+                    "remote_path":       remote_path,
                     "nextcloud_url":     (config.nextcloud_url or "").rstrip("/")
-                                         + "/apps/files/?dir=" + entry["remote_path"],
+                                         + "/apps/files/?dir=" + remote_path,
                 }
         return False
 
@@ -967,16 +1094,15 @@ class NextcloudSync(models.Model):
     def download_file(self, file_id, config):
         """Download file bytes from Nextcloud via WebDAV GET."""
         import urllib.parse
-        base_url = self._webdav_base(config)
-        if not base_url.endswith('/'): base_url += '/'
         auth = self._webdav_auth(config)
-        
-        current_path = self._get_remote_path_from_id(file_id)
-        src_url = f"{base_url}{urllib.parse.quote(current_path.lstrip('/'))}"
-        
+
+        current_path = urllib.parse.unquote(self._get_remote_path_from_id(file_id))
+        src_url = self._safe_webdav_url(config, current_path)
+
         r = http_requests.get(src_url, auth=auth, timeout=60)
         if r.status_code == 200:
             return r.content
+        _logger.warning("WebDAV GET %s → HTTP %s", src_url, r.status_code)
         return False
 
     def copy_file(self, file_id, new_name, parent_id, config):

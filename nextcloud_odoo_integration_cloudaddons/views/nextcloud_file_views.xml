@@ -201,7 +201,7 @@
     <record id="nextcloud_file_action" model="ir.actions.act_window">
         <field name="name">File Explorer</field>
         <field name="res_model">nextcloud.file</field>
-        <field name="view_mode">kanban,tree,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="search_view_id" ref="nextcloud_file_view_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">

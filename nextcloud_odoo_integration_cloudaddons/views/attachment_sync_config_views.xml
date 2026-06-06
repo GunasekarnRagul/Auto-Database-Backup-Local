@@ -383,7 +383,7 @@
     <record id="action_attachment_sync_config" model="ir.actions.act_window">
         <field name="name">Attachment Sync Configuration</field>
         <field name="res_model">attachment.sync.config</field>
-        <field name="view_mode">kanban,tree,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="search_view_id" ref="view_attachment_sync_config_search"/>
         <field name="context">{'default_state': 'active', 'group_by': ''}</field>
         <field name="help" type="html">

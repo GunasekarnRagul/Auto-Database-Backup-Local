@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Cloud Storage | Nextcloud',
-    'version': '17.0.1.0.1',
+    'version': '17.0.1.0.2',
     'category': 'Document Management',
     'summary': 'Connect Odoo with DropBox to automatically upload, sync, organize, and manage documents across both platforms.',
     'description': """
@@ -35,6 +35,7 @@
         'views/menu.xml',
     ],
     'pre_init_hook': 'pre_init_hook',
+    'post_init_hook': 'post_init_hook',
     'installable': True,
     'application': True,
     'license': 'LGPL-3',
