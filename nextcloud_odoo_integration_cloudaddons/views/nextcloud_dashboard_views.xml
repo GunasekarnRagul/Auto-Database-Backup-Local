@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_nextcloud_dashboard" model="ir.actions.client">
+        <field name="name">Sync Dashboard</field>
+        <field name="tag">nextcloud_odoo_integration.dashboard</field>
+    </record>
+</odoo>
