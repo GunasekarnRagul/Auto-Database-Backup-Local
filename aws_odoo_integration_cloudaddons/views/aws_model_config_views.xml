@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Tree View for AWS S3 Model Configuration -->
+    <record id="view_nextcloud_model_config_tree" model="ir.ui.view">
+        <field name="name">AWS S3 Model Config - Tree</field>
+        <field name="model">nextcloud.model.config</field>
+        <field name="arch" type="xml">
+            <tree string="Model Configurations">
+                <field name="model_label" string="Model"/>
+                <field name="res_model" string="Technical Name"/>
+                <field name="drive_root_folder_name" string="Drive Folder"/>
+                <field name="is_enabled" string="Enabled"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Form View for AWS S3 Model Configuration -->
+    <record id="view_nextcloud_model_config_form" model="ir.ui.view">
+        <field name="name">AWS S3 Model Config - Form</field>
+        <field name="model">nextcloud.model.config</field>
+        <field name="arch" type="xml">
+            <form string="Model Configuration">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="model_label" string="Model Label"/>
+                            <field name="res_model" string="Technical Model Name"/>
+                        </group>
+                        <group>
+                            <field name="drive_root_folder_name" string="Drive Root Folder Name"/>
+                            <field name="is_enabled" string="Enabled for Sync"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action for Nextcloud Model Configuration -->
+    <record id="action_nextcloud_model_config" model="ir.actions.act_window">
+        <field name="name">Model Configurations</field>
+        <field name="res_model">nextcloud.model.config</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_nextcloud_model_config_tree"/>
+    </record>
+</odoo>
