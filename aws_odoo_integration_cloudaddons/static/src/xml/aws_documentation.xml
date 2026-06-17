@@ -6,8 +6,8 @@
             <div class="gd_header">
                 <div class="gd_header_left" style="width: 100%;">
                     <div class="gd_logo">
-                        <img src="/aws_odoo_integration_cloudaddons/static/description/icon.png" alt="Nextcloud Icon" class="gd_logo_icon"/>
-                        <span class="gd_logo_text">Nextcloud Integration Documentation</span>
+                        <img src="/aws_odoo_integration_cloudaddons/static/description/icon.png" alt="AWS S3 Icon" class="gd_logo_icon"/>
+                        <span class="gd_logo_text">AWS S3 Storage Connector Documentation</span>
                     </div>
                 </div>
             </div>
@@ -66,8 +66,8 @@
                                 <!-- Premium Hero Section -->
                                 <div class="gdd_premium_hero" style="background: linear-gradient(135deg, #f8fafd 0%, #e8f0fe 100%); border-radius: 16px; padding: 48px; text-align: center; margin-bottom: 40px; border: 1px solid #d2e3fc;">
                                     <span style="display: inline-block; background: #ffffff; color: #1a73e8; padding: 6px 16px; border-radius: 24px; font-size: 13px; font-weight: 700; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(26,115,232,0.15); letter-spacing: 1px; text-transform: uppercase;">V17.0 | 18.0 | 19.0</span>
-                                    <h2 style="font-size: 36px; font-weight: 800; color: #202124; margin-top: 0; margin-bottom: 20px; border: none; padding: 0;">Nextcloud Document Engine</h2>
-                                    <p style="font-size: 18px; color: #5f6368; max-width: 800px; margin: 0 auto; line-height: 1.6;">Transform your Odoo ERP into a limitless cloud-native platform. The Document Engine provides a zero-latency, bi-directional bridge between Odoo and Nextcloud, completely eliminating database bloat while empowering your team with native cloud file management.</p>
+                                    <h2 style="font-size: 36px; font-weight: 800; color: #202124; margin-top: 0; margin-bottom: 20px; border: none; padding: 0;">AWS S3 Storage Engine</h2>
+                                    <p style="font-size: 18px; color: #5f6368; max-width: 800px; margin: 0 auto; line-height: 1.6;">Transform your Odoo ERP into a limitless cloud-native platform. The Document Engine provides a zero-latency, bi-directional bridge between Odoo and AWS S3, completely eliminating database bloat while empowering your team with native AWS S3 cloud file management.</p>
                                 </div>
 
                                 <!-- Executive Summary -->
@@ -78,7 +78,7 @@
                                         </div>
                                         <div>
                                             <h3 style="font-size: 22px; margin: 0 0 12px 0; color: #202124; border: none; padding: 0;">Why use the Document Engine?</h3>
-                                            <p style="margin: 0; color: #5f6368; font-size: 15px; line-height: 1.7;">As Odoo databases scale, physical attachments (PDFs, images, CAD files) consume up to 90% of your expensive server storage. This degrades database backup speeds, inflates hosting costs, and slows down system migrations. The Document Engine intercepts Odoo attachments, securely routes them to Nextcloud via OAuth 2.0 REST APIs, and replaces the heavy binaries with lightweight, clickable 0kb pointers.</p>
+                                            <p style="margin: 0; color: #5f6368; font-size: 15px; line-height: 1.7;">As Odoo databases scale, physical attachments (PDFs, images, CAD files) consume up to 90% of your expensive server storage. This degrades database backup speeds, inflates hosting costs, and slows down system migrations. The Document Engine intercepts Odoo attachments, securely routes them to AWS S3 via the boto3 SDK, and replaces the heavy binaries with lightweight, clickable 0kb pointers.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -95,7 +95,7 @@
                                             <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #1a73e8;"></div>
                                             <i class="fa fa-database" style="font-size: 28px; color: #1a73e8; margin-bottom: 16px;"></i>
                                             <h4 style="font-size: 18px; margin: 0 0 12px 0; color: #202124;">Zero-Byte Ghosting</h4>
-                                            <p style="font-size: 14px; color: #5f6368; margin: 0; line-height: 1.6;">Our proprietary routing engine uploads raw files to Nextcloud, then replaces the Odoo <code>ir.attachment</code> with a 0-byte hyperlink. Chatter and portal functionalities remain completely uninterrupted.</p>
+                                            <p style="font-size: 14px; color: #5f6368; margin: 0; line-height: 1.6;">Our proprietary routing engine uploads raw files to AWS S3, then replaces the Odoo <code>ir.attachment</code> with a 0-byte hyperlink. Chatter and portal functionalities remain completely uninterrupted.</p>
                                         </div>
                                         
                                         <!-- Pillar 2 -->
@@ -103,7 +103,7 @@
                                             <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #34a853;"></div>
                                             <i class="fa fa-folder-open" style="font-size: 28px; color: #34a853; margin-bottom: 16px;"></i>
                                             <h4 style="font-size: 18px; margin: 0 0 12px 0; color: #202124;">Native File Explorer</h4>
-                                            <p style="font-size: 14px; color: #5f6368; margin: 0; line-height: 1.6;">A complete Nextcloud client built inside Odoo. Your team can upload, download ZIPs, rename, trash, and preview documents in a gorgeous Owl UI without ever switching browser tabs.</p>
+                                            <p style="font-size: 14px; color: #5f6368; margin: 0; line-height: 1.6;">A complete AWS S3 file client built inside Odoo. Your team can upload, download ZIPs, rename, trash, and preview documents with presigned URLs in a gorgeous Owl UI without ever switching browser tabs.</p>
                                         </div>
                                         
                                         <!-- Pillar 3 -->
@@ -132,7 +132,7 @@
                                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
                                         <div style="background: #202124; border-radius: 12px; padding: 24px; color: #e8eaed;">
                                             <h4 style="color: #8ab4f8; margin-top: 0; font-size: 16px; margin-bottom: 12px;"><i class="fa fa-lock" style="margin-right: 8px;"></i> Security &amp; Auth</h4>
-                                            <p style="font-size: 13px; line-height: 1.6; color: #9aa0a6; margin: 0;">Uses Nextcloud's strict OAuth 2.0 flow. Tokens are isolated and refreshed automatically. Only the Odoo server communicates directly with Nextcloud API v2, shielding user machines.</p>
+                                            <p style="font-size: 13px; line-height: 1.6; color: #9aa0a6; margin: 0;">Uses AWS IAM credentials with time-limited presigned URLs. Credentials are stored securely in Odoo configuration. Only the Odoo server communicates directly with the AWS S3 API, shielding user machines.</p>
                                         </div>
                                         <div style="background: #202124; border-radius: 12px; padding: 24px; color: #e8eaed;">
                                             <h4 style="color: #fbbc04; margin-top: 0; font-size: 16px; margin-bottom: 12px;"><i class="fa fa-sitemap" style="margin-right: 8px;"></i> Relational Integrity</h4>
@@ -162,7 +162,7 @@
                                 <div class="gdd_premium_hero" style="background: linear-gradient(135deg, #fef7e0 0%, #fffdf5 100%); border-radius: 16px; padding: 48px; text-align: center; margin-bottom: 48px; border: 1px solid #fce8e6;">
                                     <span style="display: inline-block; background: #ffffff; color: #ea4335; padding: 6px 16px; border-radius: 24px; font-size: 13px; font-weight: 700; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(234,67,53,0.15); letter-spacing: 1px; text-transform: uppercase;">Deployment Guide</span>
                                     <h2 style="font-size: 36px; font-weight: 800; color: #202124; margin-top: 0; margin-bottom: 20px; border: none; padding: 0;">Implementation Roadmap</h2>
-                                    <p style="font-size: 18px; color: #5f6368; max-width: 800px; margin: 0 auto; line-height: 1.6;">Follow this 5-step master plan to fully deploy the Nextcloud Document Engine. From initial API authentication to empowering your team with native cloud operations.</p>
+                                    <p style="font-size: 18px; color: #5f6368; max-width: 800px; margin: 0 auto; line-height: 1.6;">Follow this 5-step master plan to fully deploy the AWS S3 Storage Engine. From initial AWS credentials setup to empowering your team with native S3 cloud operations.</p>
                                 </div>
                                 
                                 <div class="gdd_roadmap" style="max-width: 900px; margin: 0 auto;">
@@ -171,15 +171,15 @@
                                     <div class="gdd_roadmap_item" style="border-left: 4px solid #ea4335; padding-left: 24px; padding-bottom: 24px; padding-top: 24px;">
                                         <div class="gdd_roadmap_title" style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
                                             <div style="background: #ea4335; color: white; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; box-shadow: 0 4px 12px rgba(234,67,53,0.3);">1</div>
-                                            <h3 style="margin: 0; font-size: 24px; color: #202124; border: none; padding: 0;">Nextcloud API Authentication</h3>
+                                            <h3 style="margin: 0; font-size: 24px; color: #202124; border: none; padding: 0;">AWS S3 Credentials Setup</h3>
                                         </div>
                                         <div class="gdd_roadmap_content" style="padding-left: 56px;">
-                                            <p style="font-size: 15px; color: #5f6368; margin-bottom: 16px; line-height: 1.6;">Establish a secure, encrypted OAuth 2.0 tunnel between your Odoo server and Nextcloud App Console.</p>
+                                            <p style="font-size: 15px; color: #5f6368; margin-bottom: 16px; line-height: 1.6;">Configure secure AWS IAM credentials to authenticate your Odoo server with AWS S3.</p>
                                             <div style="background: #f8f9fa; border: 1px solid #e8eaed; border-radius: 8px; padding: 20px;">
                                                 <ul style="list-style: none; padding: 0; margin: 0;">
-                                                    <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;"><i class="fa fa-check-circle" style="color: #34a853; margin-top: 4px;"></i> <span style="font-size: 14px; color: #3c4043;">Navigate to <strong>Nextcloud &gt; Configuration</strong>.</span></li>
-                                                    <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;"><i class="fa fa-check-circle" style="color: #34a853; margin-top: 4px;"></i> <span style="font-size: 14px; color: #3c4043;">Input your <strong>NextCloud Username</strong> and <strong>App Password</strong> in the credentials fields.</span></li>
-                                                    <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;"><i class="fa fa-check-circle" style="color: #34a853; margin-top: 4px;"></i> <span style="font-size: 14px; color: #3c4043;">Click <strong>Authenticate</strong> to redirect to Nextcloud and grant strictly scoped drive permissions.</span></li>
+                                                    <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;"><i class="fa fa-check-circle" style="color: #34a853; margin-top: 4px;"></i> <span style="font-size: 14px; color: #3c4043;">Navigate to <strong>AWS S3 Storage &gt; Configuration</strong>.</span></li>
+                                                    <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;"><i class="fa fa-check-circle" style="color: #34a853; margin-top: 4px;"></i> <span style="font-size: 14px; color: #3c4043;">Input your <strong>AWS Access Key</strong>, <strong>Secret Key</strong>, <strong>Region</strong>, and <strong>Bucket Name</strong> in the credentials fields.</span></li>
+                                                    <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;"><i class="fa fa-check-circle" style="color: #34a853; margin-top: 4px;"></i> <span style="font-size: 14px; color: #3c4043;">Click <strong>Validate Credentials</strong> to test your AWS S3 connection and confirm bucket accessibility.</span></li>
                                                     <li style="display: flex; align-items: flex-start; gap: 12px;"><i class="fa fa-check-circle" style="color: #34a853; margin-top: 4px;"></i> <span style="font-size: 14px; color: #3c4043;">Ensure the connection status badge changes to <span style="background: #e6f4ea; color: #137333; padding: 2px 8px; border-radius: 12px; font-weight: 600; font-size: 12px;">Connected</span>.</span></li>
                                                 </ul>
                                             </div>
@@ -193,12 +193,12 @@
                                             <h3 style="margin: 0; font-size: 24px; color: #202124; border: none; padding: 0;">Workspace Initialization</h3>
                                         </div>
                                         <div class="gdd_roadmap_content" style="padding-left: 56px;">
-                                            <p style="font-size: 15px; color: #5f6368; margin-bottom: 16px; line-height: 1.6;">Define the master directory structure where all Odoo files will be organized within Nextcloud.</p>
+                                            <p style="font-size: 15px; color: #5f6368; margin-bottom: 16px; line-height: 1.6;">Define the S3 bucket and root prefix where all Odoo files will be organized within AWS S3.</p>
                                             <div style="background: #f8f9fa; border: 1px solid #e8eaed; border-radius: 8px; padding: 20px;">
                                                 <ul style="list-style: none; padding: 0; margin: 0;">
-                                                     <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;"><i class="fa fa-folder-open" style="color: #fbbc04; margin-top: 4px;"></i> <span style="font-size: 14px; color: #3c4043;">In your configuration record, locate the <strong>Root Folder</strong> section.</span></li>
-                                                    <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;"><i class="fa fa-folder-open" style="color: #fbbc04; margin-top: 4px;"></i> <span style="font-size: 14px; color: #3c4043;">Click <strong>Create Odoo Root Folder</strong> or link an existing Nextcloud directory.</span></li>
-                                                    <li style="display: flex; align-items: flex-start; gap: 12px;"><i class="fa fa-info-circle" style="color: #1a73e8; margin-top: 4px;"></i> <span style="font-size: 14px; color: #3c4043;"><strong>Why?</strong> This guarantees that Odoo data is safely isolated in one master folder, preventing it from cluttering your personal Nextcloud space.</span></li>
+                                                     <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;"><i class="fa fa-folder-open" style="color: #fbbc04; margin-top: 4px;"></i> <span style="font-size: 14px; color: #3c4043;">In your configuration record, locate the <strong>Bucket</strong> and <strong>Root Prefix</strong> section.</span></li>
+                                                    <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;"><i class="fa fa-folder-open" style="color: #fbbc04; margin-top: 4px;"></i> <span style="font-size: 14px; color: #3c4043;">Click <strong>Sync Root Folder</strong> to create and initialize the S3 root prefix folder.</span></li>
+                                                    <li style="display: flex; align-items: flex-start; gap: 12px;"><i class="fa fa-info-circle" style="color: #1a73e8; margin-top: 4px;"></i> <span style="font-size: 14px; color: #3c4043;"><strong>Why?</strong> This guarantees that Odoo data is safely isolated in one S3 prefix, preventing it from cluttering your existing bucket.</span></li>
                                                 </ul>
                                             </div>
                                         </div>
@@ -215,12 +215,12 @@
                                             
                                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
                                                 <div style="border: 1px solid #e8eaed; border-radius: 8px; padding: 16px; background: #ffffff;">
-                                                    <h4 style="color: #1a73e8; margin: 0 0 8px 0; font-size: 15px;"><img src="/aws_odoo_integration_cloudaddons/static/src/img/aws.png" alt="Drive" style="width: 20px; height: 20px; object-fit: contain; margin-right: 6px;"/> Nextcloud Only Mode</h4>
-                                                    <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.5;">Files are pushed to Nextcloud. Odoo keeps a 0kb hyperlink. <strong>Maximizes DB savings.</strong></p>
+                                                    <h4 style="color: #1a73e8; margin: 0 0 8px 0; font-size: 15px;"><img src="/aws_odoo_integration_cloudaddons/static/src/img/aws.png" alt="Drive" style="width: 20px; height: 20px; object-fit: contain; margin-right: 6px;"/> AWS S3 Only Mode</h4>
+                                                    <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.5;">Files are pushed to AWS S3. Odoo keeps a 0kb hyperlink. <strong>Maximizes DB savings.</strong></p>
                                                 </div>
                                                 <div style="border: 1px solid #e8eaed; border-radius: 8px; padding: 16px; background: #ffffff;">
                                                     <h4 style="color: #34a853; margin: 0 0 8px 0; font-size: 15px;"><i class="fa fa-copy" style="margin-right: 6px;"></i> Dual Storage Mode</h4>
-                                                    <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.5;">Files exist physically in Odoo and are mirrored to Nextcloud. <strong>Maximum redundancy.</strong></p>
+                                                    <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.5;">Files exist physically in Odoo AND a copy is pushed to AWS S3. <strong>Maximum redundancy.</strong></p>
                                                 </div>
                                             </div>
                                             
@@ -254,14 +254,14 @@
                                                     <i class="fa fa-folder" style="font-size: 24px; color: #1a73e8;"></i>
                                                     <div>
                                                         <strong style="color: #202124; display: block; margin-bottom: 4px;">File Explorer Hub</strong>
-                                                        <span style="font-size: 13px; color: #5f6368;">Navigate to <strong>Nextcloud &gt; File Explorer</strong> to browse, rename, and preview documents natively.</span>
+                                                        <span style="font-size: 13px; color: #5f6368;">Navigate to <strong>Cloud Storage &gt; File Explorer</strong> to browse, rename, and preview documents natively.</span>
                                                     </div>
                                                 </div>
                                                 <div style="background: #f8f9fa; border: 1px solid #e8eaed; border-radius: 8px; padding: 16px; display: flex; align-items: center; gap: 16px;">
                                                     <i class="fa fa-share-alt" style="font-size: 24px; color: #1a73e8;"></i>
                                                     <div>
                                                         <strong style="color: #202124; display: block; margin-bottom: 4px;">External Link Sharing</strong>
-                                                        <span style="font-size: 13px; color: #5f6368;">Generate secure Nextcloud share links from the File Explorer to send assets to clients.</span>
+                                                        <span style="font-size: 13px; color: #5f6368;">Generate secure AWS S3 presigned URLs from the File Explorer to send assets to clients.</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -281,7 +281,7 @@
                                                 <div style="background: #ffffff; border: 1px solid #e8eaed; border-radius: 8px; padding: 20px; text-align: center;">
                                                     <i class="fa fa-dashboard" style="font-size: 32px; color: #7C4DFF; margin-bottom: 12px;"></i>
                                                     <h4 style="margin: 0 0 8px 0; color: #202124; font-size: 16px;">The Dashboard</h4>
-                                                    <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.5;">Monitor live Nextcloud storage quotas, track connection statuses, and review pending sync queues across 16 widgets.</p>
+                                                    <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.5;">Monitor live AWS S3 storage usage, track connection statuses, and review pending sync queues across 16 widgets.</p>
                                                 </div>
                                                 <div style="background: #ffffff; border: 1px solid #e8eaed; border-radius: 8px; padding: 20px; text-align: center;">
                                                     <i class="fa fa-terminal" style="font-size: 32px; color: #202124; margin-bottom: 12px;"></i>
@@ -302,7 +302,7 @@
                                 <div class="gdd_premium_hero" style="background: linear-gradient(135deg, #f3f0ff 0%, #fdf8ff 100%); border-radius: 16px; padding: 48px; text-align: center; margin-bottom: 48px; border: 1px solid #d9b3ff;">
                                     <span style="display: inline-block; background: #ffffff; color: #7C4DFF; padding: 6px 16px; border-radius: 24px; font-size: 13px; font-weight: 700; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(124,77,255,0.15); letter-spacing: 1px; text-transform: uppercase;">Administration Panel</span>
                                     <h2 style="font-size: 36px; font-weight: 800; color: #202124; margin-top: 0; margin-bottom: 20px; border: none; padding: 0;">Monitoring Command Center</h2>
-                                    <p style="font-size: 18px; color: #5f6368; max-width: 800px; margin: 0 auto; line-height: 1.6;">A real-time, 16-widget administration console that gives your IT team a bird's-eye view of every Nextcloud connection, sync queue, storage quota, and user activity — without a single page refresh.</p>
+                                    <p style="font-size: 18px; color: #5f6368; max-width: 800px; margin: 0 auto; line-height: 1.6;">A real-time, 16-widget administration console that gives your IT team a bird's-eye view of every AWS S3 connection, sync queue, storage quota, and user activity — without a single page refresh.</p>
                                 </div>
 
                                 <!-- How the Dashboard Works -->
@@ -313,7 +313,7 @@
                                         </div>
                                         <div>
                                             <h3 style="font-size: 22px; margin: 0 0 12px 0; color: #202124; border: none; padding: 0;">Lazy-Load Performance Architecture</h3>
-                                            <p style="margin: 0; color: #5f6368; font-size: 15px; line-height: 1.7;">The dashboard shell renders instantly. Each widget then fires an independent, non-blocking RPC call to fetch its own data. This means even if Nextcloud API is slow to respond on one widget, the rest of the dashboard remains fully functional. Widgets also support individual <strong>manual refresh</strong> — a single click re-fetches only that widget's data, not the entire page.</p>
+                                            <p style="margin: 0; color: #5f6368; font-size: 15px; line-height: 1.7;">The dashboard shell renders instantly. Each widget then fires an independent, non-blocking RPC call to fetch its own data. This means even if AWS S3 API is slow to respond on one widget, the rest of the dashboard remains fully functional. Widgets also support individual <strong>manual refresh</strong> — a single click re-fetches only that widget's data, not the entire page.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -390,11 +390,11 @@
                                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
                                             <div style="background: #ffffff; border: 1px solid #e8eaed; border-radius: 10px; padding: 20px;">
                                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fa fa-files-o" style="color: #1a73e8; font-size: 18px;"></i><strong style="color: #202124; font-size: 15px;">Total Files</strong></div>
-                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Lifetime count of files successfully synchronized across all configured models and all connected Nextcloud accounts.</p>
+                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Lifetime count of files successfully synchronized across all configured models and all connected AWS S3 buckets.</p>
                                             </div>
                                             <div style="background: #ffffff; border: 1px solid #e8eaed; border-radius: 10px; padding: 20px;">
                                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fa fa-cloud-upload" style="color: #1a73e8; font-size: 18px;"></i><strong style="color: #202124; font-size: 15px;">Total Cloud Usage</strong></div>
-                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Physical storage consumed by Odoo attachments in Nextcloud, displayed in MB/GB. Helps track hosting cost.</p>
+                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Physical storage consumed by Odoo attachments in AWS S3, displayed in MB/GB. Helps track hosting cost.</p>
                                             </div>
                                             <div style="background: #ffffff; border: 1px solid #e8eaed; border-radius: 10px; padding: 20px;">
                                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fa fa-calendar-plus-o" style="color: #1a73e8; font-size: 18px;"></i><strong style="color: #202124; font-size: 15px;">Files This Month</strong></div>
@@ -415,19 +415,19 @@
                                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
                                             <div style="background: #ffffff; border: 1px solid #e8eaed; border-radius: 10px; padding: 20px;">
                                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fa fa-hdd-o" style="color: #34a853; font-size: 18px;"></i><strong style="color: #202124; font-size: 15px;">Connected Drivers</strong></div>
-                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Full-width panel listing every active OAuth connection. Shows email, token status, and live per-drive quota bar.</p>
+                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Full-width panel listing every active AWS S3 connection. Shows bucket name, credential status, and live storage usage bar.</p>
                                             </div>
                                             <div style="background: #ffffff; border: 1px solid #e8eaed; border-radius: 10px; padding: 20px;">
                                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fa fa-pie-chart" style="color: #34a853; font-size: 18px;"></i><strong style="color: #202124; font-size: 15px;">Storage Meter</strong></div>
-                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Doughnut chart of total vs. available quota. Color shifts to amber/red as usage approaches the Nextcloud limit.</p>
+                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Doughnut chart of total vs. available storage quota. Color shifts to amber/red as usage approaches the bucket limit.</p>
                                             </div>
                                             <div style="background: #ffffff; border: 1px solid #e8eaed; border-radius: 10px; padding: 20px;">
                                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fa fa-pie-chart" style="color: #34a853; font-size: 18px;"></i><strong style="color: #202124; font-size: 15px;">Top File Types</strong></div>
-                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Pie chart showing the distribution of MIME types (PDF, JPEG, DOCX, XML) currently stored in your Nextcloud.</p>
+                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Pie chart showing the distribution of MIME types (PDF, JPEG, DOCX, XML) currently stored in your S3 bucket.</p>
                                             </div>
                                             <div style="background: #ffffff; border: 1px solid #e8eaed; border-radius: 10px; padding: 20px;">
                                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fa fa-sort-amount-desc" style="color: #34a853; font-size: 18px;"></i><strong style="color: #202124; font-size: 15px;">Largest Files</strong></div>
-                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Leaderboard of the top heaviest files. Each row shows file name, size, and a direct clickable link to its Nextcloud location.</p>
+                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Leaderboard of the top heaviest files. Each row shows file name, size, and a direct presigned URL link to its S3 location.</p>
                                             </div>
                                         </div>
                                     </div>
@@ -444,11 +444,11 @@
                                             </div>
                                             <div style="background: #ffffff; border: 1px solid #e8eaed; border-radius: 10px; padding: 20px;">
                                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fa fa-times-circle" style="color: #ea4335; font-size: 18px;"></i><strong style="color: #202124; font-size: 15px;">Failed Syncs</strong></div>
-                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Lists sync operations that crashed — due to revoked OAuth tokens, file size limits, or API quota exhaustion — for quick debugging.</p>
+                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Lists sync operations that crashed — due to invalid AWS credentials, file size limits, or S3 API quota exhaustion — for quick debugging.</p>
                                             </div>
                                             <div style="background: #ffffff; border: 1px solid #e8eaed; border-radius: 10px; padding: 20px;">
                                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fa fa-clone" style="color: #ea4335; font-size: 18px;"></i><strong style="color: #202124; font-size: 15px;">Duplicate Files</strong></div>
-                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Detects redundant attachments uploaded multiple times to the same record folder, helping recover wasted Nextcloud quota.</p>
+                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Detects redundant attachments uploaded multiple times to the same S3 prefix, helping recover wasted S3 storage quota.</p>
                                             </div>
                                             <div style="background: #ffffff; border: 1px solid #e8eaed; border-radius: 10px; padding: 20px;">
                                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fa fa-list-alt" style="color: #ea4335; font-size: 18px;"></i><strong style="color: #202124; font-size: 15px;">Activity Log</strong></div>
@@ -473,7 +473,7 @@
                                             </div>
                                             <div style="background: #ffffff; border: 1px solid #e8eaed; border-radius: 10px; padding: 20px;">
                                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fa fa-share-alt" style="color: #fbbc04; font-size: 18px;"></i><strong style="color: #202124; font-size: 15px;">Active Share Links</strong></div>
-                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Audits all externally active Nextcloud sharing URLs generated by your team. Essential for security compliance reviews.</p>
+                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Audits all externally active AWS S3 presigned URLs generated by your team. Essential for security compliance reviews.</p>
                                             </div>
                                             <div style="background: #ffffff; border: 1px solid #e8eaed; border-radius: 10px; padding: 20px;">
                                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><i class="fa fa-tasks" style="color: #fbbc04; font-size: 18px;"></i><strong style="color: #202124; font-size: 15px;">Model Breakdown</strong></div>
@@ -501,7 +501,7 @@
                                 <div class="gdd_premium_hero" style="background: linear-gradient(135deg, #e6f4ea 0%, #f8fdf9 100%); border-radius: 16px; padding: 48px; text-align: center; margin-bottom: 48px; border: 1px solid #b7dfbf;">
                                     <span style="display: inline-block; background: #ffffff; color: #34a853; padding: 6px 16px; border-radius: 24px; font-size: 13px; font-weight: 700; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(52,168,83,0.15); letter-spacing: 1px; text-transform: uppercase;">Native Cloud Client</span>
                                     <h2 style="font-size: 36px; font-weight: 800; color: #202124; margin-top: 0; margin-bottom: 20px; border: none; padding: 0;">File Explorer</h2>
-                                    <p style="font-size: 18px; color: #5f6368; max-width: 800px; margin: 0 auto; line-height: 1.6;">A complete Nextcloud file manager built directly inside Odoo. Browse, upload, preview, rename, share, and trash files without ever leaving your ERP — eliminating context-switching between applications entirely.</p>
+                                    <p style="font-size: 18px; color: #5f6368; max-width: 800px; margin: 0 auto; line-height: 1.6;">A complete AWS S3 file manager built directly inside Odoo. Browse, upload, preview, rename, and trash files without ever leaving your ERP — eliminating context-switching between applications entirely.</p>
                                 </div>
 
                                 <!-- What is it block -->
@@ -512,7 +512,7 @@
                                         </div>
                                         <div>
                                             <h3 style="font-size: 22px; margin: 0 0 12px 0; color: #202124; border: none; padding: 0;">Why a built-in File Explorer?</h3>
-                                            <p style="margin: 0; color: #5f6368; font-size: 15px; line-height: 1.7;">When files are routed to Nextcloud, they become invisible in the Odoo chatter (stored as 0kb pointers). The File Explorer solves this completely — it provides a full-featured UI directly mapped to the Nextcloud API, so your team can access, manage, and share any synced document from one place. No separate browser tabs. No Nextcloud permissions required on end-user machines.</p>
+                                            <p style="margin: 0; color: #5f6368; font-size: 15px; line-height: 1.7;">When files are routed to AWS S3, they become invisible in the Odoo chatter (stored as 0kb presigned URL pointers). The File Explorer solves this completely — it provides a full-featured UI directly mapped to the AWS S3 API, so your team can access, manage, and preview any synced document from one place. No separate browser tabs. No AWS console access required on end-user machines.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -528,42 +528,42 @@
                                             <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #1a73e8;"></div>
                                             <i class="fa fa-hdd-o" style="font-size: 22px; color: #1a73e8; margin-bottom: 12px;"></i>
                                             <h4 style="font-size: 15px; margin: 0 0 8px 0; color: #202124;">Multi-Drive Switching</h4>
-                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Connect and switch between multiple Nextcloud accounts (Sales Nextcloud, HR Nextcloud, etc.) using the top-left driver dropdown. Each drive maintains its own folder tree and active state.</p>
+                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Connect and switch between multiple AWS S3 buckets (Sales Bucket, HR Bucket, etc.) using the top-left driver dropdown. Each bucket maintains its own folder tree and active state.</p>
                                         </div>
 
                                         <div style="background: #fff; border: 1px solid #e8eaed; border-radius: 12px; padding: 22px; position: relative; overflow: hidden;">
                                             <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #34a853;"></div>
                                             <i class="fa fa-cloud-upload" style="font-size: 22px; color: #34a853; margin-bottom: 12px;"></i>
                                             <h4 style="font-size: 15px; margin: 0 0 8px 0; color: #202124;">Bulk Upload with Progress</h4>
-                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Upload multiple files simultaneously into any Nextcloud folder. A real-time progress bar tracks the current file count and completion percentage as each file streams to Nextcloud's servers.</p>
+                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Upload multiple files simultaneously into any S3 folder prefix. A real-time progress bar tracks the current file count and completion percentage as each file streams to AWS S3.</p>
                                         </div>
 
                                         <div style="background: #fff; border: 1px solid #e8eaed; border-radius: 12px; padding: 22px; position: relative; overflow: hidden;">
                                             <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #fbbc04;"></div>
                                             <i class="fa fa-download" style="font-size: 22px; color: #fbbc04; margin-bottom: 12px;"></i>
                                             <h4 style="font-size: 15px; margin: 0 0 8px 0; color: #202124;">ZIP Download</h4>
-                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Select multiple files and download them all at once. The system bundles the selected files into a single ZIP archive, streamed directly through the Odoo server — no Nextcloud account needed by the user.</p>
+                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Select multiple files and download them all at once. The system bundles the selected files into a single ZIP archive, streamed directly through the Odoo server — no AWS console access needed by the user.</p>
                                         </div>
 
                                         <div style="background: #fff; border: 1px solid #e8eaed; border-radius: 12px; padding: 22px; position: relative; overflow: hidden;">
                                             <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #ea4335;"></div>
                                             <i class="fa fa-eye" style="font-size: 22px; color: #ea4335; margin-bottom: 12px;"></i>
                                             <h4 style="font-size: 15px; margin: 0 0 8px 0; color: #202124;">In-Modal File Preview</h4>
-                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Double-click any file to open a full-screen Odoo modal with Nextcloud's secure iframe preview. Works natively for PDFs, images, and Office documents. Falls back to a direct Nextcloud link for restricted types.</p>
+                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Double-click any file to open a full-screen Odoo modal with a secure presigned URL preview. Works natively for PDFs, images, and Office documents. Falls back to a direct S3 presigned URL for restricted types.</p>
                                         </div>
 
                                         <div style="background: #fff; border: 1px solid #e8eaed; border-radius: 12px; padding: 22px; position: relative; overflow: hidden;">
                                             <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #7C4DFF;"></div>
                                             <i class="fa fa-search" style="font-size: 22px; color: #7C4DFF; margin-bottom: 12px;"></i>
                                             <h4 style="font-size: 15px; margin: 0 0 8px 0; color: #202124;">Real-Time Search &amp; Filter</h4>
-                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">The search bar queries Nextcloud instantly across file names and metadata. Combine with filters for Nextcloud, file type, and last-modified date to pinpoint any document immediately.</p>
+                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">The search bar queries AWS S3 instantly across file names and metadata. Combine with filters for bucket, file type, and last-modified date to pinpoint any document immediately.</p>
                                         </div>
 
                                         <div style="background: #fff; border: 1px solid #e8eaed; border-radius: 12px; padding: 22px; position: relative; overflow: hidden;">
                                             <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #00ACC1;"></div>
                                             <i class="fa fa-share-alt" style="font-size: 22px; color: #00ACC1; margin-bottom: 12px;"></i>
                                             <h4 style="font-size: 15px; margin: 0 0 8px 0; color: #202124;">Secure Link Sharing</h4>
-                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Right-click any file and select Share to generate a secure Nextcloud public link instantly. The link is stored and tracked in the <strong>Active Share Links</strong> dashboard widget for auditing.</p>
+                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Right-click any file and select Share to generate a secure AWS S3 presigned URL instantly. The link is stored and tracked in the <strong>Active Share Links</strong> dashboard widget for auditing.</p>
                                         </div>
 
                                         <div style="background: #fff; border: 1px solid #e8eaed; border-radius: 12px; padding: 22px; position: relative; overflow: hidden;">
@@ -601,7 +601,7 @@
                                             <div style="background: #1a73e8; color: white; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; flex-shrink: 0;">1</div>
                                             <div>
                                                 <strong style="color: #202124; display: block; font-size: 15px; margin-bottom: 6px;">Select Target Drive</strong>
-                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Use the <strong>Driver Dropdown</strong> in the top-left to switch between connected Nextcloud accounts (e.g., Sales Nextcloud, HR Nextcloud). Each drive loads its own root folder tree independently.</p>
+                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Use the <strong>Driver Dropdown</strong> in the top-left to switch between connected AWS S3 buckets (e.g., Sales S3, HR S3). Each bucket loads its own root folder tree independently.</p>
                                             </div>
                                         </div>
 
@@ -617,7 +617,7 @@
                                             <div style="background: #fbbc04; color: white; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; flex-shrink: 0;">3</div>
                                             <div>
                                                 <strong style="color: #202124; display: block; font-size: 15px; margin-bottom: 6px;">Preview Before Action</strong>
-                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Double-click any file to open it in a full-screen Odoo preview modal powered by Nextcloud's previewer. No downloads required, no Nextcloud account needed by the viewing user.</p>
+                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Double-click any file to open it in a full-screen Odoo preview modal powered by a secure S3 presigned URL. No downloads required, no AWS console access needed by the viewing user.</p>
                                             </div>
                                         </div>
 
@@ -625,7 +625,7 @@
                                             <div style="background: #ea4335; color: white; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; flex-shrink: 0;">4</div>
                                             <div>
                                                 <strong style="color: #202124; display: block; font-size: 15px; margin-bottom: 6px;">Share &amp; Distribute</strong>
-                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Right-click any file and select <strong>Share</strong>. The module calls the Nextcloud API to generate a secure, public web-view link. Paste it directly into Odoo emails or portal messages to share with external clients.</p>
+                                                <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Right-click any file and select <strong>Share</strong>. The module calls the AWS S3 API to generate a secure, time-limited presigned URL. Paste it directly into Odoo emails or portal messages to share with external clients.</p>
                                             </div>
                                         </div>
 
@@ -663,7 +663,7 @@
                                         </div>
                                         <div>
                                             <h3 style="font-size: 22px; margin: 0 0 12px 0; color: #202124; border: none; padding: 0;">Why a Read-Only Terminal?</h3>
-                                            <p style="margin: 0; color: #5f6368; font-size: 15px; line-height: 1.7;">Synchronization happens in background CRON jobs, completely invisible to the user. The Activity Logs Terminal is the diagnostic window into this background engine. It captures every single operation — successes, failures, duration, trigger source, and the exact Nextcloud path — giving administrators the power to debug, audit, and optimize the sync pipeline without touching production data.</p>
+                                            <p style="margin: 0; color: #5f6368; font-size: 15px; line-height: 1.7;">Synchronization happens in background CRON jobs, completely invisible to the user. The Activity Logs Terminal is the diagnostic window into this background engine. It captures every single operation — successes, failures, duration, trigger source, and the exact S3 object path — giving administrators the power to debug, audit, and optimize the sync pipeline without touching production data.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -678,7 +678,7 @@
                                             <i class="fa fa-shield" style="color: #1a73e8; font-size: 22px; margin-top: 2px; flex-shrink: 0;"></i>
                                             <div>
                                                 <strong style="color: #202124; display: block; font-size: 15px; margin-bottom: 6px;">Non-Blocking Failsafe</strong>
-                                                <p style="margin: 0; color: #5f6368; font-size: 13px; line-height: 1.6;">The logging engine is wrapped in a strict <code>try/except</code> failsafe block. If the database encounters an error while writing a log record, the exception is caught and silently discarded. <strong>This guarantees that actual Nextcloud syncs never crash due to a logging failure.</strong> The sync always takes priority over its own audit trail.</p>
+                                                <p style="margin: 0; color: #5f6368; font-size: 13px; line-height: 1.6;">The logging engine is wrapped in a strict <code>try/except</code> failsafe block. If the database encounters an error while writing a log record, the exception is caught and silently discarded. <strong>This guarantees that actual AWS S3 syncs never crash due to a logging failure.</strong> The sync always takes priority over its own audit trail.</p>
                                             </div>
                                         </div>
                                         <div style="background: #f8f9fa; border-left: 4px solid #34a853; border-radius: 6px; padding: 20px; display: flex; align-items: flex-start; gap: 16px;">
@@ -708,13 +708,13 @@
                                             <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #ea4335;"></div>
                                             <i class="fa fa-map-marker" style="font-size: 22px; color: #ea4335; margin-bottom: 12px;"></i>
                                             <h4 style="font-size: 15px; margin: 0 0 8px 0; color: #202124;">Full Path Breadcrumbs</h4>
-                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Logs dynamically concatenate the Nextcloud Name, Root Folder, and Sub-Folder into a full path string. Even if 100 files are named <code>invoice.pdf</code>, each log entry visually distinguishes them by their exact location.</p>
+                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Logs dynamically concatenate the Bucket Name, Root Prefix, and Sub-Folder into a full path string. Even if 100 files are named <code>invoice.pdf</code>, each log entry visually distinguishes them by their exact location.</p>
                                         </div>
                                         <div style="background: #fff; border: 1px solid #e8eaed; border-radius: 12px; padding: 22px; position: relative; overflow: hidden;">
                                             <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #34a853;"></div>
                                             <i class="fa fa-tachometer" style="font-size: 22px; color: #34a853; margin-bottom: 12px;"></i>
                                             <h4 style="font-size: 15px; margin: 0 0 8px 0; color: #202124;">Performance Metrics</h4>
-                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">A dedicated <code>Duration (ms)</code> column tracks exactly how long the Nextcloud API took to respond. Essential for diagnosing network bottlenecks, slow quota responses, or region-specific latency issues.</p>
+                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">A dedicated <code>Duration (ms)</code> column tracks exactly how long the AWS S3 API took to respond. Essential for diagnosing network bottlenecks, slow presigned URL responses, or region-specific latency issues.</p>
                                         </div>
                                         <div style="background: #fff; border: 1px solid #e8eaed; border-radius: 12px; padding: 22px; position: relative; overflow: hidden;">
                                             <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #1a73e8;"></div>
@@ -726,7 +726,7 @@
                                             <div style="position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #fbbc04;"></div>
                                             <i class="fa fa-bug" style="font-size: 22px; color: #fbbc04; margin-bottom: 12px;"></i>
                                             <h4 style="font-size: 15px; margin: 0 0 8px 0; color: #202124;">Diagnostic Error Form</h4>
-                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Failed operations display a full <strong>Error Details</strong> panel with raw Nextcloud API HTTP error messages. Includes the exact Nextcloud File ID for instant cross-referencing directly in the Drive console.</p>
+                                            <p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Failed operations display a full <strong>Error Details</strong> panel with raw AWS S3 API error messages. Includes the exact S3 object key for instant cross-referencing directly in the AWS console.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -737,33 +737,33 @@
                                         <i class="fa fa-list-alt" style="color: #7C4DFF;"></i> Sample Log Output
                                     </h3>
                                     <div style="background: #1e1e2e; border-radius: 12px; padding: 24px; font-family: monospace; font-size: 12px; line-height: 1.8; overflow-x: auto;">
-                                        <div style="color: #6272a4; margin-bottom: 12px;"># Nextcloud Sync — Activity Terminal  |  Read-Only Audit View</div>
+                                        <div style="color: #6272a4; margin-bottom: 12px;"># AWS S3 Sync — Activity Terminal  |  Read-Only Audit View</div>
                                         <div style="display: flex; gap: 12px; margin-bottom: 6px; border-bottom: 1px solid #2d2d44; padding-bottom: 6px;">
                                             <span style="color: #6272a4; min-width: 160px;">2026-05-13 07:44:12</span>
                                             <span style="background: #e6f4ea; color: #137333; padding: 1px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">SUCCESS</span>
                                             <span style="color: #8ab4f8;">UPLOAD</span>
-                                            <span style="color: #f8f8f2;">Sales Nextcloud / Odoo Root / Sales / SO0042 / invoice.pdf</span>
+                                            <span style="color: #f8f8f2;">Sales S3 Bucket / Odoo Root / Sales / SO0042 / invoice.pdf</span>
                                             <span style="color: #6272a4; margin-left: auto;">342ms</span>
                                         </div>
                                         <div style="display: flex; gap: 12px; margin-bottom: 6px; border-bottom: 1px solid #2d2d44; padding-bottom: 6px;">
                                             <span style="color: #6272a4; min-width: 160px;">2026-05-13 07:44:09</span>
                                             <span style="background: #fce8e6; color: #c5221f; padding: 1px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">FAILED</span>
                                             <span style="color: #8ab4f8;">UPLOAD</span>
-                                            <span style="color: #f8f8f2;">HR Nextcloud / Odoo Root / HR / EMP-0012 / contract.pdf</span>
+                                            <span style="color: #f8f8f2;">HR S3 Bucket / Odoo Root / HR / EMP-0012 / contract.pdf</span>
                                             <span style="color: #6272a4; margin-left: auto;">5021ms</span>
                                         </div>
                                         <div style="display: flex; gap: 12px; margin-bottom: 6px; border-bottom: 1px solid #2d2d44; padding-bottom: 6px;">
                                             <span style="color: #6272a4; min-width: 160px;">2026-05-13 07:43:55</span>
                                             <span style="background: #e6f4ea; color: #137333; padding: 1px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">SUCCESS</span>
                                             <span style="color: #ff79c6;">SHARE</span>
-                                            <span style="color: #f8f8f2;">Sales Nextcloud / Odoo Root / Sales / SO0040 / quote_v2.pdf</span>
+                                            <span style="color: #f8f8f2;">Sales S3 Bucket / Odoo Root / Sales / SO0040 / quote_v2.pdf</span>
                                             <span style="color: #6272a4; margin-left: auto;">198ms</span>
                                         </div>
                                         <div style="display: flex; gap: 12px;">
                                             <span style="color: #6272a4; min-width: 160px;">2026-05-13 07:43:30</span>
                                             <span style="background: #e6f4ea; color: #137333; padding: 1px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">SUCCESS</span>
                                             <span style="color: #ffb86c;">TRASH</span>
-                                            <span style="color: #f8f8f2;">Sales Nextcloud / Odoo Root / Sales / SO0039 / old_draft.docx</span>
+                                            <span style="color: #f8f8f2;">Sales S3 Bucket / Odoo Root / Sales / SO0039 / old_draft.docx</span>
                                             <span style="color: #6272a4; margin-left: auto;">87ms</span>
                                         </div>
                                     </div>
@@ -774,7 +774,7 @@
                                     <i class="fa fa-lightbulb-o" style="font-size: 32px; color: #fbbc04; flex-shrink: 0;"></i>
                                     <div>
                                         <strong style="color: #e8eaed; display: block; font-size: 16px; margin-bottom: 6px;">Pro Tip: Filtering Failed Syncs</strong>
-                                        <p style="color: #9aa0a6; font-size: 13px; line-height: 1.6; margin: 0;">Use the <strong style="color: #e8eaed;">Status</strong> filter in the list view to isolate all <strong style="color: #ea4335;">Failed</strong> operations instantly. Click any failed row to open its Diagnostic Form — it shows the exact Nextcloud API HTTP error code and message, allowing you to resolve the issue (expired token, quota exceeded, missing folder) without guesswork.</p>
+                                        <p style="color: #9aa0a6; font-size: 13px; line-height: 1.6; margin: 0;">Use the <strong style="color: #e8eaed;">Status</strong> filter in the list view to isolate all <strong style="color: #ea4335;">Failed</strong> operations instantly. Click any failed row to open its Diagnostic Form — it shows the exact AWS S3 error code and message, allowing you to resolve the issue (invalid credentials, quota exceeded, missing bucket) without guesswork.</p>
                                     </div>
                                 </div>
 
@@ -788,7 +788,7 @@
                                 <div style="background: linear-gradient(135deg, #fce8e6 0%, #fff8f7 100%); border-radius: 16px; padding: 48px; text-align: center; margin-bottom: 48px; border: 1px solid #f5c6c2;">
                                     <span style="display: inline-block; background: #ffffff; color: #ea4335; padding: 6px 16px; border-radius: 24px; font-size: 13px; font-weight: 700; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(234,67,53,0.15); letter-spacing: 1px; text-transform: uppercase;">Sync Routing Engine</span>
                                     <h2 style="font-size: 36px; font-weight: 800; color: #202124; margin-top: 0; margin-bottom: 20px; border: none; padding: 0;">Attachments Configuration</h2>
-                                    <p style="font-size: 18px; color: #5f6368; max-width: 800px; margin: 0 auto; line-height: 1.6;">Define exactly which Odoo models sync their attachments to Nextcloud and how they are stored. One configuration per model. Zero conflicts. Fully automated folder routing.</p>
+                                    <p style="font-size: 18px; color: #5f6368; max-width: 800px; margin: 0 auto; line-height: 1.6;">Define exactly which Odoo models sync their attachments to AWS S3 and how they are stored. One configuration per model. Zero conflicts. Fully automated S3 prefix routing.</p>
                                 </div>
 
                                 <!-- Why block -->
@@ -799,7 +799,7 @@
                                         </div>
                                         <div>
                                             <h3 style="font-size: 22px; margin: 0 0 12px 0; color: #202124; border: none; padding: 0;">How Attachment Routing Works</h3>
-                                            <p style="margin: 0; color: #5f6368; font-size: 15px; line-height: 1.7;">When an Odoo user attaches a file to a record (via chatter, direct upload, or the portal), the engine checks the Attachments Configuration table. If the record's model has an active configuration, the file is intercepted and routed to Nextcloud according to the assigned Storage Mode. A strict SQL unique constraint ensures only one configuration per model is ever active, preventing conflicting sync rules.</p>
+                                            <p style="margin: 0; color: #5f6368; font-size: 15px; line-height: 1.7;">When an Odoo user attaches a file to a record (via chatter, direct upload, or the portal), the engine checks the Attachments Configuration table. If the record's model has an active configuration, the file is intercepted and routed to AWS S3 according to the assigned Storage Mode. A strict SQL unique constraint ensures only one configuration per model is ever active, preventing conflicting sync rules.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -824,8 +824,8 @@
                                 <div class="gdd_pro_block" style="margin-bottom: 48px;">
                                     <h3 style="font-size: 22px; color: #202124; border-bottom: 2px solid #f1f3f4; padding-bottom: 12px; margin-bottom: 24px; display: flex; align-items: center; gap: 12px;"><i class="fa fa-database" style="color: #fbbc04;"></i> Storage Modes</h3>
                                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
-                                        <div style="background: #fff; border: 2px solid #34a853; border-radius: 12px; padding: 24px; position: relative; overflow: hidden;"><div style="position: absolute; top: 0; right: 0; background: #34a853; color: white; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 0 10px 0 8px;">RECOMMENDED</div><img src="/aws_odoo_integration_cloudaddons/static/src/img/aws.png" alt="Drive" style="width: 32px; height: 32px; object-fit: contain; margin-bottom: 12px;"/><h4 style="margin: 0 0 10px 0; color: #137333; font-size: 17px;">Nextcloud Only</h4><p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Files are uploaded to Nextcloud. Odoo stores a 0kb URL pointer. <strong>Reduces DB size by up to 90%.</strong> Best for high-volume models like Invoicing.</p></div>
-                                        <div style="background: #fff; border: 2px solid #fbbc04; border-radius: 12px; padding: 24px;"><i class="fa fa-copy" style="font-size: 26px; color: #fbbc04; margin-bottom: 12px;"></i><h4 style="margin: 0 0 10px 0; color: #e37400; font-size: 17px;">Dual Storage</h4><p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Binary stays in Odoo AND a copy is pushed to Nextcloud. <strong>Maximum redundancy.</strong> Ideal for compliance-sensitive models like Accounting.</p></div>
+                                        <div style="background: #fff; border: 2px solid #34a853; border-radius: 12px; padding: 24px; position: relative; overflow: hidden;"><div style="position: absolute; top: 0; right: 0; background: #34a853; color: white; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 0 10px 0 8px;">RECOMMENDED</div><img src="/aws_odoo_integration_cloudaddons/static/src/img/aws.png" alt="Drive" style="width: 32px; height: 32px; object-fit: contain; margin-bottom: 12px;"/><h4 style="margin: 0 0 10px 0; color: #137333; font-size: 17px;">AWS S3 Only</h4><p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Files are uploaded to AWS S3. Odoo stores a 0kb presigned URL pointer. <strong>Reduces DB size by up to 90%.</strong> Best for high-volume models like Invoicing.</p></div>
+                                        <div style="background: #fff; border: 2px solid #fbbc04; border-radius: 12px; padding: 24px;"><i class="fa fa-copy" style="font-size: 26px; color: #fbbc04; margin-bottom: 12px;"></i><h4 style="margin: 0 0 10px 0; color: #e37400; font-size: 17px;">Dual Storage</h4><p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Binary stays in Odoo AND a copy is pushed to AWS S3. <strong>Maximum redundancy.</strong> Ideal for compliance-sensitive models like Accounting.</p></div>
                                         <div style="background: #fff; border: 2px solid #e8eaed; border-radius: 12px; padding: 24px;"><i class="fa fa-ban" style="font-size: 26px; color: #9aa0a6; margin-bottom: 12px;"></i><h4 style="margin: 0 0 10px 0; color: #5f6368; font-size: 17px;">Odoo Only</h4><p style="font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6;">Sync is fully disabled for this model. Standard Odoo attachment behavior is preserved completely.</p></div>
                                     </div>
                                 </div>
@@ -833,7 +833,7 @@
                                 <!-- Folder Structure -->
                                 <div class="gdd_pro_block" style="margin-bottom: 48px;">
                                     <h3 style="font-size: 22px; color: #202124; border-bottom: 2px solid #f1f3f4; padding-bottom: 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px;"><i class="fa fa-sitemap" style="color: #7C4DFF;"></i> Auto-Generated Folder Structure</h3>
-                                    <p style="color: #5f6368; font-size: 14px; margin-bottom: 20px; line-height: 1.6;">For every synced model, the engine automatically creates a standardized 3-tier sub-folder hierarchy. Files are sorted by context — preventing a cluttered, unstructured Nextcloud.</p>
+                                    <p style="color: #5f6368; font-size: 14px; margin-bottom: 20px; line-height: 1.6;">For every synced model, the engine automatically creates a standardized 3-tier sub-folder hierarchy. Files are sorted by context — preventing a cluttered, unstructured S3 bucket.</p>
                                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
                                         <div style="background: #202124; border-radius: 10px; padding: 18px; font-family: monospace; font-size: 12px; color: #e8eaed;"><div style="color: #8ab4f8; font-weight: bold; margin-bottom: 8px;"><i class="fa fa-folder-open"></i> Sales (sale.order)</div><div style="padding-left: 16px;"><div style="color: #fbbc04;"><i class="fa fa-folder"></i> Customer Uploaded Files</div><div style="color: #9aa0a6; font-size: 11px; padding-left: 16px; margin-bottom: 4px;">// Portal &amp; chatter uploads</div><div style="color: #fbbc04;"><i class="fa fa-folder"></i> Requirement / Project Files</div><div style="color: #9aa0a6; font-size: 11px; padding-left: 16px; margin-bottom: 4px;">// Quotes, sales specs</div><div style="color: #fbbc04;"><i class="fa fa-folder"></i> Email Attachments</div><div style="color: #9aa0a6; font-size: 11px; padding-left: 16px;">// Incoming/outgoing emails</div></div></div>
 
@@ -858,8 +858,8 @@
                                     <h3 style="font-size: 22px; color: #202124; border-bottom: 2px solid #f1f3f4; padding-bottom: 12px; margin-bottom: 24px; display: flex; align-items: center; gap: 12px;"><i class="fa fa-shield" style="color: #ea4335;"></i> Engine Design Principles</h3>
                                     <div style="display: flex; flex-direction: column; gap: 14px;">
                                         <div style="background: #f8f9fa; border-left: 4px solid #1a73e8; border-radius: 6px; padding: 18px; display: flex; align-items: flex-start; gap: 16px;"><i class="fa fa-comments-o" style="color: #1a73e8; font-size: 20px; margin-top: 2px; flex-shrink: 0;"></i><div><strong style="color: #202124; display: block; margin-bottom: 4px;">Chatter Integration</strong><p style="margin: 0; color: #5f6368; font-size: 13px; line-height: 1.6;">The engine listens to <code>mail.message</code> records tied to configured models to intercept chatter attachments and route them to the <strong>Email Attachments</strong> sub-folder automatically.</p></div></div>
-                                        <div style="background: #f8f9fa; border-left: 4px solid #34a853; border-radius: 6px; padding: 18px; display: flex; align-items: flex-start; gap: 16px;"><i class="fa fa-clone" style="color: #34a853; font-size: 20px; margin-top: 2px; flex-shrink: 0;"></i><div><strong style="color: #202124; display: block; margin-bottom: 4px;">Deduplication Guard</strong><p style="margin: 0; color: #5f6368; font-size: 13px; line-height: 1.6;">A robust filtering mechanism ensures the same file is never uploaded twice. If a direct and a chatter attachment for the same file exist, only one copy is synced to Nextcloud.</p></div></div>
-                                        <div style="background: #f8f9fa; border-left: 4px solid #ea4335; border-radius: 6px; padding: 18px; display: flex; align-items: flex-start; gap: 16px;"><i class="fa fa-magic" style="color: #ea4335; font-size: 20px; margin-top: 2px; flex-shrink: 0;"></i><div><strong style="color: #202124; display: block; margin-bottom: 4px;">Ghost File Failsafe</strong><p style="margin: 0; color: #5f6368; font-size: 13px; line-height: 1.6;">Zero-byte URL pointers from "Nextcloud Only" mode are strictly excluded from re-upload cycles — preventing empty ghost files from polluting Nextcloud on subsequent syncs.</p></div></div>
+                                        <div style="background: #f8f9fa; border-left: 4px solid #34a853; border-radius: 6px; padding: 18px; display: flex; align-items: flex-start; gap: 16px;"><i class="fa fa-clone" style="color: #34a853; font-size: 20px; margin-top: 2px; flex-shrink: 0;"></i><div><strong style="color: #202124; display: block; margin-bottom: 4px;">Deduplication Guard</strong><p style="margin: 0; color: #5f6368; font-size: 13px; line-height: 1.6;">A robust filtering mechanism ensures the same file is never uploaded twice. If a direct and a chatter attachment for the same file exist, only one copy is synced to AWS S3.</p></div></div>
+                                        <div style="background: #f8f9fa; border-left: 4px solid #ea4335; border-radius: 6px; padding: 18px; display: flex; align-items: flex-start; gap: 16px;"><i class="fa fa-magic" style="color: #ea4335; font-size: 20px; margin-top: 2px; flex-shrink: 0;"></i><div><strong style="color: #202124; display: block; margin-bottom: 4px;">Ghost File Failsafe</strong><p style="margin: 0; color: #5f6368; font-size: 13px; line-height: 1.6;">Zero-byte URL pointers from "AWS S3 Only" mode are strictly excluded from re-upload cycles — preventing empty ghost files from polluting S3 on subsequent syncs.</p></div></div>
                                         <div style="background: #f8f9fa; border-left: 4px solid #7C4DFF; border-radius: 6px; padding: 18px; display: flex; align-items: flex-start; gap: 16px;"><i class="fa fa-lock" style="color: #7C4DFF; font-size: 20px; margin-top: 2px; flex-shrink: 0;"></i><div><strong style="color: #202124; display: block; margin-bottom: 4px;">Unique Model Constraint</strong><p style="margin: 0; color: #5f6368; font-size: 13px; line-height: 1.6;">A SQL <code>UNIQUE</code> constraint prevents duplicate configs. Attempting to create two active configurations for <code>sale.order</code> raises a validation error immediately.</p></div></div>
                                     </div>
                                 </div>
@@ -869,7 +869,7 @@
                                     <i class="fa fa-info-circle" style="font-size: 32px; color: #8ab4f8; flex-shrink: 0;"></i>
                                     <div>
                                         <strong style="color: #e8eaed; display: block; font-size: 16px; margin-bottom: 6px;">Extending to Custom Models</strong>
-                                        <p style="color: #9aa0a6; font-size: 13px; line-height: 1.6; margin: 0;">Beyond the 8 pre-configured models, you can add any custom Odoo model. Navigate to <strong style="color: #e8eaed;">Nextcloud &gt; Attachments Config</strong>, create a new record, select your model, choose a Storage Mode, and assign a Root Folder. The engine handles the rest automatically.</p>
+                                        <p style="color: #9aa0a6; font-size: 13px; line-height: 1.6; margin: 0;">Beyond the 8 pre-configured models, you can add any custom Odoo model. Navigate to <strong style="color: #e8eaed;">Cloud Storage &gt; Attachments Config</strong>, create a new record, select your model, choose a Storage Mode, and assign a Root Folder. The engine handles the rest automatically.</p>
                                     </div>
                                 </div>
 

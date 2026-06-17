@@ -4,7 +4,7 @@ import { Component, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 
-export class NextcloudDocumentation extends Component {
+export class AwsDocumentation extends Component {
     setup() {
         this.action = useService("action");
         this.state = useState({
@@ -23,6 +23,6 @@ export class NextcloudDocumentation extends Component {
     }
 }
 
-NextcloudDocumentation.template = "nextcloud_odoo_integration.Documentation";
+AwsDocumentation.template = "nextcloud_odoo_integration.Documentation";
 
-registry.category("actions").add("nextcloud_odoo_integration.documentation", NextcloudDocumentation);
+registry.category("actions").add("nextcloud_odoo_integration.documentation", AwsDocumentation);
