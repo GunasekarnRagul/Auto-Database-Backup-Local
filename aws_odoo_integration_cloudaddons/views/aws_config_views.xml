@@ -1,0 +1,239 @@
+<odoo>
+    <record id="nextcloud_root_folder_view_tree" model="ir.ui.view">
+        <field name="name">nextcloud.root.folder.view.tree</field>
+        <field name="model">nextcloud.root.folder</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <header>
+                    <button name="%(action_nextcloud_folder_wizard)d" string="Bulk Add Folders" type="action" class="btn-primary" icon="fa-plus-circle"/>
+                </header>
+                <field name="name" placeholder="e.g. Project Documents"/>
+                <field name="root_id" readonly="1" placeholder="Auto-generated Folder ID" optional="hide"/>
+                <field name="active" widget="boolean_toggle"/>
+                <button name="unlink" type="object" icon="fa-trash-o" title="Delete Root ID" string="Delete" class="btn-link text-danger"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="nextcloud_config_view_form" model="ir.ui.view">
+        <field name="name">nextcloud.config.view.form</field>
+        <field name="model">nextcloud.config</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_authenticate" string="Connect" type="object" class="btn-primary" invisible="is_connected"/>
+                    <button name="action_disconnect" string="Disconnect" type="object" class="btn-danger" invisible="not is_connected"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,connected"/>
+                    <field name="active" widget="boolean_toggle" invisible="1"/>
+                    <field name="is_connected" invisible="1"/>
+                    <field name="aws_access_key_id" invisible="1"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Local Drive"/></h1>
+                    </div>
+                    <group>
+                        <group name="general_settings" string="General Information">
+                            <field name="drive_type" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="active" widget="boolean_toggle" readonly="state != 'connected'"/>
+                            <field name="root_folder_count" invisible="not is_connected"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Connection Settings" name="connection_settings">
+                            <group string="AWS S3 Credentials">
+                                <field name="aws_access_key_id" string="AWS Access Key ID"
+                                       placeholder="Enter your AWS Access Key ID"
+                                       readonly="is_connected"/>
+                                <field name="aws_secret_access_key" string="AWS Secret Access Key" password="True"
+                                       placeholder="Enter your AWS Secret Access Key" readonly="is_connected"/>
+                                <field name="aws_region" string="AWS Region"
+                                       placeholder="Enter your AWS Region (e.g. us-east-1)"
+                                       readonly="is_connected"/>
+                                <field name="aws_s3_bucket_name" string="S3 Bucket Name"
+                                       placeholder="e.g. my-odoo-bucket"
+                                       readonly="is_connected"/>
+
+                                <div colspan="2" class="alert alert-info mt-3 mb-3" role="status" invisible="is_connected">
+                                    <div class="d-flex align-items-center mb-2 border-bottom pb-2">
+                                        <i class="fa fa-info-circle me-2" style="font-size: 1.2rem;"/>
+                                        <strong class="text-info">How to fill these fields:</strong>
+                                    </div>
+                                    <ul class="mb-0 ms-4">
+                                        <li class="mb-1"><strong>AWS Access Key ID</strong> — The access key ID from AWS IAM.</li>
+                                        <li class="mb-1"><strong>AWS Secret Access Key</strong> — The secret access key from AWS IAM.</li>
+                                        <li class="mb-1"><strong>AWS Region</strong> — The AWS region for your operations (e.g., us-east-1).</li>
+                                    </ul>
+                                </div>
+                                <div colspan="2" class="alert alert-success mt-3 mb-3" role="status" invisible="not is_connected">
+                                    <i class="fa fa-check-circle me-2"/>
+                                    <strong>Connected!</strong> Your AWS S3 credentials have been verified successfully.
+                                    Click <strong>Disconnect</strong> at the top to reset the connection.
+                                </div>
+                            </group>
+                            <group string="Folder Configuration">
+                                <div colspan="2" class="d-flex flex-column gap-3 p-3 bg-light rounded" invisible="not is_connected">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <button name="action_configure_roots" string="Configure Folders"
+                                                type="object" class="btn-primary w-50" icon="fa-folder-open"/>
+                                        <p class="mb-0 text-muted small"><i class="fa fa-info-circle me-1"/>Create or specify the names of existing folders on AWS S3.</p>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3" invisible="state != 'connected'">
+                                        <button name="action_sync_all" string="Root folder sync"
+                                                type="object" class="btn-outline-secondary w-50" icon="fa-refresh"/>
+                                        <p class="mb-0 text-muted small"><i class="fa fa-info-circle me-1"/>Synchronize All configured folders now.</p>
+                                    </div>
+                                </div>
+                                <div colspan="2" class="alert alert-warning" role="alert" invisible="is_connected">
+                                    <i class="fa fa-exclamation-triangle me-2"/> Please click <strong>Connect</strong> first to manage root folders and synchronize files.
+                                </div>
+                            </group>
+                            <group string="Sharing Settings">
+                                <field name="share_link_expiry_days"
+                                       string="Share Link Expiry (Days)"
+                                       help="How many days a shared presigned link stays valid. AWS S3 maximum is 7 days."/>
+                                <div colspan="2" class="alert alert-info" role="status">
+                                    <i class="fa fa-info-circle me-2"/>
+                                    AWS S3 presigned URLs expire after the set number of days <strong>(maximum 7 days)</strong>.
+                                    After expiry, the recipient must request a new link.
+                                </div>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="nextcloud_config_view_tree" model="ir.ui.view">
+        <field name="name">nextcloud.config.view.tree</field>
+        <field name="model">nextcloud.config</field>
+        <field name="arch" type="xml">
+            <list decoration-success="state == 'connected'" decoration-info="state == 'draft'">
+                <field name="name"/>
+                <field name="drive_type"/>
+                <field name="state" widget="badge" decoration-success="state == 'connected'" decoration-info="state == 'draft'"/>
+                <field name="active" widget="boolean_toggle" readonly="state != 'connected'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="nextcloud_config_view_kanban" model="ir.ui.view">
+        <field name="name">nextcloud.config.view.kanban</field>
+        <field name="model">nextcloud.config</field>
+        <field name="arch" type="xml">
+            <kanban class="o_cloud_kanban" sample="1" quick_create="false">
+                <field name="name"/>
+                <field name="drive_type"/>
+                <field name="state"/>
+                <field name="active"/>
+                <field name="root_folder_count"/>
+                <field name="readonly"/>
+                <field name="group_ids"/>
+                <field name="user_ids"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_global_click oe_kanban_card o_cloud_card">
+                            <!-- Left accent stripe -->
+                            <div t-attf-class="o_cloud_card_accent #{record.state.raw_value == 'connected' ? 'accent-success' : (record.state.raw_value == 'error' ? 'accent-danger' : 'accent-warning')}"/>
+
+                            <!-- Header: Icon + Title + 3-dot menu -->
+                            <div class="o_cloud_card_header">
+                                <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
+                                    <div class="o_cloud_card_icon">
+                                        <t>
+                                            <img src="/aws_odoo_integration_cloudaddons/static/src/img/aws.png" alt="Nextcloud" style="width: 36px; height: 36px;"/>
+                                        </t>
+                                        
+                                    </div>
+                                   <div class="min-w-0">
+                                        <div class="o_cloud_card_title text-truncate">
+                                            <field name="name"/>
+                                        </div>
+                                        <div class="o_cloud_card_subtitle">
+                                            <i class="fa fa-lock me-1"/> AWS S3 Credentials
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 3-dot dropdown menu -->
+                                <div class="o_cloud_card_menu o_dropdown_kanban dropdown">
+                                    <a class="dropdown-toggle o-no-caret" role="button" data-bs-toggle="dropdown" href="#">
+                                        <i class="fa fa-ellipsis-v" title="Actions"/>
+                                    </a>
+                                    <div class="dropdown-menu dropdown-menu-end" role="menu">
+                                        <a role="menuitem" type="edit" class="dropdown-item">
+                                            <i class="fa fa-pencil me-2 text-primary"/>Edit
+                                        </a>
+                                        <a role="menuitem" type="delete" class="dropdown-item text-danger">
+                                            <i class="fa fa-trash-o me-2"/>Delete
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Driver tag -->
+                            <div style="padding: 6px 16px 0 20px;">
+                                <span class="o_cloud_drive_tag" style="white-space: nowrap;">
+                                    <i class="fa fa-hdd-o"/> Driver : <field name="drive_type"/>
+                                </span>
+                            </div>
+
+                            <!-- Details section: Counts -->
+                            <div class="o_cloud_card_details pt-2 border-top mx-3" style="font-size: 11px; color: #666;">
+                                <div class="d-flex justify-content-between">
+                                    <span><i class="fa fa-folder-open-o me-1"/> Folders Synced:</span>
+                                    <span class="fw-bold text-dark"><field name="root_folder_count"/></span>
+                                </div>
+                            </div>
+
+
+                            <!-- Footer: Status badge + Toggle -->
+                            <div class="o_cloud_card_footer">
+                                <span t-if="record.state.raw_value == 'connected'" class="o_cloud_status_badge badge-connected">
+                                    <i class="fa fa-check-circle"/>Connected
+                                </span>
+                                <span t-if="record.state.raw_value == 'draft'" class="o_cloud_status_badge badge-draft">
+                                    <i class="fa fa-clock-o"/>Pending Setup
+                                </span>
+                                <span t-if="record.state.raw_value == 'error'" class="o_cloud_status_badge badge-error">
+                                    <i class="fa fa-times-circle"/>Error
+                                </span>
+                                <field name="active" widget="boolean_toggle" readonly="state != 'connected'"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="nextcloud_config_view_search" model="ir.ui.view">
+        <field name="name">nextcloud.config.view.search</field>
+        <field name="model">nextcloud.config</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="drive_type"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="nextcloud_config_action" model="ir.actions.act_window">
+        <field name="name">AWS Storage Connector</field>
+        <field name="res_model">nextcloud.config</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="nextcloud_config_view_search"/>
+        <field name="context">{'active_test': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure your first Cloud Storage!
+            </p>
+            <p>
+                Connect Odoo with AWS S3 to synchronize your documents seamlessly.
+            </p>
+        </field>
+    </record>
+
+</odoo>
