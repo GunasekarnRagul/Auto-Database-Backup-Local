@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Attachment Config Kanban -->
+    <record id="cloud_attachment_config_view_kanban" model="ir.ui.view">
+        <field name="name">cloud.attachment.config.view.kanban</field>
+        <field name="model">cloud.attachment.config</field>
+        <field name="arch" type="xml">
+            <kanban quick_create="false">
+                <field name="name"/>
+                <field name="module_config_id"/>
+                <field name="cloud_provider_id"/>
+                <field name="provider_type"/>
+                <field name="state"/>
+                <field name="storage_mode"/>
+                <field name="synced_attachment_count"/>
+                <field name="unsynced_attachment_count"/>
+                <field name="sync_percentage"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_global_click">
+                            <strong><field name="name"/></strong>
+                            <div class="text-muted small">
+                                <field name="cloud_provider_id"/> (<field name="provider_type"/>)
+                            </div>
+                            <div class="mt-2">
+                                <span class="badge bg-success me-1"><field name="synced_attachment_count"/> synced</span>
+                                <span class="badge bg-warning"><field name="unsynced_attachment_count"/> pending</span>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Attachment Config Form -->
+    <record id="cloud_attachment_config_view_form" model="ir.ui.view">
+        <field name="name">cloud.attachment.config.view.form</field>
+        <field name="model">cloud.attachment.config</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_manual_drive_sync" string="Sync Now" type="object" class="btn-primary" icon="fa-refresh"/>
+                    <button name="action_pause_config" string="Pause" type="object" class="btn-warning"
+                            invisible="state != 'active'"/>
+                    <button name="action_activate_config" string="Activate" type="object" class="btn-success"
+                            invisible="state == 'active'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,active,paused"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="e.g. Sales Orders Sync"/></h1>
+                    </div>
+                    <group>
+                        <group string="Step 1 — Odoo Module">
+                            <field name="module_config_id"
+                                   domain="[('id','not in',existing_module_ids),('is_enabled','=',True)]"/>
+                            <field name="model_name" readonly="1"/>
+                            <field name="existing_module_ids" invisible="1"/>
+                        </group>
+                        <group string="Step 2 — Cloud Provider">
+                            <field name="cloud_provider_id"
+                                   domain="[('state','=','connected')]"
+                                   options="{'no_create': True}"/>
+                            <field name="provider_type" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Step 3 — Destination Folder">
+                            <field name="cloud_folder_id"
+                                   domain="[('file_type','=','folder'),('drive_config_id','=',cloud_provider_id)]"
+                                   options="{'no_create': True}"/>
+                            <field name="folder_path" readonly="1" string="Full Path"/>
+                        </group>
+                        <group string="Step 4 — Sync Settings">
+                            <field name="file_type"/>
+                            <field name="storage_mode"/>
+                            <field name="auto_sync_mode" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <group string="Statistics" invisible="state == 'draft'">
+                        <group>
+                            <field name="synced_attachment_count" string="Synced"/>
+                            <field name="unsynced_attachment_count" string="Pending Sync"/>
+                            <field name="dual_attachment_count" string="Dual Sync"/>
+                            <field name="drive_only_attachment_count" string="Drive Only"/>
+                        </group>
+                        <group>
+                            <field name="sync_percentage" string="Sync %" widget="progressbar"/>
+                            <field name="model_attachment_count" string="Total Attachments"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="cloud_attachment_config_view_list" model="ir.ui.view">
+        <field name="name">cloud.attachment.config.view.list</field>
+        <field name="model">cloud.attachment.config</field>
+        <field name="arch" type="xml">
+            <list decoration-success="state == 'active'" decoration-muted="state == 'paused'">
+                <field name="name"/>
+                <field name="module_config_id"/>
+                <field name="cloud_provider_id"/>
+                <field name="provider_type" widget="badge"/>
+                <field name="storage_mode" widget="badge"/>
+                <field name="sync_percentage" widget="progressbar"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'active'"
+                       decoration-warning="state == 'paused'"
+                       decoration-info="state == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="cloud_attachment_config_action" model="ir.actions.act_window">
+        <field name="name">Attachment Sync Rules</field>
+        <field name="res_model">cloud.attachment.config</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Set up your first Attachment Sync Rule!
+            </p>
+            <p>
+                Choose an Odoo module, a cloud provider, and a destination folder to auto-sync attachments.
+            </p>
+        </field>
+    </record>
+</odoo>

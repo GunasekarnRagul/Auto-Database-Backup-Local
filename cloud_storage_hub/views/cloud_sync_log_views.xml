@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ═══ LIST VIEW ═══════════════════════════════════════════════════════ -->
+    <record id="cloud_sync_log_view_list" model="ir.ui.view">
+        <field name="name">cloud.sync.log.view.list</field>
+        <field name="model">cloud.sync.log</field>
+        <field name="arch" type="xml">
+            <list decoration-danger="state == 'fail'"
+                  decoration-success="state == 'success'"
+                  default_order="create_date desc">
+                <field name="create_date" string="Time"/>
+                <field name="user_name" string="User"/>
+                <field name="provider_type" widget="badge"
+                       decoration-info="provider_type == 'gdrive'"
+                       decoration-warning="provider_type == 'aws'"
+                       decoration-primary="provider_type == 'onedrive'"/>
+                <field name="drive_name"/>
+                <field name="file_type" widget="badge" optional="show"/>
+                <field name="file_name" string="File / Folder"/>
+                <field name="operation" widget="badge"
+                       decoration-info="operation in ('upload','create_folder')"
+                       decoration-danger="operation in ('delete','trash')"
+                       decoration-warning="operation == 'rename'"
+                       decoration-success="operation == 'sync'"/>
+                <field name="sync_type" optional="show"/>
+                <field name="sync_details" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'success'"
+                       decoration-danger="state == 'fail'"/>
+                <field name="duration" optional="hide" string="Duration (s)"/>
+                <field name="error_message" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ═══ FORM VIEW ═══════════════════════════════════════════════════════ -->
+    <record id="cloud_sync_log_view_form" model="ir.ui.view">
+        <field name="name">cloud.sync.log.view.form</field>
+        <field name="model">cloud.sync.log</field>
+        <field name="arch" type="xml">
+            <form string="Activity Log Entry" create="false" edit="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="operation" readonly="1"/>
+                            — <field name="file_name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Provider">
+                            <field name="drive_config_id" readonly="1"/>
+                            <field name="provider_type" readonly="1" widget="badge"/>
+                            <field name="drive_name" readonly="1"/>
+                        </group>
+                        <group string="Status">
+                            <field name="state" readonly="1" widget="badge"
+                                   decoration-success="state == 'success'"
+                                   decoration-danger="state == 'fail'"/>
+                            <field name="sync_type" readonly="1"/>
+                            <field name="duration" readonly="1" string="Duration (s)"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="File Info">
+                            <field name="file_type" readonly="1"/>
+                            <field name="file_name" readonly="1"/>
+                            <field name="root_folder_name" readonly="1"/>
+                            <field name="folder_path" readonly="1"/>
+                            <field name="cloud_file_id" readonly="1"/>
+                            <field name="file_size" readonly="1"/>
+                        </group>
+                        <group string="User">
+                            <field name="user_id" readonly="1"/>
+                            <field name="user_name" readonly="1"/>
+                            <field name="create_date" readonly="1" string="Timestamp"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Details">
+                            <field name="sync_details" readonly="1" widget="text"
+                                   placeholder="Sync details..."/>
+                        </page>
+                        <page string="Error" invisible="state != 'fail'">
+                            <field name="error_message" readonly="1" widget="text"
+                                   placeholder="No error recorded."/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ═══ SEARCH VIEW ══════════════════════════════════════════════════════ -->
+    <record id="cloud_sync_log_view_search" model="ir.ui.view">
+        <field name="name">cloud.sync.log.view.search</field>
+        <field name="model">cloud.sync.log</field>
+        <field name="arch" type="xml">
+            <search string="Search Activity Log">
+                <field name="file_name" string="File / Folder"/>
+                <field name="drive_name" string="Provider Name"/>
+                <field name="user_name" string="User"/>
+
+                <!-- Status -->
+                <filter string="Success" domain="[('state','=','success')]" name="success"/>
+                <filter string="Failed"  domain="[('state','=','fail')]"    name="failed"/>
+                <separator/>
+
+                <!-- Time -->
+                <filter string="Today" domain="[('create_date','>=',context_today().strftime('%Y-%m-%d'))]" name="today"/>
+                <separator/>
+
+                <!-- Operations -->
+                <filter string="Create Folder" domain="[('operation','=','create_folder')]" name="op_create_folder"/>
+                <filter string="Upload"        domain="[('operation','=','upload')]"        name="op_upload"/>
+                <filter string="Rename"        domain="[('operation','=','rename')]"        name="op_rename"/>
+                <filter string="Delete"        domain="[('operation','=','delete')]"        name="op_delete"/>
+                <filter string="Trash"         domain="[('operation','=','trash')]"         name="op_trash"/>
+                <filter string="Move"          domain="[('operation','=','move')]"          name="op_move"/>
+                <filter string="Sync"          domain="[('operation','=','sync')]"          name="op_sync"/>
+                <filter string="Download"      domain="[('operation','=','download')]"      name="op_download"/>
+                <separator/>
+
+                <!-- Providers -->
+                <filter string="AWS S3"       domain="[('provider_type','=','aws')]"       name="aws"/>
+                <filter string="Google Drive" domain="[('provider_type','=','gdrive')]"    name="gdrive"/>
+                <filter string="OneDrive"     domain="[('provider_type','=','onedrive')]"  name="onedrive"/>
+                <filter string="Nextcloud"    domain="[('provider_type','=','nextcloud')]" name="nextcloud"/>
+                <filter string="Dropbox"      domain="[('provider_type','=','dropbox')]"   name="dropbox"/>
+
+                <!-- Group By -->
+                <group>
+                    <filter string="Provider"  name="grp_provider"  domain="[]" context="{'group_by': 'provider_type'}"/>
+                    <filter string="Operation" name="grp_operation" domain="[]" context="{'group_by': 'operation'}"/>
+                    <filter string="Status"    name="grp_state"     domain="[]" context="{'group_by': 'state'}"/>
+                    <filter string="User"      name="grp_user"      domain="[]" context="{'group_by': 'user_id'}"/>
+                    <filter string="Date"      name="grp_date"      domain="[]" context="{'group_by': 'create_date:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+
+    <!-- ═══ WINDOW ACTION ════════════════════════════════════════════════════ -->
+    <record id="cloud_sync_log_action" model="ir.actions.act_window">
+        <field name="name">Activity Log</field>
+        <field name="res_model">cloud.sync.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="cloud_sync_log_view_search"/>
+        <field name="context">{"search_default_today": 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No activity recorded yet.
+            </p>
+            <p>Every file operation (create folder, upload, rename, delete, move, share, sync)
+               is automatically recorded here for a full audit trail.</p>
+        </field>
+    </record>
+</odoo>

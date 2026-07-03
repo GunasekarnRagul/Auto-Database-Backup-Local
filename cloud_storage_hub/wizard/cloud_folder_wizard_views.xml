@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Wizard views -->
+    <record id="cloud_folder_wizard_view_form" model="ir.ui.view">
+        <field name="name">cloud.folder.wizard.form</field>
+        <field name="model">cloud.folder.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Bulk Add Folders">
+                <sheet>
+                    <group>
+                        <field name="config_id"/>
+                    </group>
+                    <field name="line_ids">
+                        <list editable="bottom">
+                            <field name="name"/>
+                            <field name="remote_id" optional="hide"/>
+                            <field name="selected"/>
+                        </list>
+                    </field>
+                </sheet>
+                <footer>
+                    <button name="action_apply" string="Add Selected" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cloud_folder_wizard" model="ir.actions.act_window">
+        <field name="name">Bulk Add Folders</field>
+        <field name="res_model">cloud.folder.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

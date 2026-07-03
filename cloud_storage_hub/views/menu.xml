@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Root menu -->
+    <menuitem id="menu_cloud_hub_root"
+              name="Cloud Storage Hub"
+              sequence="80"
+              web_icon="cloud_storage_hub,static/description/main_screenshot.png"/>
+
+    <!-- Dashboard -->
+    <menuitem id="menu_cloud_hub_dashboard"
+              name="Dashboard"
+              parent="menu_cloud_hub_root"
+              action="action_cloud_hub_dashboard"
+              sequence="10"/>
+
+    <!-- File Explorer -->
+    <menuitem id="menu_cloud_hub_file_explorer"
+              name="File Explorer"
+              parent="menu_cloud_hub_root"
+              action="action_cloud_hub_file_explorer"
+              sequence="20"/>
+
+    <!-- Configuration submenu -->
+    <menuitem id="menu_cloud_hub_config"
+              name="Configuration"
+              parent="menu_cloud_hub_root"
+              sequence="30"/>
+
+    <!-- Inside Configuration -->
+    <menuitem id="menu_cloud_hub_providers"
+              name="Cloud Providers"
+              parent="menu_cloud_hub_config"
+              action="cloud_provider_config_action"
+              sequence="10"/>
+
+    <menuitem id="menu_cloud_hub_attachment_sync"
+              name="Attachment Sync Rules"
+              parent="menu_cloud_hub_config"
+              action="cloud_attachment_config_action"
+              sequence="20"/>
+
+    <menuitem id="menu_cloud_hub_sync_log"
+              name="Activity Log"
+              parent="menu_cloud_hub_config"
+              action="action_cloud_hub_sync_log_terminal"
+              sequence="30"/>
+
+    <menuitem id="menu_cloud_hub_model_config"
+              name="Module Configurations"
+              parent="menu_cloud_hub_config"
+              action="cloud_model_config_action"
+              sequence="40"/>
+
+    <menuitem id="menu_cloud_hub_cloud_files"
+              name="Synced Files"
+              parent="menu_cloud_hub_config"
+              action="cloud_file_action"
+              sequence="50"/>
+
+    <!-- Documentation -->
+    <menuitem id="menu_cloud_hub_documentation"
+              name="Documentation"
+              parent="menu_cloud_hub_root"
+              action="action_cloud_hub_documentation"
+              sequence="40"/>
+</odoo>

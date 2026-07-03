@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List/Form views for cloud.file -->
+    <record id="cloud_file_view_list" model="ir.ui.view">
+        <field name="name">cloud.file.view.list</field>
+        <field name="model">cloud.file</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="file_type" widget="badge"/>
+                <field name="drive_config_id"/>
+                <field name="provider_type" widget="badge" optional="show"/>
+                <field name="file_size_fmt" string="Size"/>
+                <field name="sync_state" widget="badge"
+                       decoration-success="sync_state == 'synced'"
+                       decoration-warning="sync_state == 'pending'"
+                       decoration-danger="sync_state == 'error'"/>
+                <field name="cloud_url" widget="url" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="cloud_file_view_form" model="ir.ui.view">
+        <field name="name">cloud.file.view.form</field>
+        <field name="model">cloud.file</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="file_type"/>
+                            <field name="drive_config_id"/>
+                            <field name="provider_type"/>
+                            <field name="sync_state"/>
+                        </group>
+                        <group>
+                            <field name="file_size_fmt" string="File Size"/>
+                            <field name="mime_type"/>
+                            <field name="cloud_url" widget="url"/>
+                            <field name="cloud_file_id" string="Remote ID"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="cloud_file_action" model="ir.actions.act_window">
+        <field name="name">Cloud Files</field>
+        <field name="res_model">cloud.file</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

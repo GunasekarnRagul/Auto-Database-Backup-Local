@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ir_attachment_form_cloud" model="ir.ui.view">
+        <field name="name">ir.attachment.form.cloud</field>
+        <field name="model">ir.attachment</field>
+        <field name="inherit_id" ref="base.view_attachment_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[2]" position="after">
+                <group string="Cloud Storage" invisible="not cloud_file_id">
+                    <field name="cloud_file_id"/>
+                    <field name="cloud_url" widget="url" string="Cloud URL"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
