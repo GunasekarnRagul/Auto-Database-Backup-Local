@@ -1,8 +1,0 @@
-*.pyc
-*.pyo
-__pycache__/
-.DS_Store
-.idea/
-.vscode/
-*.log
-.odoo-backup/
