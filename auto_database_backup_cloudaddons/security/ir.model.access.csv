@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_auto_backup_config_admin,auto.backup.config (Admin),auto_database_backup.model_auto_backup_config,base.group_system,1,1,1,1
+access_auto_backup_config_user,auto.backup.config (User),auto_database_backup.model_auto_backup_config,base.group_user,1,0,0,0
+access_auto_backup_history_admin,auto.backup.history (Admin),auto_database_backup.model_auto_backup_history,base.group_system,1,1,1,1
+access_auto_backup_history_user,auto.backup.history (User),auto_database_backup.model_auto_backup_history,base.group_user,1,0,0,0
