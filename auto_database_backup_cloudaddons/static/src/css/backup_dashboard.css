@@ -1,0 +1,19 @@
+/* ============================================================
+   Auto Database Backup — Backend CSS
+   ============================================================ */
+
+/* Status badge colours */
+.badge.text-bg-success { background: #28a745 !important; }
+.badge.text-bg-danger  { background: #dc3545 !important; }
+.badge.text-bg-info    { background: #17a2b8 !important; }
+
+/* Config form — path field hint box */
+.o_field_widget[name="backup_path"] .o_field_char {
+    font-family: monospace;
+    font-size: 0.92rem;
+}
+
+/* History list — colour row by status */
+.o_list_table tr.text-success td { background: #f0fff4 !important; }
+.o_list_table tr.text-danger  td { background: #fff5f5 !important; }
+.o_list_table tr.text-info    td { background: #f0faff !important; }

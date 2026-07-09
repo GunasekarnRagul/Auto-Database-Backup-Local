@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ─── Backup History: Form View ────────────────────────────────────────── -->
+    <record id="view_auto_backup_history_form" model="ir.ui.view">
+        <field name="name">auto.backup.history.form</field>
+        <field name="model">auto.backup.history</field>
+        <field name="arch" type="xml">
+            <form string="Backup History Entry" create="false">
+                <header>
+                    <button name="action_download_backup"
+                            string="Download File"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-download"
+                            invisible="not file_exists"/>
+                    <button name="action_delete_backup_file"
+                            string="Delete File from Disk"
+                            type="object"
+                            class="btn-danger"
+                            confirm="This will permanently delete the backup file from disk. Continue?"
+                            invisible="not file_exists"/>
+                    <field name="status" widget="statusbar"
+                           statusbar_visible="running,success,failed"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Backup Details">
+                            <field name="config_id" readonly="1"/>
+                            <field name="backup_date" readonly="1"/>
+                            <field name="database_name" readonly="1"/>
+                            <field name="backup_format" readonly="1"/>
+                        </group>
+                        <group string="Result">
+                            <field name="status" readonly="1" widget="badge"
+                                   decoration-success="status == 'success'"
+                                   decoration-danger="status == 'failed'"
+                                   decoration-info="status == 'running'"/>
+                            <field name="size_mb" readonly="1"/>
+                            <field name="duration_seconds" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="File Location">
+                        <field name="backup_path" readonly="1"/>
+                        <field name="filename" readonly="1"/>
+                        <field name="full_path" readonly="1" string="Full Path"/>
+                        <field name="file_exists" readonly="1" widget="boolean"
+                               string="File on Disk"/>
+                    </group>
+                    <group string="Notes / Error">
+                        <field name="notes" readonly="1" nolabel="1" colspan="2"/>
+                    </group>
+
+
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ─── Backup History: List View ────────────────────────────────────────── -->
+    <record id="view_auto_backup_history_list" model="ir.ui.view">
+        <field name="name">auto.backup.history.list</field>
+        <field name="model">auto.backup.history</field>
+        <field name="arch" type="xml">
+            <list string="Backup History" create="false">
+                <field name="backup_date"/>
+                <field name="config_id" string="Configuration"/>
+                <field name="database_name"/>
+                <field name="filename"/>
+                <field name="backup_format"/>
+                <field name="size_mb" string="Size (MB)"/>
+                <field name="duration_seconds" string="Duration (s)"/>
+                <field name="status"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ─── Backup History: Search View ──────────────────────────────────────── -->
+    <record id="view_auto_backup_history_search" model="ir.ui.view">
+        <field name="name">auto.backup.history.search</field>
+        <field name="model">auto.backup.history</field>
+        <field name="arch" type="xml">
+            <search string="Search Backup History">
+                <field name="database_name"/>
+                <field name="filename"/>
+                <field name="config_id"/>
+                <filter string="Successful" name="success"
+                        domain="[('status','=','success')]"/>
+                <filter string="Failed" name="failed"
+                        domain="[('status','=','failed')]"/>
+                <filter string="Running" name="running"
+                        domain="[('status','=','running')]"/>
+                <group name="group_by">
+                    <filter string="Status" name="group_status"
+                            context="{'group_by': 'status'}"/>
+                    <filter string="Configuration" name="group_config"
+                            context="{'group_by': 'config_id'}"/>
+                    <filter string="Database" name="group_db"
+                            context="{'group_by': 'database_name'}"/>
+                    <filter string="Date" name="group_date"
+                            context="{'group_by': 'backup_date:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ─── Action: Backup History ───────────────────────────────────────────── -->
+    <record id="action_auto_backup_history" model="ir.actions.act_window">
+        <field name="name">Backup History</field>
+        <field name="res_model">auto.backup.history</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_auto_backup_history_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No backup history yet</p>
+            <p>Run a backup from the Backup Configurations menu to see history here.</p>
+        </field>
+    </record>
+
+</odoo>

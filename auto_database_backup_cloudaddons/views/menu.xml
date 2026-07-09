@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ─── Root Menu ─────────────────────────────────────────────────────────── -->
+    <menuitem id="menu_auto_backup_root"
+              name="DB Backup"
+              sequence="90"
+              web_icon="auto_database_backup_cloudaddons,static/description/icon.png"
+              groups="base.group_system"/>
+
+    <!-- ─── Sub-menus ─────────────────────────────────────────────────────────── -->
+    <menuitem id="menu_auto_backup_config"
+              name="Backup Configurations"
+              parent="menu_auto_backup_root"
+              action="action_auto_backup_config"
+              sequence="10"
+              groups="base.group_system"/>
+
+    <menuitem id="menu_auto_backup_history"
+              name="Backup History"
+              parent="menu_auto_backup_root"
+              action="action_auto_backup_history"
+              sequence="20"
+              groups="base.group_system"/>
+
+    <!-- ─── Cloud Providers promo ─────────────────────────────────────────── -->
+    <menuitem id="menu_auto_backup_upgrade"
+              name="☁️ Cloud Backup Providers"
+              parent="menu_auto_backup_root"
+              action="action_auto_backup_upgrade_page"
+              sequence="90"
+              groups="base.group_system"/>
+
+</odoo>
