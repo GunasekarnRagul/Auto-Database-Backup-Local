@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ─── Backup Config: Form View ─────────────────────────────────────────── -->
+    <record id="view_auto_backup_config_form" model="ir.ui.view">
+        <field name="name">auto.backup.config.form</field>
+        <field name="model">auto.backup.config</field>
+        <field name="arch" type="xml">
+            <form string="Backup Configuration">
+                <header>
+                    <button name="action_run_backup_now"
+                            string="Run Backup Now"
+                            type="object"
+                            class="btn-primary"
+                            confirm="This will start a backup immediately. Continue?"/>
+                    <button name="action_test_backup_path"
+                            string="Test Path"
+                            type="object"
+                            class="btn-secondary"/>
+                    <button name="action_toggle_pause"
+                            string="Pause / Resume"
+                            type="object"
+                            class="btn-secondary"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,running,paused"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_history"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-history">
+                            <field name="total_backups" widget="statinfo" string="Backups"/>
+                        </button>
+                    </div>
+
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Configuration Name…"/>
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group string="General">
+                            <field name="active" widget="boolean_toggle"/>
+                            <field name="database_name"
+                                   placeholder="e.g. my_odoo_db"/>
+                            <field name="backup_format"/>
+                            <field name="backup_frequency"/>
+                        </group>
+                        <group string="Last Run">
+                            <field name="last_backup_date" readonly="1"/>
+                            <field name="last_backup_status" readonly="1"
+                                   widget="badge"
+                                   decoration-success="last_backup_status == 'success'"
+                                   decoration-danger="last_backup_status == 'failed'"/>
+                            <field name="disk_usage_mb" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <group string="Storage Path">
+                        <field name="backup_path"
+                               placeholder="/var/odoo/backups  or  /mnt/nas/odoo-backups"
+                               colspan="2"/>
+                        <div colspan="2" class="text-muted small">
+                            Specify an absolute path on the server.
+                            This can be a local directory or any network-mounted drive (NFS, SMB/CIFS, etc.).
+                            Make sure the Odoo process has write permission on this path.
+                        </div>
+                    </group>
+
+                    <group string="Retention Policy">
+                        <field name="retention_enabled" widget="boolean_toggle"/>
+                        <field name="retention_days"
+                               invisible="not retention_enabled"
+                               required="retention_enabled"/>
+                    </group>
+
+                    <group string="Failure Notifications">
+                        <field name="notify_on_failure" widget="boolean_toggle"/>
+                        <field name="notify_email"
+                               placeholder="admin@yourcompany.com (leave blank for admin email)"
+                               invisible="not notify_on_failure"/>
+                    </group>
+
+                    <notebook>
+                        <page string="Backup History" name="history">
+                            <field name="history_ids" readonly="1"
+                                   context="{'default_config_id': id}">
+                                <tree decoration-success="status == 'success'"
+                                      decoration-danger="status == 'failed'"
+                                      decoration-muted="status == 'running'"
+                                      limit="20">
+                                    <field name="backup_date"/>
+                                    <field name="filename"/>
+                                    <field name="size_mb" string="Size (MB)"/>
+                                    <field name="duration_seconds" string="Duration (s)"/>
+                                    <field name="status" widget="badge"
+                                           decoration-success="status == 'success'"
+                                           decoration-danger="status == 'failed'"
+                                           decoration-info="status == 'running'"/>
+                                    <field name="notes"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ─── Backup Config: List View ─────────────────────────────────────────── -->
+    <record id="view_auto_backup_config_list" model="ir.ui.view">
+        <field name="name">auto.backup.config.list</field>
+        <field name="model">auto.backup.config</field>
+        <field name="arch" type="xml">
+            <tree string="Backup Configurations">
+                <field name="name"/>
+                <field name="database_name"/>
+                <field name="backup_path"/>
+                <field name="backup_format"/>
+                <field name="backup_frequency"/>
+                <field name="state"/>
+                <field name="last_backup_date"/>
+                <field name="last_backup_status"/>
+                <field name="total_backups" string="# Backups"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- ─── Backup Config: Search View ───────────────────────────────────────── -->
+    <record id="view_auto_backup_config_search" model="ir.ui.view">
+        <field name="name">auto.backup.config.search</field>
+        <field name="model">auto.backup.config</field>
+        <field name="arch" type="xml">
+            <search string="Search Backup Configurations">
+                <field name="name"/>
+                <field name="database_name"/>
+                <filter string="Active" name="active" domain="[('active','=',True)]"/>
+                <filter string="Paused" name="paused" domain="[('state','=','paused')]"/>
+                <filter string="Running" name="running" domain="[('state','=','running')]"/>
+                <group name="group_by">
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Format" name="group_format" context="{'group_by': 'backup_format'}"/>
+                    <filter string="Frequency" name="group_freq" context="{'group_by': 'backup_frequency'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ─── Action: Backup Configurations ────────────────────────────────────── -->
+    <record id="action_auto_backup_config" model="ir.actions.act_window">
+        <field name="name">Backup Configurations</field>
+        <field name="res_model">auto.backup.config</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_auto_backup_config_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first backup configuration
+            </p>
+            <p>
+                Configure a backup job to automatically save your Odoo database
+                to a local folder or a network-mounted drive.
+            </p>
+        </field>
+    </record>
+
+</odoo>
