@@ -25,6 +25,7 @@
     'author': 'CloudAddons Technologies',
     'support': 'cloudaddonstechnologies@gmail.com',
     'depends': ['base', 'mail'],
+    'images': ['static/description/main_screenshot.png'],
     'data': [
         'security/ir.model.access.csv',
         'data/cron_backup.xml',
